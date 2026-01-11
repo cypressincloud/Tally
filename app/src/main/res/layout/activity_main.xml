@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/app_yellow"> <!-- 关键点1：根布局设为黄色 -->
+
+    <!-- 中间的内容容器 -->
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/nav_host_fragment"
+        android:name="androidx.navigation.fragment.NavHostFragment"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/white"
+        app:defaultNavHost="true"
+        app:navGraph="@navigation/nav_graph" />
+    <!-- 关键点2：容器设为白色 (防止黄色背景透到底下的记账页面) -->
+
+    <!-- 底部导航栏 -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/app_yellow"
+
+        app:menu="@menu/bottom_menu"
+        app:labelVisibilityMode="labeled"
+
+        app:itemIconTint="@color/selector_bottom_nav"
+        app:itemTextColor="@color/selector_bottom_nav"
+        app:itemActiveIndicatorStyle="@style/TransparentIndicator" />
+
+</LinearLayout>

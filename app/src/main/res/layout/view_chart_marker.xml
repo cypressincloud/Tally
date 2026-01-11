@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    app:cardBackgroundColor="@color/marker_bg"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="4dp"
+    app:contentPadding="12dp">
+    <!-- 背景设为浅灰 #F5F5F5，避免白色背景下黄色文字看不清 -->
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 1. 日期 (黑色) -->
+        <TextView
+            android:id="@+id/tv_marker_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="1月15日"
+            android:textColor="@color/black_marker"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+
+        <!-- 2. 收入 (红色) -->
+        <TextView
+            android:id="@+id/tv_marker_income"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="收入: +0"
+            android:textColor="@color/income_red"
+            android:textSize="12sp"/>
+
+        <!-- 3. 支出 (绿色) -->
+        <TextView
+            android:id="@+id/tv_marker_expense"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="支出: -0"
+            android:textColor="@color/expense_green"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp"/>
+
+        <!-- 分割线 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#DDDDDD"
+            android:layout_marginVertical="4dp"/>
+
+        <!-- 4. 净收支 (黄色 - 为了看清建议用深一点的黄或者背景色衬托) -->
+        <TextView
+            android:id="@+id/tv_marker_net"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="净收支: 0"
+            android:textColor="#FBC02D"
+            android:textStyle="bold"
+            android:textSize="12sp"/>
+        <!-- 这里直接写死一个稍深的黄色 #FBC02D，
+             因为纯亮黄在浅色背景下很难看清。
+             如果你坚持用 app_yellow，请确保 CardView 背景够暗 -->
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="320dp"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="12dp"
+    app:cardBackgroundColor="@color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/tv_dialog_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="添加资产"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:gravity="center"
+            android:layout_marginBottom="20dp"/>
+
+        <RadioGroup
+            android:id="@+id/rg_asset_type"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/rb_asset"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="资产"
+                android:layout_marginEnd="16dp"/>
+
+            <RadioButton
+                android:id="@+id/rb_liability"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="负债"
+                android:layout_marginEnd="16dp"/>
+
+            <RadioButton
+                android:id="@+id/rb_lent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="借出"/>
+        </RadioGroup>
+
+        <EditText
+            android:id="@+id/et_asset_name"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@drawable/bg_input_field"
+            android:hint="资产名称"
+            android:inputType="text"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:paddingHorizontal="16dp"
+            android:textSize="16sp" />
+
+        <EditText
+            android:id="@+id/et_asset_amount"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_input_field"
+            android:hint="金额"
+            android:inputType="numberDecimal"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:paddingHorizontal="16dp"
+            android:textSize="16sp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="24dp">
+
+            <Button
+                android:id="@+id/btn_delete"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="删除"
+                android:textColor="@color/text_primary"
+                android:backgroundTint="@color/input_bg"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone"
+                app:cornerRadius="8dp"/>
+
+            <Button
+                android:id="@+id/btn_cancel"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="取消"
+                android:textColor="@color/text_primary"
+                android:backgroundTint="@color/input_bg"
+                android:layout_marginEnd="8dp"
+                app:cornerRadius="8dp"/>
+
+            <Button
+                android:id="@+id/btn_save"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="确  认"
+                android:textStyle="bold"
+                android:textColor="@color/black"
+                android:backgroundTint="@color/app_yellow"
+                app:cornerRadius="8dp"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

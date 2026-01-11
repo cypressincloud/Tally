@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="320dp"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="8dp"
+    app:cardBackgroundColor="@color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tv_detail_date"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="2024-01-01"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:textColor="@color/text_primary"/>
+
+        <!-- 交易列表 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_detail_list"
+            android:layout_width="match_parent"
+            android:layout_height="250dp"
+            android:layout_marginTop="12dp"
+            android:scrollbars="vertical"/>
+
+        <!-- 添加按钮 -->
+        <Button
+            android:id="@+id/btn_add_new"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="+ 添加新记录"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="@color/app_yellow"
+            android:textColor="@color/black"/>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

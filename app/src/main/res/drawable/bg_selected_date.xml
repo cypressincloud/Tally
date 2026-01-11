@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+
+    <!-- 修改这里：引用新建的颜色变量 -->
+    <solid android:color="@color/highlight_bg_color"/>
+
+    <!-- 边框：在夜间模式如果不需要黄色边框，也可以把这里改成 @color/highlight_bg_color 或者透明 -->
+    <!-- 如果你想保留日间黄色边框，夜间深色边框，建议把 stroke color 也做成变量 -->
+    <!-- 这里简单处理，夜间模式可以让边框和填充色一致，或者去掉边框 -->
+    <stroke android:width="0dp" android:color="@android:color/transparent"/>
+
+    <corners android:radius="8dp"/>
+</shape>

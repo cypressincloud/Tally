@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="320dp"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="@color/app_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView android:id="@+id/tv_dialog_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="记一笔" android:textSize="20sp" android:textStyle="bold" android:textColor="?android:attr/textColorPrimary" android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp"/>
+
+        <TextView android:id="@+id/tv_dialog_date" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="12dp" android:textColor="?android:attr/textColorSecondary" android:layout_gravity="start"/>
+
+        <RadioGroup android:id="@+id/rg_type" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center" android:layout_marginBottom="12dp">
+            <RadioButton android:id="@+id/rb_expense" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="支出" android:checked="true" android:textColor="?android:attr/textColorPrimary" android:layout_marginEnd="24dp"/>
+            <RadioButton android:id="@+id/rb_income" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="?android:attr/textColorPrimary" android:text="收入"/>
+        </RadioGroup>
+
+        <RadioGroup android:id="@+id/rg_category" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="8dp">
+            <RadioButton android:id="@+id/rb_food" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="餐饮" android:textColor="?android:attr/textColorPrimary" android:checked="true"/>
+            <RadioButton android:id="@+id/rb_entertainment" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="娱乐" android:textColor="?android:attr/textColorPrimary"/>
+            <RadioButton android:id="@+id/rb_shopping" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="购物" android:textColor="?android:attr/textColorPrimary"/>
+            <RadioButton android:id="@+id/rb_custom" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="自定义" android:textColor="?android:attr/textColorPrimary"/>
+        </RadioGroup>
+
+        <Spinner
+            android:id="@+id/sp_asset"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_input_field"
+            android:padding="2dp"
+            android:layout_marginBottom="16dp"/>
+
+        <EditText android:id="@+id/et_amount" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="请输入金额" android:inputType="numberDecimal" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:textColorHint="?android:attr/textColorHint" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="16dp"/>
+
+        <EditText android:id="@+id/et_custom_category" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="自定义分类*" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:textColorHint="?android:attr/textColorHint" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="16dp" android:visibility="gone"/>
+
+        <EditText android:id="@+id/et_remark" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="添加备注*" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:textColorHint="?android:attr/textColorHint" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="16dp"/>
+
+        <EditText android:id="@+id/et_note" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="记录标识" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:textColorHint="?android:attr/textColorHint" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="16dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/btn_delete" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginEnd="8dp" android:layout_weight="1" android:backgroundTint="@color/input_bg" android:text="删除" android:textColor="@color/text_primary" android:visibility="gone" />
+            <Button android:id="@+id/btn_save" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:backgroundTint="?attr/colorPrimary" android:text="保存修改" android:textColor="@color/text_primary" />
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

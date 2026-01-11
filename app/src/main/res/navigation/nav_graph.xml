@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/nav_record">
+
+    <fragment
+        android:id="@+id/nav_record"
+        android:name="com.example.budgetapp.ui.RecordFragment"
+        android:label="记账">
+        <action
+            android:id="@+id/action_to_stats"
+            app:destination="@id/nav_stats"
+            app:enterAnim="@anim/nav_enter"
+            app:exitAnim="@anim/nav_exit"
+            app:popEnterAnim="@anim/nav_enter"
+            app:popExitAnim="@anim/nav_exit"/>
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_assets"
+        android:name="com.example.budgetapp.ui.AssetsFragment"
+        android:label="资产" />
+
+    <fragment
+        android:id="@+id/nav_stats"
+        android:name="com.example.budgetapp.ui.StatsFragment"
+        android:label="统计">
+        <action
+            android:id="@+id/action_to_record"
+            app:destination="@id/nav_record"
+            app:enterAnim="@anim/nav_enter"
+            app:exitAnim="@anim/nav_exit"
+            app:popEnterAnim="@anim/nav_enter"
+            app:popExitAnim="@anim/nav_exit"/>
+    </fragment>
+</navigation>

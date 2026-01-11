@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tv_detail_date"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="分类"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"/>
+
+        <TextView
+            android:id="@+id/tv_detail_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="-0.00"
+            android:textColor="@color/expense_green"
+            android:textStyle="bold"
+            android:textSize="16sp"/>
+    </LinearLayout>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp">
+
+        <FrameLayout
+            android:id="@+id/fl_status_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true">
+
+            <View
+                android:id="@+id/view_remark_indicator"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_gravity="center"
+                android:background="@color/income_red"
+                android:visibility="gone"/>
+
+            <TextView
+                android:id="@+id/tv_asset_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                android:text="资产名称"/>
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tv_detail_note"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:layout_toStartOf="@+id/fl_status_container"
+            android:layout_marginEnd="8dp"
+            android:text="note info"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="visible"/>
+
+    </RelativeLayout>
+
+</LinearLayout>

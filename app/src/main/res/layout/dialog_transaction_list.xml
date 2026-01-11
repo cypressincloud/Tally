@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="320dp"
+    android:layout_height="480dp"
+    app:cardCornerRadius="16dp"
+    app:cardBackgroundColor="@color/white"
+    app:cardElevation="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/tv_dialog_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="2024-01-01"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:gravity="center"
+            android:paddingBottom="16dp"/>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/text_secondary"
+            android:alpha="0.2"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_detail_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+
+            <Button
+                android:id="@+id/btn_add_overtime"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:text="加班"
+                android:layout_marginEnd="8dp"
+                android:backgroundTint="@color/input_bg"
+                android:textColor="@color/text_primary"
+                app:cornerRadius="8dp"
+                app:icon="@android:drawable/ic_menu_my_calendar"
+                app:iconTint="@color/text_primary"/>
+
+            <Button
+                android:id="@+id/btn_add_transaction"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:text="记一笔"
+                android:backgroundTint="@color/app_yellow"
+                android:textColor="@color/black"
+                app:cornerRadius="8dp"
+                app:icon="@android:drawable/ic_menu_edit"
+                app:iconTint="@color/black"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_close_dialog"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="关  闭"
+            android:textStyle="bold"
+            android:backgroundTint="@color/app_yellow"
+            android:textColor="@color/black"
+            app:cornerRadius="8dp"/>
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

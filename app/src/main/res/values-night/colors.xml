@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 逻辑反转：变量名不变，但值变成夜间模式的颜色 -->
+
+    <!-- 主题色：原本是黄，夜间模式改为低饱和蓝 (#90CAF9 是 Material Design 标准低饱和蓝) -->
+    <color name="app_yellow">#0C3B59</color>
+    <color name="ripple_yellow">#263238</color>
+
+    <!-- 背景色：原本是白，夜间模式改为偏黑的深灰 (#121212 是背景，#1E1E1E 是卡片) -->
+    <color name="app_background">#121212</color>
+    <color name="white">#1E1E1E</color> <!-- 这里的 white 实际指向深色，用于卡片/底色 -->
+
+    <!-- 文字颜色：原本是黑，夜间模式改为白 -->
+    <color name="black">#E0E0E0</color> <!-- 稍微带点灰的白，比纯白护眼 -->
+    <color name="black_marker">#8C8C8C</color>
+    <color name="text_primary">#E0E0E0</color>
+    <color name="text_secondary">#A0A0A0</color>
+
+    <!-- 1. 线状图净收支：夜间强制保持黄色 (不随主题蓝变化) -->
+    <color name="fixed_yellow">#FFD700</color>
+
+    <!-- 2. 切换按钮未选中颜色：改为你想要的“灰蓝色” -->
+    <color name="tab_unselected">#90A4AE</color> <!-- 蓝灰色 -->
+
+    <!-- 3. 底栏选中颜色：夜间背景是黑的，图标选中要变亮蓝 (主题色) -->
+    <color name="bottom_selected">#90CAF9</color>
+    <!-- 分割线 -->
+    <color name="divider">#2C2C2C</color>
+
+    <!-- 功能色：夜间模式下红绿也需要稍微降低饱和度，避免刺眼 -->
+    <color name="income_red">#EF9A9A</color>  <!-- 浅红 -->
+    <color name="expense_green">#A5D6A7</color> <!-- 浅绿 -->
+
+    <!-- 饼图颜色：在深色背景下，保持原有的低饱和度颜色即可，或者微调 -->
+    <color name="pie_food">#FFF59D</color>
+    <color name="pie_fun">#A5D6A7</color>
+    <color name="pie_edu">#90CAF9</color>
+    <color name="pie_shop">#EF9A9A</color>
+
+    <color name="highlight_bg_color">#263238</color>
+
+    <color name="input_bg">#2C2C2C</color>
+
+    <!-- 底部导航栏选择器颜色 -->
+    <color name="selector_bottom_nav">#FFFFFF</color>
+</resources>

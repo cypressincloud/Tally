@@ -1,0 +1,32 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 背景：主题黄色圆角矩形 -->
+    <path
+        android:pathData="M0,0h108v108h-108z"
+        android:fillColor="#FFD700"/>
+
+    <!-- 钱包主体：白色 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,34 C24,29.58 27.58,26 32,26 L76,26 C80.42,26 84,29.58 84,34 L84,74 C84,78.42 80.42,82 76,82 L32,82 C27.58,82 24,78.42 24,74 Z" />
+
+    <!-- 钱包的翻盖阴影细节 (稍微深一点的黄色/金色，增加层次感) -->
+    <path
+        android:fillColor="#FBC02D"
+        android:pathData="M24,38 L84,38 L84,34 C84,29.58 80.42,26 76,26 L32,26 C27.58,26 24,29.58 24,34 Z" />
+
+    <!-- 硬币/卡扣：圆形 -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M66,58m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+
+    <!-- 硬币中间的方孔 (或是钱币符号的暗示) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M64,56h4v4h-4z" />
+
+</vector>

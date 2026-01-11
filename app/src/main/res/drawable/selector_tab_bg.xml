@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 选中状态：显示黄色背景，带圆角 -->
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/app_yellow"/>
+            <corners android:radius="8dp"/>
+        </shape>
+    </item>
+
+    <!-- 未选中状态：背景透明 -->
+    <item android:state_checked="false" android:drawable="@android:color/transparent"/>
+</selector>

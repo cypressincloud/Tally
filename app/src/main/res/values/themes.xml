@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.BudgetApp" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/app_yellow</item>
+        <item name="android:statusBarColor">@color/app_yellow</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">@color/white</item>
+
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+    </style>
+
+    <style name="TransparentIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@android:color/transparent</item>
+    </style>
+
+    <style name="Theme.BudgetApp" parent="Base.Theme.BudgetApp" />
+
+    <style name="ThemeOverlay.App.DatePicker" parent="ThemeOverlay.Material3.MaterialCalendar">
+        <item name="colorPrimary">@color/app_yellow</item>
+        <item name="colorOnPrimary">#000000</item>
+
+<!--        <item name="android:windowBackground">@color/app_background</item>-->
+<!--        <item name="colorSurface">@color/app_background</item>-->
+<!--        <item name="colorSurfaceContainer">@color/app_background</item>-->
+<!--        <item name="colorSurfaceContainerHigh">@color/app_background</item>-->
+<!--        <item name="colorSurfaceContainerHighest">@color/app_background</item>-->
+<!--        <item name="colorSurfaceContainerLow">@color/app_background</item>-->
+<!--        <item name="colorSurfaceContainerLowest">@color/app_background</item>-->
+
+        <item name="android:elevation">0dp</item>
+        <item name="elevation">0dp</item>
+
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.App.DatePicker.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.App.DatePicker.Button</item>
+    </style>
+
+    <style name="Widget.App.DatePicker.Button" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">@color/app_yellow</item>
+    </style>
+
+</resources>

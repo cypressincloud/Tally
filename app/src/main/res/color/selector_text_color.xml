@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 选中状态：日间黑/夜间白 (引用之前的 black) -->
+    <item android:state_checked="true" android:color="@color/black"/>
+
+    <!-- 未选中状态：引用我们刚定义的颜色 (日间灰/夜间灰蓝) -->
+    <item android:state_checked="false" android:color="@color/tab_unselected"/>
+</selector>

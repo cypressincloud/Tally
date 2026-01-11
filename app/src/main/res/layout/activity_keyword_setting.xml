@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/app_background">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="关键字管理"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        android:layout_marginBottom="16dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_input_field"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp"
+        android:elevation="2dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="选择应用："
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"/>
+
+        <Spinner
+            android:id="@+id/spinner_app_selector"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:spinnerMode="dropdown"/>
+    </LinearLayout>
+
+    <RadioGroup
+        android:id="@+id/rg_keyword_type"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="10dp"
+        android:gravity="center_vertical">
+
+        <RadioButton
+            android:id="@+id/rb_type_expense"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="支出关键字"
+            android:checked="true"
+            android:textColor="@color/text_primary"
+            android:layout_marginEnd="20dp"/>
+
+        <RadioButton
+            android:id="@+id/rb_type_income"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:text="收入关键字"/>
+    </RadioGroup>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="10dp">
+
+        <EditText
+            android:id="@+id/et_keyword_input"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_weight="1"
+            android:hint="输入触发关键字"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:background="@drawable/bg_input_field"
+            android:paddingStart="12dp"
+            android:inputType="text"
+            android:maxLines="1"/>
+
+        <Button
+            android:id="@+id/btn_add_keyword"
+            android:layout_width="wrap_content"
+            android:layout_height="50dp"
+            android:text="添加"
+            android:layout_marginStart="8dp"
+            android:backgroundTint="@color/app_yellow"
+            android:textColor="#FFFFFF"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_current_app_hint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="当前显示的关键字仅对上方选中的应用生效"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary"
+        android:layout_marginBottom="8dp"/>
+
+    <ListView
+        android:id="@+id/list_keywords"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_input_field"
+        android:divider="@color/divider"
+        android:dividerHeight="1dp"/>
+
+</LinearLayout>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_record"
+        android:title="记账"
+        android:icon="@drawable/ic_nav_record"/>
+
+    <item
+        android:id="@+id/nav_assets"
+        android:title="资产"
+        android:icon="@drawable/ic_nav_assets"/>
+
+    <item
+        android:id="@+id/nav_stats"
+        android:title="统计"
+        android:icon="@drawable/ic_nav_stats"/>
+</menu>
