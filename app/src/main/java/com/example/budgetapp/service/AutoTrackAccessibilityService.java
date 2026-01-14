@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -124,7 +125,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             Set<String> expenseKeywords = KeywordManager.getKeywords(this, currentPackageName, KeywordManager.TYPE_EXPENSE);
             Set<String> incomeKeywords = KeywordManager.getKeywords(this, currentPackageName, KeywordManager.TYPE_INCOME);
 
-            // 尝试匹配资产
             int autoAssetId = AutoAssetManager.matchAsset(this, currentPackageName, text);
 
             for (String kw : expenseKeywords) {
@@ -187,9 +187,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
         if (text != null && !text.isEmpty()) {
             if (text.contains(":")) {
-                // Time
             } else if (text.matches(".*\\d+[件个笔条].*")) {
-                // Quantity
             } else {
                 String cleanText = quantityPattern.matcher(text).replaceAll("");
                 Matcher matcher = amountPattern.matcher(cleanText);
@@ -250,7 +248,20 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             params.format = PixelFormat.TRANSLUCENT;
             params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
-            params.width = WindowManager.LayoutParams.MATCH_PARENT;
+            
+            // 动态计算宽度
+            DisplayMetrics metrics = getResources().getDisplayMetrics();
+            int screenWidth = metrics.widthPixels;
+            int screenHeight = metrics.heightPixels;
+            
+            if (screenWidth > screenHeight) {
+                // 横屏限制宽度
+                params.width = (int) (400 * metrics.density); 
+            } else {
+                // 竖屏占 92%
+                params.width = (int) (screenWidth * 0.92);
+            }
+
             params.height = WindowManager.LayoutParams.WRAP_CONTENT;
             params.gravity = Gravity.CENTER;
 
@@ -280,8 +291,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             } else {
                 rgType.check(R.id.rb_window_expense);
                 rgCategory.setVisibility(View.VISIBLE);
-                
-                // 默认初始化判断，先默认隐藏，由下面的具体逻辑决定是否显示
                 etCategory.setVisibility(View.GONE); 
             }
 
@@ -301,13 +310,11 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 else if ("交通".equals(category)) {
                     rgCategory.check(R.id.rb_window_custom);
                     etCategory.setText("交通");
-                    // 【修复点 1】: 显式设置为可见
                     etCategory.setVisibility(View.VISIBLE);
                 }
                 else {
                     rgCategory.check(R.id.rb_window_custom);
                     etCategory.setText(category);
-                    // 【修复点 2】: 显式设置为可见，解决自动弹出时输入框不显示的问题
                     etCategory.setVisibility(View.VISIBLE);
                 }
             } else {
@@ -337,8 +344,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     for (AssetAccount a : loadedAssets) names.add(a.name);
 
                     int defaultAssetId = config.getDefaultAssetId();
-                    
-                    // 优先级逻辑：自动匹配 > 全局默认
                     int targetAssetId = (matchedAssetId > 0) ? matchedAssetId : defaultAssetId;
 
                     handler.post(() -> {
@@ -360,14 +365,12 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 spAsset.setVisibility(View.GONE);
             }
 
-            // 类型切换监听
             rgType.setOnCheckedChangeListener((group, checkedId) -> {
                 if (checkedId == R.id.rb_window_income) {
                     rgCategory.setVisibility(View.GONE);
                     etCategory.setVisibility(View.GONE);
                 } else {
                     rgCategory.setVisibility(View.VISIBLE);
-                    // 切换回支出时，检查分类状态
                     if (rgCategory.getCheckedRadioButtonId() == R.id.rb_window_custom) {
                         etCategory.setVisibility(View.VISIBLE);
                     } else {
@@ -376,8 +379,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 }
             });
 
-            // 分类切换监听：点击自定义才显示输入框
-            // 注意：这个监听器在初始化逻辑之后才注册，所以初始化时的状态需要上面的代码显式控制
             rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
                 if (checkedId == R.id.rb_window_custom) {
                     etCategory.setVisibility(View.VISIBLE);
@@ -397,7 +398,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     if (finalType == 1) {
                         finalCat = "收入";
                     } else {
-                        // 支出逻辑
                         int checkedId = rgCategory.getCheckedRadioButtonId();
                         if (checkedId == R.id.rb_window_custom) {
                             String customInput = etCategory.getText().toString().trim();
@@ -405,7 +405,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                                 finalCat = customInput;
                             } else {
                                 Toast.makeText(this, "自定义分类*", Toast.LENGTH_SHORT).show();
-                                return; // 阻止保存
+                                return;
                             }
                         } else if (checkedId == R.id.rb_cat_food) finalCat = "餐饮";
                         else if (checkedId == R.id.rb_cat_ent) finalCat = "娱乐";

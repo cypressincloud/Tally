@@ -10,6 +10,7 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
+import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -97,7 +98,18 @@ public class QuickAddTileService extends TileService {
             params.format = PixelFormat.TRANSLUCENT;
             params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
-            params.width = WindowManager.LayoutParams.MATCH_PARENT;
+            
+            // 动态计算宽度
+            DisplayMetrics metrics = getResources().getDisplayMetrics();
+            int screenWidth = metrics.widthPixels;
+            int screenHeight = metrics.heightPixels;
+            
+            if (screenWidth > screenHeight) {
+                params.width = (int) (400 * metrics.density); 
+            } else {
+                params.width = (int) (screenWidth * 0.92);
+            }
+
             params.height = WindowManager.LayoutParams.WRAP_CONTENT;
             params.gravity = Gravity.CENTER;
 
@@ -152,7 +164,6 @@ public class QuickAddTileService extends TileService {
                         names.add(a.name);
                     }
 
-                    // 读取默认资产
                     int defaultAssetId = config.getDefaultAssetId();
 
                     new Handler(Looper.getMainLooper()).post(() -> {
@@ -160,7 +171,6 @@ public class QuickAddTileService extends TileService {
                         adapter.addAll(names);
                         adapter.notifyDataSetChanged();
 
-                        // 选中默认
                         if (defaultAssetId != -1) {
                             for (int i = 0; i < loadedAssets.size(); i++) {
                                 if (loadedAssets.get(i).id == defaultAssetId) {
@@ -181,7 +191,6 @@ public class QuickAddTileService extends TileService {
                     etCategory.setVisibility(View.GONE);
                 } else {
                     rgCategory.setVisibility(View.VISIBLE);
-                    // 检查分类状态
                     if (rgCategory.getCheckedRadioButtonId() == R.id.rb_window_custom) {
                         etCategory.setVisibility(View.VISIBLE);
                     } else {
@@ -190,7 +199,6 @@ public class QuickAddTileService extends TileService {
                 }
             });
 
-            // 添加分类监听：自定义才显示输入框
             rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
                 if (checkedId == R.id.rb_window_custom) {
                     etCategory.setVisibility(View.VISIBLE);
