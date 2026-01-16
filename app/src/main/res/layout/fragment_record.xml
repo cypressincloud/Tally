@@ -10,13 +10,17 @@
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:background="@color/app_yellow">
+
         <ImageButton
             android:id="@+id/btn_prev_month"
             android:layout_width="48dp"
             android:layout_height="match_parent"
             android:background="@null"
-            android:src="@android:drawable/ic_media_previous"
-            android:layout_toStartOf="@id/tv_month_title"/>
+            android:src="@drawable/ic_arrow_left"
+            app:tint="@color/black"
+            android:layout_toStartOf="@id/tv_month_title"
+            android:contentDescription="上一月"/>
+
         <TextView
             android:id="@+id/tv_month_title"
             android:layout_width="wrap_content"
@@ -27,13 +31,16 @@
             android:textSize="18sp"
             android:textStyle="bold"
             android:paddingHorizontal="16dp"/>
+
         <ImageButton
             android:id="@+id/btn_next_month"
             android:layout_width="48dp"
             android:layout_height="match_parent"
             android:background="@null"
-            android:src="@android:drawable/ic_media_next"
-            android:layout_toEndOf="@id/tv_month_title"/>
+            android:src="@drawable/ic_arrow_right"
+            app:tint="@color/black"
+            android:layout_toEndOf="@id/tv_month_title"
+            android:contentDescription="下一月"/>
     </RelativeLayout>
 
     <androidx.recyclerview.widget.RecyclerView

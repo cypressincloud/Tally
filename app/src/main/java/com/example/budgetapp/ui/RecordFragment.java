@@ -327,6 +327,9 @@ public class RecordFragment extends Fragment {
         
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
+        
+        // 新增：获取撤回按钮
+        TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
 
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
 
@@ -361,9 +364,7 @@ public class RecordFragment extends Fragment {
                 adapter.addAll(names);
                 adapter.notifyDataSetChanged();
 
-                // 核心修改逻辑开始
                 if (existingTransaction != null && existingTransaction.assetId != 0) {
-                    // 如果是编辑，选中原有的
                     for (int i = 0; i < assetList.size(); i++) {
                         if (assetList.get(i).id == existingTransaction.assetId) {
                             spAsset.setSelection(i);
@@ -371,7 +372,6 @@ public class RecordFragment extends Fragment {
                         }
                     }
                 } else if (existingTransaction == null) {
-                    // 如果是新建，检查有没有默认资产
                     int defaultAssetId = config.getDefaultAssetId();
                     if (defaultAssetId != -1) {
                         for (int i = 0; i < assetList.size(); i++) {
@@ -382,7 +382,6 @@ public class RecordFragment extends Fragment {
                         }
                     }
                 }
-                // 核心修改逻辑结束
             });
         } else {
             spAsset.setVisibility(View.GONE);
@@ -445,7 +444,6 @@ public class RecordFragment extends Fragment {
             datePicker.show(getParentFragmentManager(), "date_picker");
         });
 
-        // 监听分类选择，控制自定义输入框显隐
         rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.rb_custom) {
                 etCustomCategory.setVisibility(View.VISIBLE);
@@ -455,11 +453,9 @@ public class RecordFragment extends Fragment {
             }
         });
 
-        // 监听收支类型切换
         rgType.setOnCheckedChangeListener((g, id) -> {
             boolean isExpense = (id == R.id.rb_expense);
             rgCategory.setVisibility(isExpense ? View.VISIBLE : View.GONE);
-            // 切换类型时，根据当前分类选择决定是否显示输入框
             if (isExpense) {
                 etCustomCategory.setVisibility(rgCategory.getCheckedRadioButtonId() == R.id.rb_custom ? View.VISIBLE : View.GONE);
             } else {
@@ -506,9 +502,18 @@ public class RecordFragment extends Fragment {
                         .setNegativeButton("取消", null)
                         .show();
             });
+
+            // --- 新增：撤回按钮逻辑 ---
+            tvRevoke.setVisibility(View.VISIBLE);
+            tvRevoke.setOnClickListener(v -> {
+                showRevokeDialog(existingTransaction, dialog);
+            });
+            
         } else {
             btnSave.setText("保存");
             btnDelete.setVisibility(View.GONE);
+            // 新建模式下不显示撤回
+            tvRevoke.setVisibility(View.GONE); 
             SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA);
             etNote.setText(noteSdf.format(calendar.getTime()) + " manual");
         }
@@ -570,6 +575,80 @@ public class RecordFragment extends Fragment {
             }
         });
         dialog.show();
+    }
+
+    // --- 新增：显示撤回记录对话框 ---
+    private void showRevokeDialog(Transaction transaction, AlertDialog parentDialog) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        View view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_revoke_transaction, null);
+        builder.setView(view);
+        AlertDialog revokeDialog = builder.create();
+        if (revokeDialog.getWindow() != null) revokeDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+        Spinner spRevokeAsset = view.findViewById(R.id.sp_revoke_asset);
+        Button btnCancel = view.findViewById(R.id.btn_revoke_cancel);
+        Button btnConfirm = view.findViewById(R.id.btn_revoke_confirm);
+
+        List<AssetAccount> assetList = new ArrayList<>();
+        // 不关联资产选项
+        AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
+        noAsset.id = 0;
+        
+        // 资产配置
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), R.layout.item_spinner_dropdown);
+        adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spRevokeAsset.setAdapter(adapter);
+
+        // 加载资产数据
+        viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
+            assetList.clear();
+            assetList.add(noAsset);
+            if (assets != null) {
+                for (AssetAccount a : assets) {
+                    if (a.type == 0) {
+                        assetList.add(a);
+                    }
+                }
+            }
+            List<String> names = assetList.stream().map(a -> a.name).collect(Collectors.toList());
+            adapter.clear();
+            adapter.addAll(names);
+            adapter.notifyDataSetChanged();
+
+            // 默认选中当前账单关联的资产
+            int targetIndex = 0;
+            if (transaction.assetId != 0) {
+                for (int i = 0; i < assetList.size(); i++) {
+                    if (assetList.get(i).id == transaction.assetId) {
+                        targetIndex = i;
+                        break;
+                    }
+                }
+            }
+            spRevokeAsset.setSelection(targetIndex);
+        });
+
+        btnCancel.setOnClickListener(v -> revokeDialog.dismiss());
+
+        btnConfirm.setOnClickListener(v -> {
+            int selectedPos = spRevokeAsset.getSelectedItemPosition();
+            if (selectedPos >= 0 && selectedPos < assetList.size()) {
+                AssetAccount selectedAsset = assetList.get(selectedPos);
+                
+                // 执行撤回逻辑
+                viewModel.revokeTransaction(transaction, selectedAsset.id);
+                
+                String msg = selectedAsset.id == 0 ? "已撤回记录（无资产变动）" : "已撤回并退款至 " + selectedAsset.name;
+                Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+                
+                revokeDialog.dismiss();
+                if (parentDialog != null && parentDialog.isShowing()) {
+                    parentDialog.dismiss();
+                }
+            }
+        });
+
+        revokeDialog.show();
     }
     
     private static class DecimalDigitsInputFilter implements InputFilter {

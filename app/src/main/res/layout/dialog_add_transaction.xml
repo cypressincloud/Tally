@@ -13,7 +13,33 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <TextView android:id="@+id/tv_dialog_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="记一笔" android:textSize="20sp" android:textStyle="bold" android:textColor="?android:attr/textColorPrimary" android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp"/>
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/tv_dialog_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="记一笔"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="?android:attr/textColorPrimary"
+                android:layout_centerInParent="true"/>
+
+            <TextView
+                android:id="@+id/tv_revoke"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="撤回"
+                android:textColor="@color/income_red"
+                android:textSize="14sp"
+                android:padding="4dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:visibility="gone"/>
+        </RelativeLayout>
 
         <TextView android:id="@+id/tv_dialog_date" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="12dp" android:textColor="?android:attr/textColorSecondary" android:layout_gravity="start"/>
 
