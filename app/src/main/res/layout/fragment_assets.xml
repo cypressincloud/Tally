@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/app_background">
+    android:background="@color/bar_background">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -13,7 +13,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="@color/app_yellow"
+            android:background="@color/bar_background"
             android:gravity="center"
             android:text="资产"
             android:textSize="20sp"
@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:layout_margin="16dp"
             app:cardCornerRadius="16dp"
-            app:cardElevation="4dp"
+            app:cardElevation="0dp"
             app:cardBackgroundColor="@color/white">
 
             <LinearLayout
@@ -67,7 +67,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="@color/divider"
+                    android:background="#EEEEEE"
                     android:layout_marginVertical="12dp"
                     android:layout_marginHorizontal="20dp"/>
 
@@ -167,10 +167,15 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="24dp"
+        android:layout_margin="20dp"
         android:src="@android:drawable/ic_input_add"
+        app:tint="@color/white"
+        android:contentDescription="添加资产"
         app:backgroundTint="@color/app_yellow"
-        app:tint="@color/black"
-        android:contentDescription="添加资产"/>
+
+        app:elevation="0dp"
+        app:pressedTranslationZ="0dp"
+        app:borderWidth="0dp"
+        android:stateListAnimator="@null"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

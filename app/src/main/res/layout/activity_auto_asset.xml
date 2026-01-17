@@ -72,7 +72,7 @@
             android:layout_width="wrap_content"
             android:layout_height="40dp"
             android:text="+ 新增规则"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/white"
             android:textSize="12sp"/>
     </LinearLayout>
 

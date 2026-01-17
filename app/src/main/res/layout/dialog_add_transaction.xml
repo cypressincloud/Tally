@@ -76,7 +76,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal">
             <Button android:id="@+id/btn_delete" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginEnd="8dp" android:layout_weight="1" android:backgroundTint="@color/input_bg" android:text="删除" android:textColor="@color/text_primary" android:visibility="gone" />
-            <Button android:id="@+id/btn_save" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:backgroundTint="?attr/colorPrimary" android:text="保存修改" android:textColor="@color/text_primary" />
+            <Button android:id="@+id/btn_save" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:backgroundTint="?attr/colorPrimary" android:text="保存修改" android:textColor="@color/white" />
         </LinearLayout>
 
     </LinearLayout>

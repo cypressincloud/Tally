@@ -20,7 +20,7 @@
             android:orientation="vertical"
             android:padding="20dp">
 
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="💰 自动记账" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/black" android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="自动记账" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/black" android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp"/>
 
             <EditText android:id="@+id/et_window_amount" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="金额" android:inputType="numberDecimal" android:textSize="20sp" android:textStyle="bold" android:textColor="@color/text_primary" android:textColorHint="@color/text_secondary" android:gravity="center" android:background="@null" android:padding="8dp"/>
 
@@ -56,8 +56,34 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-                <Button android:id="@+id/btn_window_cancel" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="取消" android:textColor="@color/text_primary" android:backgroundTint="@color/input_bg" android:layout_marginEnd="8dp"/>
-                <Button android:id="@+id/btn_window_save" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="确认保存" android:textColor="@color/black" android:textStyle="bold" android:backgroundTint="@color/app_yellow"/>
+                <Button
+                    android:id="@+id/btn_window_cancel"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="取消"
+                    android:textColor="@color/text_primary"
+                    android:backgroundTint="@color/input_bg"
+                    android:layout_marginEnd="8dp"
+
+                    app:elevation="0dp"
+                    app:pressedTranslationZ="0dp"
+                    app:borderWidth="0dp"
+                    android:stateListAnimator="@null"/>
+                <Button
+                    android:id="@+id/btn_window_save"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="确认保存"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:backgroundTint="@color/app_yellow"
+
+                    app:elevation="0dp"
+                    app:pressedTranslationZ="0dp"
+                    app:borderWidth="0dp"
+                    android:stateListAnimator="@null"/>
             </LinearLayout>
 
         </LinearLayout>

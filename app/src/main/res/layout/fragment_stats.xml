@@ -4,12 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/app_background">
+    android:background="@color/bar_background">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@color/app_yellow"
+        android:background="@color/bar_background"
         android:gravity="center"
         android:text="统计"
         android:textSize="20sp"
@@ -31,7 +31,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="40dp"
                 android:orientation="horizontal"
-                android:background="@drawable/bg_selected_date"
+                android:background="@drawable/bg_selector_stats"
                 android:layout_marginHorizontal="16dp"
                 android:layout_marginTop="16dp"
                 android:gravity="center">
@@ -168,7 +168,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:background="@drawable/bg_input_field"
+                android:background="@drawable/assets_field"
                 android:layout_marginHorizontal="16dp"
                 android:layout_marginBottom="24dp"
                 android:padding="16dp">

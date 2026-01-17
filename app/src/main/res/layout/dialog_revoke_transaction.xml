@@ -61,7 +61,7 @@
                 android:layout_weight="1"
                 android:backgroundTint="?attr/colorPrimary"
                 android:text="确定"
-                android:textColor="@color/text_primary"/>
+                android:textColor="@color/white"/>
         </LinearLayout>
 
     </LinearLayout>

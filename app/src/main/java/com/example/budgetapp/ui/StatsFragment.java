@@ -576,7 +576,7 @@ public class StatsFragment extends Fragment {
 
     private void setupPieChart() {
         int textColor = ContextCompat.getColor(requireContext(), R.color.text_primary);
-        int holeColor = ContextCompat.getColor(requireContext(), R.color.app_background);
+        int holeColor = ContextCompat.getColor(requireContext(), R.color.bar_background);
 
         pieChart.getDescription().setEnabled(false);
         pieChart.setHoleRadius(40f);

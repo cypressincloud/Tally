@@ -39,6 +39,6 @@
             android:text="+ 添加新记录"
             android:layout_marginTop="12dp"
             android:backgroundTint="@color/app_yellow"
-            android:textColor="@color/black"/>
+            android:textColor="@color/white"/>
     </LinearLayout>
 </androidx.cardview.widget.CardView>

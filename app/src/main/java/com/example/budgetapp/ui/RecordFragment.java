@@ -149,12 +149,35 @@ public class RecordFragment extends Fragment {
     private void updateCalendar() {
         tvMonthTitle.setText(currentMonth.format(DateTimeFormatter.ofPattern("yyyy年MM月")));
         List<LocalDate> days = new ArrayList<>();
+        
+        // --- 核心修改逻辑开始 ---
+        // 1. 获取当月第一天
+        LocalDate firstDay = currentMonth.atDay(1);
+        
+        // 2. 计算第一天是星期几 (1=周一, 7=周日)
+        int dayOfWeek = firstDay.getDayOfWeek().getValue();
+        
+        // 3. 计算需要的偏移量 (因为第一列是周一，所以周一偏移0，周二偏移1...)
+        int offset = dayOfWeek - 1;
+
+        // 4. 计算并添加上个月的日期作为占位
+        LocalDate startOfGrid = firstDay.minusDays(offset);
+        for (int i = 0; i < offset; i++) {
+            days.add(startOfGrid.plusDays(i));
+        }
+
+        // 5. 添加本月日期
         int length = currentMonth.lengthOfMonth();
         for (int i = 1; i <= length; i++) {
             days.add(currentMonth.atDay(i));
         }
+        // --- 核心修改逻辑结束 ---
+
         List<Transaction> allList = viewModel.getAllTransactions().getValue();
         List<Transaction> currentList = allList != null ? allList : new ArrayList<>();
+        
+        // 将当前月份传给 Adapter 以便区分样式
+        adapter.setCurrentMonth(currentMonth);
         adapter.updateData(days, currentList);
         calculateMonthTotals(currentList);
     }
@@ -328,7 +351,6 @@ public class RecordFragment extends Fragment {
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
         
-        // 新增：获取撤回按钮
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
 
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
@@ -503,7 +525,6 @@ public class RecordFragment extends Fragment {
                         .show();
             });
 
-            // --- 新增：撤回按钮逻辑 ---
             tvRevoke.setVisibility(View.VISIBLE);
             tvRevoke.setOnClickListener(v -> {
                 showRevokeDialog(existingTransaction, dialog);
@@ -512,7 +533,6 @@ public class RecordFragment extends Fragment {
         } else {
             btnSave.setText("保存");
             btnDelete.setVisibility(View.GONE);
-            // 新建模式下不显示撤回
             tvRevoke.setVisibility(View.GONE); 
             SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA);
             etNote.setText(noteSdf.format(calendar.getTime()) + " manual");
@@ -577,7 +597,6 @@ public class RecordFragment extends Fragment {
         dialog.show();
     }
 
-    // --- 新增：显示撤回记录对话框 ---
     private void showRevokeDialog(Transaction transaction, AlertDialog parentDialog) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_revoke_transaction, null);
@@ -590,16 +609,13 @@ public class RecordFragment extends Fragment {
         Button btnConfirm = view.findViewById(R.id.btn_revoke_confirm);
 
         List<AssetAccount> assetList = new ArrayList<>();
-        // 不关联资产选项
         AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
         noAsset.id = 0;
         
-        // 资产配置
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), R.layout.item_spinner_dropdown);
         adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spRevokeAsset.setAdapter(adapter);
 
-        // 加载资产数据
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             assetList.clear();
             assetList.add(noAsset);
@@ -615,7 +631,6 @@ public class RecordFragment extends Fragment {
             adapter.addAll(names);
             adapter.notifyDataSetChanged();
 
-            // 默认选中当前账单关联的资产
             int targetIndex = 0;
             if (transaction.assetId != 0) {
                 for (int i = 0; i < assetList.size(); i++) {
@@ -635,7 +650,6 @@ public class RecordFragment extends Fragment {
             if (selectedPos >= 0 && selectedPos < assetList.size()) {
                 AssetAccount selectedAsset = assetList.get(selectedPos);
                 
-                // 执行撤回逻辑
                 viewModel.revokeTransaction(transaction, selectedAsset.id);
                 
                 String msg = selectedAsset.id == 0 ? "已撤回记录（无资产变动）" : "已撤回并退款至 " + selectedAsset.name;

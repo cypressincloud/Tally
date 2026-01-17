@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="black">#FF000000</color>
+    <color name="selector_text">#FFFFFF</color>
     <color name="white">#FFFFFFFF</color>
     <color name="marker_bg">#F5F5F5</color>
 
-    <color name="app_yellow">#FFD700</color>
+    <color name="app_yellow">#1677FF</color>
     <color name="ripple_yellow">#FFF59D</color>
     <color name="app_background">#FFFFFF</color>
 
@@ -21,7 +22,7 @@
 
     <color name="tab_unselected">#757575</color>
 
-    <color name="bottom_selected">#000000</color>
+    <color name="bottom_selected">#1677FF</color>
 
     <color name="pie_food">#FFF59D</color>
     <color name="pie_fun">#A5D6A7</color>
@@ -33,4 +34,7 @@
     <color name="input_bg">#F5F5F5</color>
 
     <color name="highlight_bg_color">#FFF59D</color>
+
+    <color name="bar_background">#F7F7F7</color>
+    <color name="bottom_unselected">#333333</color>
 </resources>
