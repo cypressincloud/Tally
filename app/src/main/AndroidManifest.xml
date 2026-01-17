@@ -38,6 +38,12 @@
             android:exported="false"
             android:theme="@style/Theme.BudgetApp" />
 
+        <activity
+            android:name=".ui.YearCalendarActivity"
+            android:label="年度账单"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
         <service
             android:name=".service.QuickAddTileService"
             android:icon="@drawable/ic_qs_record"

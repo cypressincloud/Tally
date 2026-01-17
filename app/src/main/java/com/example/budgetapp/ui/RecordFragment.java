@@ -1,6 +1,8 @@
 package com.example.budgetapp.ui;
 
+import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -17,12 +19,15 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.NumberPicker;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
@@ -35,6 +40,7 @@ import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.timepicker.MaterialTimePicker;
 import com.google.android.material.timepicker.TimeFormat;
@@ -47,6 +53,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -71,16 +78,39 @@ public class RecordFragment extends Fragment {
     private List<AssetAccount> cachedAssets = new ArrayList<>();
     private TransactionListAdapter currentDetailAdapter;
 
-    // [新增] 手势检测器
+    // 手势检测器
     private GestureDetector gestureDetector;
+
+    // Activity Result Launcher
+    private ActivityResultLauncher<Intent> yearCalendarLauncher;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        yearCalendarLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                        int year = result.getData().getIntExtra("year", -1);
+                        int month = result.getData().getIntExtra("month", -1);
+                        if (year != -1 && month != -1) {
+                            currentMonth = YearMonth.of(year, month);
+                            updateCalendar();
+                        }
+                    }
+                }
+        );
+    }
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_record, container, false);
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
-        currentMonth = YearMonth.now();
+        
+        if (currentMonth == null) {
+            currentMonth = YearMonth.now();
+        }
 
-        // [新增] 初始化手势检测
         initGestureDetector();
 
         tvMonthTitle = view.findViewById(R.id.tv_month_title);
@@ -109,14 +139,27 @@ public class RecordFragment extends Fragment {
         });
         recyclerView.setAdapter(adapter);
 
-        // [新增] 将手势监听绑定到 RecyclerView (日历区域)
-        recyclerView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
+        // 【修复的关键点 1】
+        // 在 OnTouchListener 中调用手势检测，但始终返回 false。
+        // 这样既能让 GestureDetector 监听到滑动(onFling)，又不会拦截掉点击事件(onClick)，
+        // 从而让 RecyclerView 的 Item 点击依然有效。
+        recyclerView.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            return false;
+        });
 
-        // [新增] 也可以绑定到月份大字上，方便用户在空白处滑动
+        // 【修复的关键点 2】
+        // 单独为月份标签设置点击事件，不再通过手势的 onSingleTapUp 处理
         if (tvMonthLabel != null) {
+            tvMonthLabel.setOnClickListener(v -> {
+                Intent intent = new Intent(requireContext(), YearCalendarActivity.class);
+                intent.putExtra("year", currentMonth.getYear());
+                yearCalendarLauncher.launch(intent);
+            });
+            // 如果希望月份标签也支持滑动，可以加上触摸监听，同样返回 false 以免拦截点击
             tvMonthLabel.setOnTouchListener((v, event) -> {
-                gestureDetector.onTouchEvent(event);
-                return true; // 消费事件，允许滑动
+                 gestureDetector.onTouchEvent(event);
+                 return false;
             });
         }
 
@@ -125,30 +168,15 @@ public class RecordFragment extends Fragment {
         layoutExpense.setOnClickListener(v -> switchFilterMode(2));
         layoutOvertime.setOnClickListener(v -> switchFilterMode(3));
 
-        // 点击年份标题，依然弹出日期选择器 (保持原有效果)
-        tvMonthTitle.setOnClickListener(v -> {
-            long selection = currentMonth.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
-            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
-                    .setTitleText("选择月份")
-                    .setSelection(selection)
-                    .setInputMode(MaterialDatePicker.INPUT_MODE_CALENDAR)
-                    .setTheme(R.style.ThemeOverlay_App_DatePicker)
-                    .build();
-            datePicker.addOnPositiveButtonClickListener(selectionMillis -> {
-                LocalDate date = Instant.ofEpochMilli(selectionMillis).atZone(ZoneOffset.UTC).toLocalDate();
-                currentMonth = YearMonth.from(date);
-                updateCalendar();
-            });
-            datePicker.show(getParentFragmentManager(), "MONTH_PICKER");
-        });
+        // 点击年份标题，弹出自定义底部滚轮选择器
+        tvMonthTitle.setOnClickListener(v -> showCustomDatePicker());
 
-        // [修改] 左右箭头改为切换年份
         view.findViewById(R.id.btn_prev_month).setOnClickListener(v -> {
-            currentMonth = currentMonth.minusYears(1); // 减一年
+            currentMonth = currentMonth.minusYears(1);
             updateCalendar();
         });
         view.findViewById(R.id.btn_next_month).setOnClickListener(v -> {
-            currentMonth = currentMonth.plusYears(1); // 加一年
+            currentMonth = currentMonth.plusYears(1);
             updateCalendar();
         });
 
@@ -167,7 +195,116 @@ public class RecordFragment extends Fragment {
         return view;
     }
 
-    // [新增] 初始化手势监听逻辑
+    // 【新增】显示底部自定义日期选择器
+    private void showCustomDatePicker() {
+        if (getContext() == null) return;
+
+        final BottomSheetDialog dialog = new BottomSheetDialog(getContext());
+        dialog.setContentView(R.layout.dialog_bottom_date_picker);
+
+        // 设置悬浮背景透明 (关键：去除默认白色方块背景，显示圆角和间距)
+        dialog.setOnShowListener(dialogInterface -> {
+            BottomSheetDialog bottomSheetDialog = (BottomSheetDialog) dialogInterface;
+            View bottomSheet = bottomSheetDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                bottomSheet.setBackgroundResource(android.R.color.transparent);
+            }
+        });
+
+        // 获取初始日期
+        LocalDate baseDate = selectedDate != null ? selectedDate : currentMonth.atDay(1);
+        int curYear = baseDate.getYear();
+        int curMonth = baseDate.getMonthValue();
+        int curDay = baseDate.getDayOfMonth();
+
+        NumberPicker npYear = dialog.findViewById(R.id.np_year);
+        NumberPicker npMonth = dialog.findViewById(R.id.np_month);
+        NumberPicker npDay = dialog.findViewById(R.id.np_day);
+        TextView tvPreview = dialog.findViewById(R.id.tv_date_preview);
+        Button btnCancel = dialog.findViewById(R.id.btn_cancel);
+        Button btnConfirm = dialog.findViewById(R.id.btn_confirm);
+
+        if (npYear == null || npMonth == null || npDay == null || btnConfirm == null || btnCancel == null) return;
+
+        // 配置滚轮
+        npYear.setMinValue(2000);
+        npYear.setMaxValue(2050);
+        npYear.setValue(curYear);
+
+        npMonth.setMinValue(1);
+        npMonth.setMaxValue(12);
+        npMonth.setValue(curMonth);
+
+        npDay.setMinValue(1);
+        int maxDays = YearMonth.of(curYear, curMonth).lengthOfMonth();
+        npDay.setMaxValue(maxDays);
+        npDay.setValue(curDay);
+
+        // 联动逻辑
+        NumberPicker.OnValueChangeListener dateChangeListener = (picker, oldVal, newVal) -> {
+            int y = npYear.getValue();
+            int m = npMonth.getValue();
+            int newMaxDays = YearMonth.of(y, m).lengthOfMonth();
+            if (npDay.getMaxValue() != newMaxDays) {
+                int currentD = npDay.getValue();
+                npDay.setMaxValue(newMaxDays);
+                if (currentD > newMaxDays) npDay.setValue(newMaxDays);
+            }
+            updatePreviewText(tvPreview, y, m, npDay.getValue());
+        };
+
+        npYear.setOnValueChangedListener(dateChangeListener);
+        npMonth.setOnValueChangedListener(dateChangeListener);
+        npDay.setOnValueChangedListener(dateChangeListener);
+        
+        // 初始化预览
+        updatePreviewText(tvPreview, curYear, curMonth, curDay);
+
+        // 按钮事件
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnConfirm.setOnClickListener(v -> {
+            int year = npYear.getValue();
+            int month = npMonth.getValue();
+            int day = npDay.getValue();
+            
+            currentMonth = YearMonth.of(year, month);
+            selectedDate = LocalDate.of(year, month, day);
+            updateCalendar();
+            
+            // 确保适配器选中该日期
+            adapter.setSelectedDate(selectedDate);
+            
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    private void updatePreviewText(TextView tv, int year, int month, int day) {
+        if (tv == null) return;
+        try {
+            LocalDate date = LocalDate.of(year, month, day);
+            // 修正格式为 "yyyy年M月d日 EEEE" (例如: 2026年1月1日 星期四)
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA);
+            tv.setText(date.format(formatter));
+        } catch (Exception e) {
+            tv.setText(year + "年" + month + "月" + day + "日");
+        }
+    }
+
+    // 【新增】辅助方法：根据年月计算当月最大天数
+    private void updateDayPickerLimit(NumberPicker npYear, NumberPicker npMonth, NumberPicker npDay) {
+        int year = npYear.getValue();
+        int month = npMonth.getValue();
+        int maxDays = YearMonth.of(year, month).lengthOfMonth();
+        int currentDay = npDay.getValue();
+        npDay.setMaxValue(maxDays);
+        if (currentDay > maxDays) {
+            npDay.setValue(maxDays);
+        }
+    }
+
     private void initGestureDetector() {
         gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
             private static final int SWIPE_THRESHOLD = 100;
@@ -180,16 +317,13 @@ public class RecordFragment extends Fragment {
                 float diffX = e2.getX() - e1.getX();
                 float diffY = e2.getY() - e1.getY();
 
-                // 只有横向滑动距离大于纵向，且速度足够时才触发
                 if (Math.abs(diffX) > Math.abs(diffY) &&
                         Math.abs(diffX) > SWIPE_THRESHOLD &&
                         Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
 
                     if (diffX > 0) {
-                        // 向右滑 -> 上一个月
                         currentMonth = currentMonth.minusMonths(1);
                     } else {
-                        // 向左滑 -> 下一个月
                         currentMonth = currentMonth.plusMonths(1);
                     }
                     updateCalendar();
@@ -197,6 +331,11 @@ public class RecordFragment extends Fragment {
                 }
                 return false;
             }
+
+            // 【修复的关键点 3】
+            // 彻底移除 onSingleTapUp 方法。
+            // 之前的 bug 就是因为这里拦截了点击事件并强制跳转。
+            // 移除后，点击事件会自然穿透给 RecyclerView 的 Adapter 处理。
         });
     }
 
@@ -205,16 +344,12 @@ public class RecordFragment extends Fragment {
     }
 
     private void updateCalendar() {
-        // [修改] 顶部只显示年份
         tvMonthTitle.setText(currentMonth.format(DateTimeFormatter.ofPattern("yyyy")));
-
-        // 单独的行显示月份 (如果布局中有这个控件)
         if (tvMonthLabel != null) {
             tvMonthLabel.setText(currentMonth.getMonthValue() + "月");
         }
 
         List<LocalDate> days = new ArrayList<>();
-
         LocalDate firstDay = currentMonth.atDay(1);
         int dayOfWeek = firstDay.getDayOfWeek().getValue();
         int offset = dayOfWeek - 1;
@@ -234,9 +369,16 @@ public class RecordFragment extends Fragment {
 
         adapter.setCurrentMonth(currentMonth);
         adapter.updateData(days, currentList);
+        
+        if (selectedDate != null && YearMonth.from(selectedDate).equals(currentMonth)) {
+            adapter.setSelectedDate(selectedDate);
+        }
+        
         calculateMonthTotals(currentList);
     }
-
+    
+    // ... 后续代码 (calculateMonthTotals, showDateDetailDialog, showOvertimeDialog, showAddOrEditDialog 等) 保持不变 ...
+    
     private void calculateMonthTotals(List<Transaction> transactions) {
         double totalIncome = 0;
         double totalExpense = 0;

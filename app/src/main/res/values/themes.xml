@@ -39,4 +39,9 @@
         <item name="android:textColor">@color/app_yellow</item>
     </style>
 
+    <style name="ThemeOverlay.App.NumberPicker" parent="ThemeOverlay.Material3.DynamicColors.DayNight">
+        <item name="android:selectionDividerHeight">0dp</item>
+        <item name="android:colorControlNormal">@android:color/transparent</item>
+    </style>
+
 </resources>

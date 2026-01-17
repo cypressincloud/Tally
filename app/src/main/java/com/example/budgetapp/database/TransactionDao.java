@@ -23,17 +23,16 @@ public interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY date DESC")
     LiveData<List<Transaction>> getAllTransactions();
 
-    // --- 【新增】用于备份还原的方法 ---
-
-    // 1. 导出时使用：同步获取所有数据（不通过 LiveData，直接拿到 List）
     @Query("SELECT * FROM transactions")
     List<Transaction> getAllTransactionsSync();
 
-    // 2. 导入时使用：批量插入
     @Insert
     void insertAll(List<Transaction> transactions);
 
-    // 3. 导入时使用：清空旧数据
     @Query("DELETE FROM transactions")
     void deleteAll();
+
+    // 【新增】查询指定范围内的账单
+    @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end")
+    List<Transaction> getTransactionsByRange(long start, long end);
 }

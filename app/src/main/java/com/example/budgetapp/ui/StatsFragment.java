@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.text.InputFilter;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
+import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
 import android.view.GestureDetector;
 import android.view.LayoutInflater;
@@ -19,6 +20,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.NumberPicker; // 新增
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
@@ -52,6 +54,7 @@ import com.github.mikephil.charting.data.PieEntry;
 import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.github.mikephil.charting.highlight.Highlight;
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener;
+import com.google.android.material.bottomsheet.BottomSheetDialog; // 新增
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.timepicker.MaterialTimePicker;
 import com.google.android.material.timepicker.TimeFormat;
@@ -60,6 +63,7 @@ import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth; // 新增
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -80,17 +84,16 @@ import java.util.stream.Collectors;
 
 public class StatsFragment extends Fragment {
 
+    // ... (成员变量保持不变)
     private FinanceViewModel viewModel;
     private LineChart lineChart;
     private PieChart pieChart;
     private RadioGroup rgTimeScope;
     private TextView tvDateRange;
     
-    // 总结板块
     private TextView tvSummaryTitle;
     private TextView tvSummaryContent;
 
-    // 手势相关
     private ScrollView scrollView;
     private GestureDetector gestureDetector;
     private float touchStartX, touchStartY;
@@ -98,11 +101,9 @@ public class StatsFragment extends Fragment {
     private boolean isHorizontalSwipe = false;
     private int touchSlop;
 
-    // 0=年, 1=月, 2=周
     private int currentMode = 2;
     private LocalDate selectedDate = LocalDate.now();
     private List<Transaction> allTransactions = new ArrayList<>();
-    // 缓存资产列表，用于传给弹窗Adapter
     private List<AssetAccount> assetList = new ArrayList<>();
     private CustomMarkerView markerView;
 
@@ -112,19 +113,17 @@ public class StatsFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_stats, container, false);
 
         initViews(view);
-        setupGestures(); // 初始化手势监听
+        setupGestures(); 
         setupLineChart();
         setupPieChart();
 
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
         
-        // 观察交易记录
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
             this.allTransactions = list;
             refreshData();
         });
 
-        // 观察资产列表，并更新本地缓存
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             this.assetList = assets;
         });
@@ -135,21 +134,71 @@ public class StatsFragment extends Fragment {
         return view;
     }
 
+    // ... (initViews, setupGestures, SwipeGestureListener 保持不变)
+
     private void initViews(View view) {
         lineChart = view.findViewById(R.id.chart_line);
         pieChart = view.findViewById(R.id.chart_pie);
         rgTimeScope = view.findViewById(R.id.rg_time_scope);
         tvDateRange = view.findViewById(R.id.tv_current_date_range);
-        
-        // 初始化总结板块的 View
         tvSummaryTitle = view.findViewById(R.id.tv_summary_title);
         tvSummaryContent = view.findViewById(R.id.tv_summary_content);
-        
-        // 初始化 ScrollView
         scrollView = view.findViewById(R.id.scroll_view_stats);
-        
-        // 获取系统最小滑动距离阈值
         touchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
+    }
+    
+    private void setupGestures() {
+        if (scrollView == null) return;
+        gestureDetector = new GestureDetector(requireContext(), new SwipeGestureListener());
+        scrollView.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    touchStartX = event.getX();
+                    touchStartY = event.getY();
+                    isDirectionLocked = false;
+                    isHorizontalSwipe = false;
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (!isDirectionLocked) {
+                        float dx = Math.abs(event.getX() - touchStartX);
+                        float dy = Math.abs(event.getY() - touchStartY);
+                        if (dx > touchSlop || dy > touchSlop) {
+                            isDirectionLocked = true;
+                            if (dx > dy) isHorizontalSwipe = true;
+                            else isHorizontalSwipe = false;
+                        }
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    isDirectionLocked = false;
+                    isHorizontalSwipe = false;
+                    break;
+            }
+            return isDirectionLocked && isHorizontalSwipe;
+        });
+    }
+
+    private class SwipeGestureListener extends GestureDetector.SimpleOnGestureListener {
+        private static final int SWIPE_THRESHOLD = 100;
+        private static final int SWIPE_VELOCITY_THRESHOLD = 100;
+        @Override
+        public boolean onDown(@NonNull MotionEvent e) { return true; }
+        @Override
+        public boolean onFling(@Nullable MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
+            if (e1 == null || e2 == null) return false;
+            float diffX = e2.getX() - e1.getX();
+            float diffY = e2.getY() - e1.getY();
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                if (Math.abs(diffX) > SWIPE_THRESHOLD && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+                    if (diffX > 0) changeDate(-1);
+                    else changeDate(1);
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     private void setupListeners(View view) {
@@ -168,7 +217,8 @@ public class StatsFragment extends Fragment {
         btnPrev.setOnClickListener(v -> changeDate(-1));
         btnNext.setOnClickListener(v -> changeDate(1));
 
-        tvDateRange.setOnClickListener(v -> showDatePicker());
+        // 【修改】这里改为调用自定义的 showCustomDatePicker
+        tvDateRange.setOnClickListener(v -> showCustomDatePicker());
 
         tvDateRange.setOnLongClickListener(v -> {
             Intent intent = new Intent(requireContext(), AssistantManagerActivity.class);
@@ -177,79 +227,8 @@ public class StatsFragment extends Fragment {
         });
     }
 
-    private void setupGestures() {
-        if (scrollView == null) return;
-
-        gestureDetector = new GestureDetector(requireContext(), new SwipeGestureListener());
-
-        scrollView.setOnTouchListener((v, event) -> {
-            gestureDetector.onTouchEvent(event);
-
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    touchStartX = event.getX();
-                    touchStartY = event.getY();
-                    isDirectionLocked = false;
-                    isHorizontalSwipe = false;
-                    break;
-
-                case MotionEvent.ACTION_MOVE:
-                    if (!isDirectionLocked) {
-                        float dx = Math.abs(event.getX() - touchStartX);
-                        float dy = Math.abs(event.getY() - touchStartY);
-
-                        if (dx > touchSlop || dy > touchSlop) {
-                            isDirectionLocked = true;
-                            if (dx > dy) {
-                                isHorizontalSwipe = true;
-                            } else {
-                                isHorizontalSwipe = false;
-                            }
-                        }
-                    }
-                    break;
-                
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_CANCEL:
-                    isDirectionLocked = false;
-                    isHorizontalSwipe = false;
-                    break;
-            }
-
-            return isDirectionLocked && isHorizontalSwipe;
-        });
-    }
-
-    private class SwipeGestureListener extends GestureDetector.SimpleOnGestureListener {
-        private static final int SWIPE_THRESHOLD = 100;
-        private static final int SWIPE_VELOCITY_THRESHOLD = 100;
-
-        @Override
-        public boolean onDown(@NonNull MotionEvent e) {
-            return true;
-        }
-
-        @Override
-        public boolean onFling(@Nullable MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
-            if (e1 == null || e2 == null) return false;
-
-            float diffX = e2.getX() - e1.getX();
-            float diffY = e2.getY() - e1.getY();
-
-            if (Math.abs(diffX) > Math.abs(diffY)) {
-                if (Math.abs(diffX) > SWIPE_THRESHOLD && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
-                    if (diffX > 0) {
-                        changeDate(-1);
-                    } else {
-                        changeDate(1);
-                    }
-                    return true;
-                }
-            }
-            return false;
-        }
-    }
-
+    // ... (changeDate, updateDateRangeDisplay 保持不变)
+    
     private void changeDate(int offset) {
         if (currentMode == 0) selectedDate = selectedDate.plusYears(offset);
         else if (currentMode == 1) selectedDate = selectedDate.plusMonths(offset);
@@ -260,10 +239,13 @@ public class StatsFragment extends Fragment {
 
     private void updateDateRangeDisplay() {
         if (currentMode == 0) {
+            // 年视图保持不变
             tvDateRange.setText(selectedDate.format(DateTimeFormatter.ofPattern("yyyy年")));
         } else if (currentMode == 1) {
+            // 月视图保持不变
             tvDateRange.setText(selectedDate.format(DateTimeFormatter.ofPattern("yyyy年MM月")));
         } else {
+            // === 修改周视图的显示逻辑 ===
             WeekFields weekFields = WeekFields.of(Locale.CHINA);
             String yearMonthStr = selectedDate.format(DateTimeFormatter.ofPattern("yyyy年M月"));
             int weekOfMonth = selectedDate.get(weekFields.weekOfMonth());
@@ -271,42 +253,143 @@ public class StatsFragment extends Fragment {
             LocalDate startOfWeek = selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
             LocalDate endOfWeek = selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
 
-            DateTimeFormatter rangeFormatter = DateTimeFormatter.ofPattern("M.d");
+            // 格式化为 "M月d日" (例如: 5月20日)
+            DateTimeFormatter rangeFormatter = DateTimeFormatter.ofPattern("M月d日");
             String startStr = startOfWeek.format(rangeFormatter);
             String endStr = endOfWeek.format(rangeFormatter);
 
-            String finalStr = String.format(Locale.CHINA, "%s 第%d周 (%s - %s)",
-                    yearMonthStr, weekOfMonth, startStr, endStr);
+            // 第一行标题
+            String title = String.format(Locale.CHINA, "%s 第%d周", yearMonthStr, weekOfMonth);
+            // 第二行日期范围
+            String subtitle = String.format(Locale.CHINA, "%s - %s", startStr, endStr);
 
-            tvDateRange.setText(finalStr);
+            SpannableStringBuilder ssb = new SpannableStringBuilder();
+            ssb.append(title);
+            ssb.append("\n"); // 换行
+
+            int startSubtitle = ssb.length();
+            ssb.append(subtitle);
+
+            // 设置第二行为浅色 (text_secondary)
+            if (getContext() != null) {
+                int secondaryColor = ContextCompat.getColor(requireContext(), R.color.text_secondary);
+                ssb.setSpan(new ForegroundColorSpan(secondaryColor), startSubtitle, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+                // (可选) 稍微缩小第二行字体，例如 13sp，让层次更分明
+                ssb.setSpan(new AbsoluteSizeSpan(13, true), startSubtitle, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+
+            tvDateRange.setText(ssb);
         }
     }
 
-    private void showDatePicker() {
-        long selection = selectedDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
-        MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
-                .setTitleText("选择日期")
-                .setSelection(selection)
-                .setInputMode(MaterialDatePicker.INPUT_MODE_CALENDAR)
-                .setTheme(R.style.ThemeOverlay_App_DatePicker)
-                .build();
-        datePicker.addOnPositiveButtonClickListener(selectionMillis -> {
-            selectedDate = Instant.ofEpochMilli(selectionMillis).atZone(ZoneOffset.UTC).toLocalDate();
+    // 【新增】替换原有的 showDatePicker
+    private void showCustomDatePicker() {
+        if (getContext() == null) return;
+
+        final BottomSheetDialog dialog = new BottomSheetDialog(getContext());
+        dialog.setContentView(R.layout.dialog_bottom_date_picker);
+
+        // 设置悬浮背景透明 (关键：去除默认白色方块背景，显示圆角和间距)
+        dialog.setOnShowListener(dialogInterface -> {
+            BottomSheetDialog bottomSheetDialog = (BottomSheetDialog) dialogInterface;
+            View bottomSheet = bottomSheetDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                bottomSheet.setBackgroundResource(android.R.color.transparent);
+            }
+        });
+
+        // 获取初始日期
+        int curYear = selectedDate.getYear();
+        int curMonth = selectedDate.getMonthValue();
+        int curDay = selectedDate.getDayOfMonth();
+
+        NumberPicker npYear = dialog.findViewById(R.id.np_year);
+        NumberPicker npMonth = dialog.findViewById(R.id.np_month);
+        NumberPicker npDay = dialog.findViewById(R.id.np_day);
+        TextView tvPreview = dialog.findViewById(R.id.tv_date_preview);
+        Button btnCancel = dialog.findViewById(R.id.btn_cancel);
+        Button btnConfirm = dialog.findViewById(R.id.btn_confirm);
+
+        if (npYear == null || npMonth == null || npDay == null || btnConfirm == null || btnCancel == null) return;
+
+        // 配置滚轮
+        npYear.setMinValue(2000);
+        npYear.setMaxValue(2050);
+        npYear.setValue(curYear);
+
+        npMonth.setMinValue(1);
+        npMonth.setMaxValue(12);
+        npMonth.setValue(curMonth);
+
+        npDay.setMinValue(1);
+        int maxDays = YearMonth.of(curYear, curMonth).lengthOfMonth();
+        npDay.setMaxValue(maxDays);
+        npDay.setValue(curDay);
+
+        // 联动逻辑
+        NumberPicker.OnValueChangeListener dateChangeListener = (picker, oldVal, newVal) -> {
+            int y = npYear.getValue();
+            int m = npMonth.getValue();
+            int newMaxDays = YearMonth.of(y, m).lengthOfMonth();
+            if (npDay.getMaxValue() != newMaxDays) {
+                int currentD = npDay.getValue();
+                npDay.setMaxValue(newMaxDays);
+                if (currentD > newMaxDays) npDay.setValue(newMaxDays);
+            }
+            updatePreviewText(tvPreview, y, m, npDay.getValue());
+        };
+
+        npYear.setOnValueChangedListener(dateChangeListener);
+        npMonth.setOnValueChangedListener(dateChangeListener);
+        npDay.setOnValueChangedListener(dateChangeListener);
+        
+        // 初始化预览
+        updatePreviewText(tvPreview, curYear, curMonth, curDay);
+
+        // 按钮事件
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnConfirm.setOnClickListener(v -> {
+            int year = npYear.getValue();
+            int month = npMonth.getValue();
+            int day = npDay.getValue();
+            
+            selectedDate = LocalDate.of(year, month, day);
+            
+            // 更新显示和图表
             updateDateRangeDisplay();
             refreshData();
+            
+            dialog.dismiss();
         });
-        datePicker.show(getParentFragmentManager(), "DATE_PICKER");
+
+        dialog.show();
     }
 
-    // --- 图表数据处理和绘制逻辑 ---
+    // 【新增】辅助方法：更新日期预览文字
+    private void updatePreviewText(TextView tv, int year, int month, int day) {
+        if (tv == null) return;
+        try {
+            LocalDate date = LocalDate.of(year, month, day);
+            // 修改点：同样改为单数字格式
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA);
+            tv.setText(date.format(formatter));
+        } catch (Exception e) {
+            tv.setText(year + "年" + month + "月" + day + "日");
+        }
+    }
 
+    // --- 图表数据处理和绘制逻辑 (后续代码保持不变) ---
+    // ...
     private void refreshData() {
         if (allTransactions == null) return;
         if (currentMode == 0) processYearlyData();
         else if (currentMode == 1) processMonthlyData();
         else processWeeklyData();
     }
-
+    
+    // ... processYearlyData, processMonthlyData, processWeeklyData, IndexExtractor, aggregateData ...
     private void processYearlyData() {
         int year = selectedDate.getYear();
         aggregateData(t -> {
@@ -314,7 +397,7 @@ public class StatsFragment extends Fragment {
             return date.getYear() == year ? date.getMonthValue() : -1;
         }, 12, "月", null);
     }
-
+    
     private void processMonthlyData() {
         int year = selectedDate.getYear();
         int month = selectedDate.getMonthValue();
@@ -360,9 +443,10 @@ public class StatsFragment extends Fragment {
         updateCharts(incomeMap, expenseMap, pieCats, maxX, suffix, customLabels);
     }
 
+    // ... (updateCharts, updateSummarySection, generateLowSaturationColors, createLineDataSet 等其余方法保持不变)
+    
     private void updateCharts(Map<Integer, Double> incomeMap, Map<Integer, Double> expenseMap,
                               Map<String, Double> pieMap, int maxX, String suffix, String[] customLabels) {
-        // ... (数据处理逻辑保持不变)
         List<Entry> inEntries = new ArrayList<>();
         List<Entry> outEntries = new ArrayList<>();
         List<Entry> netEntries = new ArrayList<>();
@@ -633,9 +717,6 @@ public class StatsFragment extends Fragment {
         lineChart.setExtraBottomOffset(10f);
         lineChart.setDragEnabled(true);
         lineChart.setScaleEnabled(false);
-        
-        // 【新增】设置拖拽时不显示高亮（即不显示 MarkerView）
-        // 这样只有点击时才会显示详情
         lineChart.setHighlightPerDragEnabled(false);
 
         if (getContext() != null) {
@@ -655,8 +736,6 @@ public class StatsFragment extends Fragment {
         pieChart.setHoleColor(holeColor);
         pieChart.setEntryLabelColor(textColor);
         pieChart.setEntryLabelTextSize(10f);
-        
-        // 【新增】禁止饼状图旋转，防止误触
         pieChart.setRotationEnabled(false);
 
         Legend l = pieChart.getLegend();
@@ -770,11 +849,8 @@ public class StatsFragment extends Fragment {
 
         dialog.show();
     }
-
-    private void showEditDialog(Transaction t, AlertDialog parentDialog) {
-        // ... (保持不变)
-    }
-
+    
+    // ... showAddOrEditDialog 和 DecimalDigitsInputFilter 保持不变
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_transaction, null);
@@ -789,7 +865,7 @@ public class StatsFragment extends Fragment {
         EditText etCustomCategory = dialogView.findViewById(R.id.et_custom_category);
         EditText etRemark = dialogView.findViewById(R.id.et_remark);
         EditText etNote = dialogView.findViewById(R.id.et_note);
-        Spinner spAsset = dialogView.findViewById(R.id.sp_asset); // 关联资产 Spinner
+        Spinner spAsset = dialogView.findViewById(R.id.sp_asset);
         
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);

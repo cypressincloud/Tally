@@ -73,9 +73,10 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:orientation="horizontal"
-                android:gravity="center"
+                android:gravity="center_vertical"
                 android:layout_marginTop="8dp">
 
                 <ImageButton
@@ -90,13 +91,14 @@
                 <TextView
                     android:id="@+id/tv_current_date_range"
                     android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:gravity="center"
                     android:text="2024年5月 第3周"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"
-                    android:paddingHorizontal="16dp"/>
+                    android:paddingHorizontal="4dp"/>
 
                 <ImageButton
                     android:id="@+id/btn_next"
