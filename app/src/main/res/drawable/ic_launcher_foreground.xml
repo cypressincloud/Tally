@@ -2,12 +2,12 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="54"
-    android:viewportHeight="54">
+    android:viewportWidth="64"
+    android:viewportHeight="64">
 
     <group
-        android:translateX="15"
-        android:translateY="15">
+        android:translateX="20"
+        android:translateY="20">
 
         <path
             android:fillColor="@android:color/white"
