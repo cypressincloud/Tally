@@ -64,10 +64,10 @@
                 android:layout_weight="1"
                 android:text="记一笔"
                 android:backgroundTint="@color/app_yellow"
-                android:textColor="@color/white"
+                android:textColor="@color/text_white"
                 app:cornerRadius="8dp"
                 app:icon="@android:drawable/ic_menu_edit"
-                app:iconTint="@color/black"/>
+                app:iconTint="@android:color/white"/>
         </LinearLayout>
 
         <Button
@@ -77,7 +77,7 @@
             android:text="关  闭"
             android:textStyle="bold"
             android:backgroundTint="@color/app_yellow"
-            android:textColor="@color/white"
+            android:textColor="@color/text_white"
             app:cornerRadius="8dp"/>
 
     </LinearLayout>

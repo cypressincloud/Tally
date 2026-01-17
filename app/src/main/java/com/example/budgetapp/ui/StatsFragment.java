@@ -9,8 +9,11 @@ import android.text.InputFilter;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -18,6 +21,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -86,11 +90,19 @@ public class StatsFragment extends Fragment {
     private TextView tvSummaryTitle;
     private TextView tvSummaryContent;
 
+    // 手势相关
+    private ScrollView scrollView;
+    private GestureDetector gestureDetector;
+    private float touchStartX, touchStartY;
+    private boolean isDirectionLocked = false;
+    private boolean isHorizontalSwipe = false;
+    private int touchSlop;
+
     // 0=年, 1=月, 2=周
     private int currentMode = 2;
     private LocalDate selectedDate = LocalDate.now();
     private List<Transaction> allTransactions = new ArrayList<>();
-    // 【新增】缓存资产列表，用于传给弹窗Adapter
+    // 缓存资产列表，用于传给弹窗Adapter
     private List<AssetAccount> assetList = new ArrayList<>();
     private CustomMarkerView markerView;
 
@@ -100,6 +112,7 @@ public class StatsFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_stats, container, false);
 
         initViews(view);
+        setupGestures(); // 初始化手势监听
         setupLineChart();
         setupPieChart();
 
@@ -111,7 +124,7 @@ public class StatsFragment extends Fragment {
             refreshData();
         });
 
-        // 【新增】观察资产列表，并更新本地缓存
+        // 观察资产列表，并更新本地缓存
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             this.assetList = assets;
         });
@@ -131,6 +144,12 @@ public class StatsFragment extends Fragment {
         // 初始化总结板块的 View
         tvSummaryTitle = view.findViewById(R.id.tv_summary_title);
         tvSummaryContent = view.findViewById(R.id.tv_summary_content);
+        
+        // 初始化 ScrollView
+        scrollView = view.findViewById(R.id.scroll_view_stats);
+        
+        // 获取系统最小滑动距离阈值
+        touchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
     }
 
     private void setupListeners(View view) {
@@ -156,6 +175,79 @@ public class StatsFragment extends Fragment {
             startActivity(intent);
             return true;
         });
+    }
+
+    private void setupGestures() {
+        if (scrollView == null) return;
+
+        gestureDetector = new GestureDetector(requireContext(), new SwipeGestureListener());
+
+        scrollView.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    touchStartX = event.getX();
+                    touchStartY = event.getY();
+                    isDirectionLocked = false;
+                    isHorizontalSwipe = false;
+                    break;
+
+                case MotionEvent.ACTION_MOVE:
+                    if (!isDirectionLocked) {
+                        float dx = Math.abs(event.getX() - touchStartX);
+                        float dy = Math.abs(event.getY() - touchStartY);
+
+                        if (dx > touchSlop || dy > touchSlop) {
+                            isDirectionLocked = true;
+                            if (dx > dy) {
+                                isHorizontalSwipe = true;
+                            } else {
+                                isHorizontalSwipe = false;
+                            }
+                        }
+                    }
+                    break;
+                
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    isDirectionLocked = false;
+                    isHorizontalSwipe = false;
+                    break;
+            }
+
+            return isDirectionLocked && isHorizontalSwipe;
+        });
+    }
+
+    private class SwipeGestureListener extends GestureDetector.SimpleOnGestureListener {
+        private static final int SWIPE_THRESHOLD = 100;
+        private static final int SWIPE_VELOCITY_THRESHOLD = 100;
+
+        @Override
+        public boolean onDown(@NonNull MotionEvent e) {
+            return true;
+        }
+
+        @Override
+        public boolean onFling(@Nullable MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
+            if (e1 == null || e2 == null) return false;
+
+            float diffX = e2.getX() - e1.getX();
+            float diffY = e2.getY() - e1.getY();
+
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                if (Math.abs(diffX) > SWIPE_THRESHOLD && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+                    if (diffX > 0) {
+                        changeDate(-1);
+                    } else {
+                        changeDate(1);
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     private void changeDate(int offset) {
@@ -270,7 +362,7 @@ public class StatsFragment extends Fragment {
 
     private void updateCharts(Map<Integer, Double> incomeMap, Map<Integer, Double> expenseMap,
                               Map<String, Double> pieMap, int maxX, String suffix, String[] customLabels) {
-
+        // ... (数据处理逻辑保持不变)
         List<Entry> inEntries = new ArrayList<>();
         List<Entry> outEntries = new ArrayList<>();
         List<Entry> netEntries = new ArrayList<>();
@@ -391,12 +483,10 @@ public class StatsFragment extends Fragment {
         pieChart.animateY(800);
         pieChart.invalidate();
         
-        // --- 总结板块逻辑更新 ---
         updateSummarySection(pieMap, totalPieAmount);
     }
     
     private void updateSummarySection(Map<String, Double> pieMap, double totalAmount) {
-        // 更新标题为 “本X消费”
         String scopeStr;
         if (currentMode == 0) scopeStr = "本年";
         else if (currentMode == 1) scopeStr = "本月";
@@ -408,62 +498,49 @@ public class StatsFragment extends Fragment {
             return;
         }
 
-        // 排序取出前三名
         List<Map.Entry<String, Double>> sortedEntries = new ArrayList<>(pieMap.entrySet());
-        // 降序排序
         Collections.sort(sortedEntries, (e1, e2) -> Double.compare(e2.getValue(), e1.getValue()));
 
         SpannableStringBuilder ssb = new SpannableStringBuilder();
         String[] prefixes = {"最多是", "其次是", "然后是"};
         
-        // 获取颜色资源
         int yellowColor = ContextCompat.getColor(requireContext(), R.color.fixed_yellow);
         int greenColor = ContextCompat.getColor(requireContext(), R.color.expense_green);
         int redColor = ContextCompat.getColor(requireContext(), R.color.income_red);
 
         int count = Math.min(sortedEntries.size(), 3);
         for (int i = 0; i < count; i++) {
-            if (i > 0) ssb.append("\n"); // 换行
+            if (i > 0) ssb.append("\n"); 
 
             Map.Entry<String, Double> e = sortedEntries.get(i);
             double percent = (e.getValue() / totalAmount) * 100;
 
-            // 前缀
             ssb.append(prefixes[i]);
             
-            // 类别名称 (黄色字体)
             String category = e.getKey();
             int startCat = ssb.length();
             ssb.append(category);
             ssb.setSpan(new ForegroundColorSpan(yellowColor), startCat, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             
             ssb.append(", ");
-
-            // 占比标签
             ssb.append("占比");
             
-            // 百分比数值 (绿色字体)
             String percentStr = String.format(Locale.CHINA, "%.1f%%", percent);
             int startPer = ssb.length();
             ssb.append(percentStr);
             ssb.setSpan(new ForegroundColorSpan(greenColor), startPer, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             
             ssb.append(", ");
-
-            // 消费标签
             ssb.append("消费");
 
-            // 金额数值 (红色字体)
             String amountStr = String.format(Locale.CHINA, "%.2f", e.getValue());
             int startAmt = ssb.length();
             ssb.append(amountStr);
             ssb.setSpan(new ForegroundColorSpan(redColor), startAmt, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
-            // 单位
             ssb.append("元");
         }
 
-        // --- NEW: 共计消费和日均消费 (动态逻辑) ---
         ssb.append("\n");
         
         long days = 1;
@@ -482,13 +559,9 @@ public class StatsFragment extends Fragment {
             endOfPeriod = selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
         }
 
-        // 判断当前日期是否在选定周期内
-        // 注意：isAfter/isBefore 不包含边界，所以要用 !isBefore(start) && !isAfter(end)
         if (!today.isBefore(startOfPeriod) && !today.isAfter(endOfPeriod)) {
-             // 如果是当前周期，计算从开始到今天的天数（含今天）
              days = ChronoUnit.DAYS.between(startOfPeriod, today) + 1;
         } else {
-             // 如果是过去或未来的完整周期，计算总天数
              days = ChronoUnit.DAYS.between(startOfPeriod, endOfPeriod) + 1;
         }
 
@@ -496,28 +569,22 @@ public class StatsFragment extends Fragment {
 
         double dailyAvg = totalAmount / days;
 
-        // "共计消费"
         ssb.append("共计消费");
         
-        // 总金额 (红色字体)
         String totalStr = String.format(Locale.CHINA, "%.2f", totalAmount);
         int startTotal = ssb.length();
         ssb.append(totalStr);
         ssb.setSpan(new ForegroundColorSpan(redColor), startTotal, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         
-        // "元, "
         ssb.append("元, ");
         
-        // "日均消费"
         ssb.append("日均消费");
         
-        // 日均金额 (红色字体)
         String avgStr = String.format(Locale.CHINA, "%.2f", dailyAvg);
         int startAvg = ssb.length();
         ssb.append(avgStr);
         ssb.setSpan(new ForegroundColorSpan(redColor), startAvg, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         
-        // "元"
         ssb.append("元");
 
         tvSummaryContent.setText(ssb);
@@ -566,6 +633,10 @@ public class StatsFragment extends Fragment {
         lineChart.setExtraBottomOffset(10f);
         lineChart.setDragEnabled(true);
         lineChart.setScaleEnabled(false);
+        
+        // 【新增】设置拖拽时不显示高亮（即不显示 MarkerView）
+        // 这样只有点击时才会显示详情
+        lineChart.setHighlightPerDragEnabled(false);
 
         if (getContext() != null) {
             markerView = new CustomMarkerView(getContext(), R.layout.view_chart_marker);
@@ -584,6 +655,9 @@ public class StatsFragment extends Fragment {
         pieChart.setHoleColor(holeColor);
         pieChart.setEntryLabelColor(textColor);
         pieChart.setEntryLabelTextSize(10f);
+        
+        // 【新增】禁止饼状图旋转，防止误触
+        pieChart.setRotationEnabled(false);
 
         Legend l = pieChart.getLegend();
         l.setTextColor(textColor);
@@ -682,7 +756,6 @@ public class StatsFragment extends Fragment {
         });
         
         adapter.setTransactions(filteredList);
-        // 【关键修复】: 将缓存的资产列表传给 Adapter
         adapter.setAssets(assetList); 
         
         rv.setAdapter(adapter);

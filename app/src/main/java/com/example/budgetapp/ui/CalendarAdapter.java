@@ -88,10 +88,10 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         Context context = holder.itemView.getContext();
         holder.tvDay.setText(String.valueOf(date.getDayOfMonth()));
 
-        // 获取各种基础颜色
+        // 基础颜色
         int colorPrimaryText = getThemeColor(context, android.R.attr.textColorPrimary);
         int colorSecondaryText = getThemeColor(context, android.R.attr.textColorSecondary);
-        int themeColor = context.getColor(R.color.app_yellow); // 获取当前应用主题色
+        int themeColor = context.getColor(R.color.app_yellow);
 
         boolean isCurrentMonth = true;
         if (currentMonth != null) {
@@ -99,7 +99,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                              date.getMonth() == currentMonth.getMonth();
         }
 
-        // --- 1. 先计算默认状态下的字体颜色 (未选中时) ---
+        // --- 1. 计算默认字体颜色 ---
         int defaultDayColor;
         if (isCurrentMonth) {
             holder.tvDay.setAlpha(1.0f);
@@ -111,7 +111,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             defaultDayColor = colorSecondaryText;
         }
 
-        // --- 2. 统计金额并计算默认金额颜色 ---
+        // --- 2. 统计金额及默认颜色 ---
         double dailySum = 0;
         long start = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
         long end = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
@@ -143,9 +143,8 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         String netText = "";
         if (Math.abs(dailySum) > 0.001) {
             netText = String.format("%.2f", dailySum);
-            holder.tvNet.setAlpha(isCurrentMonth ? 1.0f : 0.3f);
-
-            if (filterMode == 2) {
+            // 金额颜色逻辑保持不变...
+             if (filterMode == 2) {
                 defaultNetColor = Color.parseColor("#4CAF50");
             } else if (filterMode == 3) {
                 defaultNetColor = Color.parseColor("#FF9800");
@@ -154,33 +153,51 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             }
         }
 
-        // --- 3. 【核心逻辑】根据选中状态应用最终样式 ---
-        if (date.equals(selectedDate)) {
-            // A. 设置背景及主题色Tint
-            holder.itemView.setBackgroundResource(R.drawable.bg_selected_date);
-            Drawable background = holder.itemView.getBackground();
-            if (background != null) {
-                // 将背景着色为当前主题色
-                background.setTint(themeColor);
-            }
-            holder.itemView.setSelected(true);
+        // --- 3. 样式应用核心逻辑 ---
+        boolean isToday = date.equals(LocalDate.now());
+        boolean isSelected = date.equals(selectedDate);
 
-            // B. 强制将所有文字颜色改为 selector_text (通常是白色)
-            int selectedTextColor = context.getColor(R.color.selector_text);
+        if (isToday) {
+            // [今天]：实心主题色背景 + 白色文字 (优先级最高，或者与选中效果叠加)
+            // 这里假设"今天"的样式优先展示，即使被选中也保持实心
+            holder.itemView.setBackgroundResource(R.drawable.bg_calendar_today);
+            Drawable bg = holder.itemView.getBackground();
+            if (bg != null) bg.setTint(themeColor);
             
-            holder.tvDay.setTextColor(selectedTextColor);
-            holder.tvDay.setAlpha(1.0f); // 选中时完全不透明
+            // 强制白色文字
+            holder.tvDay.setTextColor(Color.WHITE);
+            holder.tvDay.setAlpha(1.0f);
+            
+            holder.tvNet.setText(netText);
+            if (!netText.isEmpty()) {
+                holder.tvNet.setTextColor(Color.WHITE); // 金额也由白色显示
+                holder.tvNet.setAlpha(1.0f);
+            } else {
+                 holder.tvNet.setText("");
+            }
+            holder.itemView.setSelected(isSelected); // 保持选中状态标记（如有需要）
+
+        } else if (isSelected) {
+            // [被选中 (非今天)]：空心边框 + 默认文字颜色
+            holder.itemView.setBackgroundResource(R.drawable.bg_selected_date);
+            Drawable bg = holder.itemView.getBackground();
+            if (bg != null) bg.setTint(themeColor);
+            
+            // 字体不用变色，使用 defaultDayColor
+            holder.tvDay.setTextColor(defaultDayColor);
+            holder.tvDay.setAlpha(1.0f);
 
             holder.tvNet.setText(netText);
             if (!netText.isEmpty()) {
-                holder.tvNet.setTextColor(selectedTextColor);
-                holder.tvNet.setAlpha(1.0f);
+                holder.tvNet.setTextColor(defaultNetColor);
+                holder.tvNet.setAlpha(isCurrentMonth ? 1.0f : 0.3f);
             } else {
-                holder.tvNet.setText("");
+                 holder.tvNet.setText("");
             }
+            holder.itemView.setSelected(true);
 
         } else {
-            // 未选中状态：清除背景，恢复默认计算的颜色
+            // [普通状态]
             holder.itemView.setBackgroundResource(0);
             holder.itemView.setSelected(false);
             
@@ -189,6 +206,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             holder.tvNet.setText(netText);
             if (!netText.isEmpty()) {
                 holder.tvNet.setTextColor(defaultNetColor);
+                holder.tvNet.setAlpha(isCurrentMonth ? 1.0f : 0.3f);
             }
         }
 

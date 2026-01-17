@@ -169,7 +169,7 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="20dp"
         android:src="@android:drawable/ic_input_add"
-        app:tint="@color/white"
+        app:tint="@android:color/white"
         android:contentDescription="添加资产"
         app:backgroundTint="@color/app_yellow"
 

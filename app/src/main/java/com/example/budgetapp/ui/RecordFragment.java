@@ -8,7 +8,9 @@ import android.text.Editable;
 import android.text.InputFilter;
 import android.text.Spanned;
 import android.text.TextWatcher;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
@@ -58,7 +60,10 @@ public class RecordFragment extends Fragment {
     private CalendarAdapter adapter;
     private YearMonth currentMonth;
     private LocalDate selectedDate;
+
+    // UI 控件
     private TextView tvMonthTitle;
+    private TextView tvMonthLabel;
 
     private TextView tvIncome, tvExpense, tvBalance, tvOvertime;
     private LinearLayout layoutIncome, layoutExpense, layoutBalance, layoutOvertime;
@@ -66,13 +71,20 @@ public class RecordFragment extends Fragment {
     private List<AssetAccount> cachedAssets = new ArrayList<>();
     private TransactionListAdapter currentDetailAdapter;
 
+    // [新增] 手势检测器
+    private GestureDetector gestureDetector;
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_record, container, false);
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
         currentMonth = YearMonth.now();
 
+        // [新增] 初始化手势检测
+        initGestureDetector();
+
         tvMonthTitle = view.findViewById(R.id.tv_month_title);
+        tvMonthLabel = view.findViewById(R.id.tv_month_label);
 
         tvIncome = view.findViewById(R.id.tv_month_income);
         tvExpense = view.findViewById(R.id.tv_month_expense);
@@ -97,11 +109,23 @@ public class RecordFragment extends Fragment {
         });
         recyclerView.setAdapter(adapter);
 
+        // [新增] 将手势监听绑定到 RecyclerView (日历区域)
+        recyclerView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
+
+        // [新增] 也可以绑定到月份大字上，方便用户在空白处滑动
+        if (tvMonthLabel != null) {
+            tvMonthLabel.setOnTouchListener((v, event) -> {
+                gestureDetector.onTouchEvent(event);
+                return true; // 消费事件，允许滑动
+            });
+        }
+
         layoutBalance.setOnClickListener(v -> switchFilterMode(0));
         layoutIncome.setOnClickListener(v -> switchFilterMode(1));
         layoutExpense.setOnClickListener(v -> switchFilterMode(2));
         layoutOvertime.setOnClickListener(v -> switchFilterMode(3));
 
+        // 点击年份标题，依然弹出日期选择器 (保持原有效果)
         tvMonthTitle.setOnClickListener(v -> {
             long selection = currentMonth.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
             MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
@@ -118,12 +142,13 @@ public class RecordFragment extends Fragment {
             datePicker.show(getParentFragmentManager(), "MONTH_PICKER");
         });
 
+        // [修改] 左右箭头改为切换年份
         view.findViewById(R.id.btn_prev_month).setOnClickListener(v -> {
-            currentMonth = currentMonth.minusMonths(1);
+            currentMonth = currentMonth.minusYears(1); // 减一年
             updateCalendar();
         });
         view.findViewById(R.id.btn_next_month).setOnClickListener(v -> {
-            currentMonth = currentMonth.plusMonths(1);
+            currentMonth = currentMonth.plusYears(1); // 加一年
             updateCalendar();
         });
 
@@ -142,41 +167,71 @@ public class RecordFragment extends Fragment {
         return view;
     }
 
+    // [新增] 初始化手势监听逻辑
+    private void initGestureDetector() {
+        gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
+            private static final int SWIPE_THRESHOLD = 100;
+            private static final int SWIPE_VELOCITY_THRESHOLD = 100;
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                if (e1 == null || e2 == null) return false;
+
+                float diffX = e2.getX() - e1.getX();
+                float diffY = e2.getY() - e1.getY();
+
+                // 只有横向滑动距离大于纵向，且速度足够时才触发
+                if (Math.abs(diffX) > Math.abs(diffY) &&
+                        Math.abs(diffX) > SWIPE_THRESHOLD &&
+                        Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+
+                    if (diffX > 0) {
+                        // 向右滑 -> 上一个月
+                        currentMonth = currentMonth.minusMonths(1);
+                    } else {
+                        // 向左滑 -> 下一个月
+                        currentMonth = currentMonth.plusMonths(1);
+                    }
+                    updateCalendar();
+                    return true;
+                }
+                return false;
+            }
+        });
+    }
+
     private void switchFilterMode(int mode) {
         adapter.setFilterMode(mode);
     }
 
     private void updateCalendar() {
-        tvMonthTitle.setText(currentMonth.format(DateTimeFormatter.ofPattern("yyyy年MM月")));
+        // [修改] 顶部只显示年份
+        tvMonthTitle.setText(currentMonth.format(DateTimeFormatter.ofPattern("yyyy")));
+
+        // 单独的行显示月份 (如果布局中有这个控件)
+        if (tvMonthLabel != null) {
+            tvMonthLabel.setText(currentMonth.getMonthValue() + "月");
+        }
+
         List<LocalDate> days = new ArrayList<>();
-        
-        // --- 核心修改逻辑开始 ---
-        // 1. 获取当月第一天
+
         LocalDate firstDay = currentMonth.atDay(1);
-        
-        // 2. 计算第一天是星期几 (1=周一, 7=周日)
         int dayOfWeek = firstDay.getDayOfWeek().getValue();
-        
-        // 3. 计算需要的偏移量 (因为第一列是周一，所以周一偏移0，周二偏移1...)
         int offset = dayOfWeek - 1;
 
-        // 4. 计算并添加上个月的日期作为占位
         LocalDate startOfGrid = firstDay.minusDays(offset);
         for (int i = 0; i < offset; i++) {
             days.add(startOfGrid.plusDays(i));
         }
 
-        // 5. 添加本月日期
         int length = currentMonth.lengthOfMonth();
         for (int i = 1; i <= length; i++) {
             days.add(currentMonth.atDay(i));
         }
-        // --- 核心修改逻辑结束 ---
 
         List<Transaction> allList = viewModel.getAllTransactions().getValue();
         List<Transaction> currentList = allList != null ? allList : new ArrayList<>();
-        
-        // 将当前月份传给 Adapter 以便区分样式
+
         adapter.setCurrentMonth(currentMonth);
         adapter.updateData(days, currentList);
         calculateMonthTotals(currentList);
@@ -231,7 +286,7 @@ public class RecordFragment extends Fragment {
             LocalDate transDate = Instant.ofEpochMilli(transaction.date).atZone(ZoneId.systemDefault()).toLocalDate();
             showAddOrEditDialog(transaction, transDate);
         });
-        
+
         listAdapter.setAssets(cachedAssets);
         currentDetailAdapter = listAdapter;
         rvList.setAdapter(listAdapter);
@@ -315,7 +370,7 @@ public class RecordFragment extends Fragment {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         dialog.show();
     }
-    
+
     private void calculateOvertime(EditText etRate, EditText etDuration, TextView tvResult) {
         try {
             String r = etRate.getText().toString();
@@ -347,10 +402,10 @@ public class RecordFragment extends Fragment {
         EditText etRemark = dialogView.findViewById(R.id.et_remark);
         EditText etNote = dialogView.findViewById(R.id.et_note);
         Spinner spAsset = dialogView.findViewById(R.id.sp_asset);
-        
+
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
-        
+
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
 
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
@@ -529,11 +584,11 @@ public class RecordFragment extends Fragment {
             tvRevoke.setOnClickListener(v -> {
                 showRevokeDialog(existingTransaction, dialog);
             });
-            
+
         } else {
             btnSave.setText("保存");
             btnDelete.setVisibility(View.GONE);
-            tvRevoke.setVisibility(View.GONE); 
+            tvRevoke.setVisibility(View.GONE);
             SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA);
             etNote.setText(noteSdf.format(calendar.getTime()) + " manual");
         }
@@ -576,14 +631,14 @@ public class RecordFragment extends Fragment {
                     viewModel.addTransaction(t);
 
                     if (selectedAssetId != 0) {
-                         for (AssetAccount asset : assetList) {
-                             if (asset.id == selectedAssetId) {
-                                 if (type == 1) asset.amount += amount;
-                                 else asset.amount -= amount;
-                                 viewModel.updateAsset(asset);
-                                 break;
-                             }
-                         }
+                        for (AssetAccount asset : assetList) {
+                            if (asset.id == selectedAssetId) {
+                                if (type == 1) asset.amount += amount;
+                                else asset.amount -= amount;
+                                viewModel.updateAsset(asset);
+                                break;
+                            }
+                        }
                     }
                 } else {
                     Transaction updateT = new Transaction(ts, type, category, amount, noteContent, userRemark);
@@ -611,7 +666,7 @@ public class RecordFragment extends Fragment {
         List<AssetAccount> assetList = new ArrayList<>();
         AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
         noAsset.id = 0;
-        
+
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), R.layout.item_spinner_dropdown);
         adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spRevokeAsset.setAdapter(adapter);
@@ -649,12 +704,12 @@ public class RecordFragment extends Fragment {
             int selectedPos = spRevokeAsset.getSelectedItemPosition();
             if (selectedPos >= 0 && selectedPos < assetList.size()) {
                 AssetAccount selectedAsset = assetList.get(selectedPos);
-                
+
                 viewModel.revokeTransaction(transaction, selectedAsset.id);
-                
+
                 String msg = selectedAsset.id == 0 ? "已撤回记录（无资产变动）" : "已撤回并退款至 " + selectedAsset.name;
                 Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
-                
+
                 revokeDialog.dismiss();
                 if (parentDialog != null && parentDialog.isShowing()) {
                     parentDialog.dismiss();
@@ -664,7 +719,7 @@ public class RecordFragment extends Fragment {
 
         revokeDialog.show();
     }
-    
+
     private static class DecimalDigitsInputFilter implements InputFilter {
         private final Pattern mPattern;
         public DecimalDigitsInputFilter(int digitsAfterZero) {

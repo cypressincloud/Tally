@@ -83,7 +83,7 @@
                 android:layout_weight="1"
                 android:text="确  认"
                 android:textStyle="bold"
-                android:textColor="@color/white"
+                android:textColor="@color/text_white"
                 android:backgroundTint="@color/app_yellow"
                 app:cornerRadius="8dp"/>
         </LinearLayout>

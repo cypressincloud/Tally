@@ -5,6 +5,8 @@
     <color name="white">#FFFFFFFF</color>
     <color name="marker_bg">#F5F5F5</color>
 
+    <color name="text_white">#FFFFFFFF</color>
+
     <color name="app_yellow">#1677FF</color>
     <color name="ripple_yellow">#FFF59D</color>
     <color name="app_background">#FFFFFF</color>
@@ -16,7 +18,7 @@
 
     <color name="black_marker">#FF000000</color>
 
-    <color name="fixed_yellow">#FFD700</color>
+    <color name="fixed_yellow">#1677FF</color>
 
     <color name="divider">#E0E0E0</color>
 

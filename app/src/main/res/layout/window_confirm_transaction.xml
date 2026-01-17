@@ -76,7 +76,7 @@
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:text="确认保存"
-                    android:textColor="@color/white"
+                    android:textColor="@color/text_white"
                     android:textStyle="bold"
                     android:backgroundTint="@color/app_yellow"
 

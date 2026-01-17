@@ -43,11 +43,23 @@
             android:contentDescription="下一月"/>
     </RelativeLayout>
 
+    <TextView
+        android:id="@+id/tv_month_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/bar_background"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="8dp"
+        android:text="12月"
+        android:textColor="@color/black"
+        android:textSize="32sp"
+        android:textStyle="bold" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="12dp"
+        android:paddingTop="4dp"
         android:paddingBottom="8dp"
         android:paddingHorizontal="8dp"
         android:background="@color/bar_background">
