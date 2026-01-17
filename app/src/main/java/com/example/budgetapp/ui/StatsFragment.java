@@ -380,7 +380,7 @@ public class StatsFragment extends Fragment {
 
         LineDataSet setIn = createLineDataSet(inEntries, "收入", R.color.income_red);
         LineDataSet setOut = createLineDataSet(outEntries, "支出", R.color.expense_green);
-        LineDataSet setNet = createLineDataSet(netEntries, "净收支", R.color.fixed_yellow);
+        LineDataSet setNet = createLineDataSet(netEntries, "净收支", R.color.app_yellow);
         setNet.enableDashedLine(10f, 5f, 0f);
 
         LineData lineData = new LineData(setIn, setOut, setNet);
@@ -504,7 +504,7 @@ public class StatsFragment extends Fragment {
         SpannableStringBuilder ssb = new SpannableStringBuilder();
         String[] prefixes = {"最多是", "其次是", "然后是"};
         
-        int yellowColor = ContextCompat.getColor(requireContext(), R.color.fixed_yellow);
+        int yellowColor = ContextCompat.getColor(requireContext(), R.color.app_yellow);
         int greenColor = ContextCompat.getColor(requireContext(), R.color.expense_green);
         int redColor = ContextCompat.getColor(requireContext(), R.color.income_red);
 
