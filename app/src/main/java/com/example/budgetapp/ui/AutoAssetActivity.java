@@ -140,65 +140,82 @@ public class AutoAssetActivity extends AppCompatActivity {
         container.setOrientation(LinearLayout.VERTICAL);
         container.setPadding(60, 40, 60, 20);
 
-        // 应用选择
+        // 定义通用的 Spinner 布局参数：增加上边距 (例如 30px)
+        LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        spinnerParams.topMargin = 30; // 【修改 1】增加上边距，拉开与标题的距离
+
+        // 1. 应用选择
         TextView labelApp = new TextView(this);
         labelApp.setText("生效应用:");
         labelApp.setTextColor(Color.GRAY);
         container.addView(labelApp);
 
-        // ... (应用选择 Spinner)
         final Spinner spinnerApp = new Spinner(this);
-        // 【修改】只设置弹出背景
+        spinnerApp.setBackground(null); // 去掉箭头和背景
         spinnerApp.setPopupBackgroundResource(R.drawable.bg_input_field);
 
+        // 【修改 2】设置内边距为 0，确保文字与上方的标题 ("生效应用") 严格左对齐
+        spinnerApp.setPadding(0, 0, 0, 0);
+
+        // 应用布局参数
+        container.addView(spinnerApp, spinnerParams);
+
         ArrayAdapter<AppItem> appAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, cachedApps);
-        // 如果想让下拉里的 Item 样式更好看，建议保留这行；如果只想改框体圆角，这行保持原样即可
         appAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerApp.setAdapter(appAdapter);
-        container.addView(spinnerApp);
 
-        // 资产选择
+
+        // 2. 资产选择
         TextView labelAsset = new TextView(this);
         labelAsset.setText("\n关联资产:");
         labelAsset.setTextColor(Color.GRAY);
         container.addView(labelAsset);
 
         final Spinner spinnerAsset = new Spinner(this);
-
+        spinnerAsset.setBackground(null); // 去掉箭头和背景
         spinnerAsset.setPopupBackgroundResource(R.drawable.bg_input_field);
+
+        // 【修改 2】同样设置内边距为 0，确保对齐
+        spinnerAsset.setPadding(0, 0, 0, 0);
+
+        // 应用布局参数
+        container.addView(spinnerAsset, spinnerParams);
 
         List<String> assetNames = new ArrayList<>();
         for(AssetAccount a : cachedAssets) assetNames.add(a.name);
-        
+
         ArrayAdapter<String> assetAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, assetNames);
         assetAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerAsset.setAdapter(assetAdapter);
-        container.addView(spinnerAsset);
 
-        // 关键字输入
+
+        // 3. 关键字输入
         TextView labelKw = new TextView(this);
         labelKw.setText("\n屏幕关键字 (包含即触发):");
         labelKw.setTextColor(Color.GRAY);
         container.addView(labelKw);
 
         final EditText etKeyword = new EditText(this);
-        etKeyword.setHint("例如: 招商银行");
-        container.addView(etKeyword);
+        etKeyword.setHint(" 例如: 招商银行");
+        // 给输入框也加一点上边距，保持风格统一
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        inputParams.topMargin = 20;
+        container.addView(etKeyword, inputParams);
 
-        // --- 回显数据 (如果是编辑模式) ---
         if (oldRule != null) {
-            // 1. 回显关键字
             etKeyword.setText(oldRule.keyword);
-            
-            // 2. 回显应用
             for (int i = 0; i < cachedApps.size(); i++) {
                 if (cachedApps.get(i).packageName.equals(oldRule.packageName)) {
                     spinnerApp.setSelection(i);
                     break;
                 }
             }
-
-            // 3. 回显资产
             for (int i = 0; i < cachedAssets.size(); i++) {
                 if (cachedAssets.get(i).id == oldRule.assetId) {
                     spinnerAsset.setSelection(i);
@@ -209,6 +226,7 @@ public class AutoAssetActivity extends AppCompatActivity {
 
         builder.setView(container);
 
+        // ... (后续按钮监听代码保持不变) ...
         builder.setPositiveButton("保存", (dialog, which) -> {
             String keyword = etKeyword.getText().toString().trim();
             if (keyword.isEmpty()) {
@@ -218,37 +236,35 @@ public class AutoAssetActivity extends AppCompatActivity {
 
             AppItem selectedApp = (AppItem) spinnerApp.getSelectedItem();
             if (selectedApp == null || cachedAssets.isEmpty()) return;
-            
+
             int selectedAssetIndex = spinnerAsset.getSelectedItemPosition();
             if (selectedAssetIndex < 0 || selectedAssetIndex >= cachedAssets.size()) return;
-            
+
             AssetAccount selectedAsset = cachedAssets.get(selectedAssetIndex);
 
             AutoAssetManager.AssetRule newRule = new AutoAssetManager.AssetRule(selectedApp.packageName, keyword, selectedAsset.id);
-            
-            // 如果是编辑，先删除旧的
+
             if (oldRule != null) {
                 AutoAssetManager.removeRule(this, oldRule);
             }
-            
+
             AutoAssetManager.addRule(this, newRule);
-            
-            loadData(); // 刷新列表
+
+            loadData();
             String msg = (oldRule != null) ? "规则已更新" : "规则已添加";
             Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         });
         builder.setNegativeButton("取消", null);
-        
+
         AlertDialog dialog = builder.create();
         dialog.show();
-        
+
         int primaryColor = ContextCompat.getColor(this, R.color.text_primary);
         Button btnPos = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
         Button btnNeg = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
         if (btnPos != null) btnPos.setTextColor(primaryColor);
         if (btnNeg != null) btnNeg.setTextColor(primaryColor);
     }
-
     private String getAssetNameById(int id) {
         for (AssetAccount a : cachedAssets) {
             if (a.id == id) return a.name;
