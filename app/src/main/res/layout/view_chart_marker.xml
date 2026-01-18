@@ -4,7 +4,7 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     app:cardBackgroundColor="@color/marker_bg"
-    app:cardCornerRadius="8dp"
+    app:cardCornerRadius="16dp"
     app:cardElevation="4dp"
     app:contentPadding="12dp">
     <!-- 背景设为浅灰 #F5F5F5，避免白色背景下黄色文字看不清 -->
@@ -57,7 +57,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="净收支: 0"
-            android:textColor="#FBC02D"
+            android:textColor="@color/app_yellow"
             android:textStyle="bold"
             android:textSize="12sp"/>
         <!-- 这里直接写死一个稍深的黄色 #FBC02D，

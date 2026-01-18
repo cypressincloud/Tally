@@ -1,9 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@drawable/bg_input_field" />
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
 
-    <item
-        android:drawable="@drawable/ic_arrow_drop_down"
-        android:gravity="end|center_vertical"
-        android:right="12dp" />
-</layer-list>
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="16dp" />
+            <solid android:color="@android:color/black" />
+        </shape>
+    </item>
+
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/input_bg"/>
+                    <corners android:radius="16dp"/>
+                </shape>
+            </item>
+
+            <item
+                android:drawable="@drawable/ic_arrow_drop_down"
+                android:gravity="end|center_vertical"
+                android:right="12dp" />
+        </layer-list>
+    </item>
+</ripple>

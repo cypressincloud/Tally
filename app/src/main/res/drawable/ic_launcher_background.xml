@@ -6,6 +6,6 @@
     android:viewportHeight="108">
 
     <path
-        android:fillColor="@color/app_yellow"
+        android:fillColor="#1677FF"
         android:pathData="M0,0h108v108h-108z" />
 </vector>

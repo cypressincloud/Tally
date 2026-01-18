@@ -1,91 +1,135 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/window_root"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_margin="0dp"
-    app:cardCornerRadius="16dp"
-    app:cardElevation="8dp"
-    app:cardBackgroundColor="@color/white">
+    android:layout_height="match_parent"
+    android:background="#00000000">
 
-    <ScrollView
-        android:layout_width="match_parent"
+    <androidx.cardview.widget.CardView
+        android:id="@+id/window_card_content"
+        android:layout_width="360dp"
         android:layout_height="wrap_content"
-        android:scrollbars="vertical"
-        android:fadeScrollbars="false">
+        android:layout_gravity="center"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white">
 
-        <LinearLayout
+        <ScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="20dp">
-
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="自动记账" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/black" android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp"/>
-
-            <EditText android:id="@+id/et_window_amount" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="金额" android:inputType="numberDecimal" android:textSize="20sp" android:textStyle="bold" android:textColor="@color/text_primary" android:textColorHint="@color/text_secondary" android:gravity="center" android:background="@null" android:padding="8dp"/>
-
-            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#E0E0E0" android:layout_marginBottom="16dp"/>
-
-            <RadioGroup android:id="@+id/rg_window_type" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center" android:layout_marginBottom="16dp">
-                <RadioButton android:id="@+id/rb_window_expense" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="支出" android:textColor="@color/text_primary" android:buttonTint="@color/app_yellow" android:layout_marginEnd="24dp"/>
-                <RadioButton android:id="@+id/rb_window_income" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:buttonTint="@color/app_yellow" android:text="收入"/>
-            </RadioGroup>
-
-            <RadioGroup android:id="@+id/rg_window_category" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center" android:layout_marginBottom="12dp">
-                <RadioButton android:id="@+id/rb_cat_food" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="餐饮" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary" android:checked="true"/>
-                <RadioButton android:id="@+id/rb_cat_ent" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="娱乐" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary"/>
-                <RadioButton android:id="@+id/rb_cat_shop" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="购物" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary"/>
-                <RadioButton android:id="@+id/rb_window_custom" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="自定义" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary"/>
-            </RadioGroup>
-
-            <Spinner
-                android:id="@+id/sp_asset"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_input_field"
-                android:padding="2dp"
-                android:layout_marginBottom="16dp"/>
-
-            <EditText android:id="@+id/et_window_category" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="自定义分类*" android:textColor="@color/text_primary" android:textColorHint="@color/text_secondary" android:textSize="14sp" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="12dp" android:visibility="gone"/>
-
-            <EditText android:id="@+id/et_window_note" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:textColorHint="@color/text_secondary" android:hint="记录时间 (可选)" android:textSize="14sp" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="20dp"/>
-
-            <EditText android:id="@+id/et_window_remark" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:textColorHint="@color/text_secondary" android:hint="添加备注*" android:textSize="14sp" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="20dp"/>
+            android:scrollbars="vertical"
+            android:fadeScrollbars="false">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
-                <Button
-                    android:id="@+id/btn_window_cancel"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="取消"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="自动记账" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/black" android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp"/>
+
+                <EditText android:id="@+id/et_window_amount" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="金额" android:inputType="numberDecimal" android:textSize="20sp" android:textStyle="bold" android:textColor="@color/text_primary" android:textColorHint="@color/text_secondary" android:gravity="center" android:background="@null" android:padding="8dp"/>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#E0E0E0" android:layout_marginBottom="16dp"/>
+
+                <RadioGroup android:id="@+id/rg_window_type" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center" android:layout_marginBottom="16dp">
+                    <RadioButton android:id="@+id/rb_window_expense" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="支出" android:textColor="@color/text_primary" android:buttonTint="@color/app_yellow" android:layout_marginEnd="24dp"/>
+                    <RadioButton android:id="@+id/rb_window_income" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:buttonTint="@color/app_yellow" android:text="收入"/>
+                </RadioGroup>
+
+                <RadioGroup android:id="@+id/rg_window_category" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center" android:layout_marginBottom="12dp">
+                    <RadioButton android:id="@+id/rb_cat_food" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="餐饮" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary" android:checked="true"/>
+                    <RadioButton android:id="@+id/rb_cat_ent" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="娱乐" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary"/>
+                    <RadioButton android:id="@+id/rb_cat_shop" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="购物" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary"/>
+                    <RadioButton android:id="@+id/rb_window_custom" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="自定义" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary"/>
+                </RadioGroup>
+
+                <Spinner
+                    android:id="@+id/sp_asset"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_input_field"
+                    android:popupBackground="@drawable/bg_input_field"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="12dp"
+                    android:layout_marginBottom="16dp"/>
+
+                <EditText
+                    android:id="@+id/et_window_category"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:hint="自定义分类*"
                     android:textColor="@color/text_primary"
-                    android:backgroundTint="@color/input_bg"
-                    android:layout_marginEnd="8dp"
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="16sp"
+                    android:background="@drawable/bg_input_field"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginBottom="12dp"
+                    android:visibility="gone"/>
 
-                    app:elevation="0dp"
-                    app:pressedTranslationZ="0dp"
-                    app:borderWidth="0dp"
-                    android:stateListAnimator="@null"/>
-                <Button
-                    android:id="@+id/btn_window_save"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
+                <EditText
+                    android:id="@+id/et_window_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:hint="记录时间 (可选)"
+                    android:textSize="16sp"
+                    android:background="@drawable/bg_input_field"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginBottom="20dp"/>
+
+                <EditText
+                    android:id="@+id/et_window_remark"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:hint="添加备注*"
+                    android:textSize="16sp"
+                    android:background="@drawable/bg_input_field"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginBottom="20dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="确认保存"
-                    android:textColor="@color/text_white"
-                    android:textStyle="bold"
-                    android:backgroundTint="@color/app_yellow"
+                    android:orientation="horizontal">
 
-                    app:elevation="0dp"
-                    app:pressedTranslationZ="0dp"
-                    app:borderWidth="0dp"
-                    android:stateListAnimator="@null"/>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_window_cancel"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="56dp"
+                        android:text="取消"
+                        android:textColor="@color/text_primary"
+                        android:backgroundTint="@color/input_bg"
+                        android:layout_marginEnd="8dp"
+                        app:cornerRadius="16dp"
+                        app:elevation="0dp"
+                        app:pressedTranslationZ="0dp"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"/>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_window_save"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="56dp"
+                        android:text="确认保存"
+                        android:textColor="@color/text_white"
+                        android:textStyle="bold"
+                        android:backgroundTint="@color/app_yellow"
+                        app:cornerRadius="16dp"
+                        app:elevation="0dp"
+                        app:pressedTranslationZ="0dp"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"/>
+                </LinearLayout>
+
             </LinearLayout>
-
-        </LinearLayout>
-    </ScrollView>
-</androidx.cardview.widget.CardView>
+        </ScrollView>
+    </androidx.cardview.widget.CardView>
+</FrameLayout>

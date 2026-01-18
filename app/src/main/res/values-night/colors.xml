@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="app_yellow">#1677FF</color>
+    <color name="app_yellow">#4086DE</color>
     <color name="ripple_yellow">#263238</color>
 
     <color name="app_background">#121212</color>
@@ -17,7 +17,7 @@
     <color name="bottom_selected">@color/app_yellow</color>
 
     <color name="divider">#2C2C2C</color>
-    <color name="income_red">#EF9A9A</color>
+    <color name="income_red">#EF6565</color>
     <color name="expense_green">#A5D6A7</color>
     <color name="pie_food">#FFF59D</color>
     <color name="pie_fun">#A5D6A7</color>
@@ -26,7 +26,8 @@
     <color name="highlight_bg_color">#263238</color>
     <color name="input_bg">#2C2C2C</color>
 
-    <color name="bar_background">#191919</color>
+    <color name="down_background">#000000</color>
+    <color name="bar_background">#000000</color>
 
     <color name="bottom_unselected">#FFFFFF</color>
 

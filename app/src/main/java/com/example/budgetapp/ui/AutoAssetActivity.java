@@ -146,8 +146,13 @@ public class AutoAssetActivity extends AppCompatActivity {
         labelApp.setTextColor(Color.GRAY);
         container.addView(labelApp);
 
+        // ... (应用选择 Spinner)
         final Spinner spinnerApp = new Spinner(this);
+        // 【修改】只设置弹出背景
+        spinnerApp.setPopupBackgroundResource(R.drawable.bg_input_field);
+
         ArrayAdapter<AppItem> appAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, cachedApps);
+        // 如果想让下拉里的 Item 样式更好看，建议保留这行；如果只想改框体圆角，这行保持原样即可
         appAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerApp.setAdapter(appAdapter);
         container.addView(spinnerApp);

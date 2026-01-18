@@ -93,28 +93,38 @@ public class QuickAddTileService extends TileService {
         try {
             WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
             WindowManager.LayoutParams params = new WindowManager.LayoutParams();
+
+            // 【关键修改】TileService 通常使用 TYPE_APPLICATION_OVERLAY
             params.type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
-            params.format = PixelFormat.TRANSLUCENT;
-            params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
-            
-            // 动态计算宽度
-            DisplayMetrics metrics = getResources().getDisplayMetrics();
-            int screenWidth = metrics.widthPixels;
-            int screenHeight = metrics.heightPixels;
-            
-            if (screenWidth > screenHeight) {
-                params.width = (int) (400 * metrics.density); 
-            } else {
-                params.width = (int) (screenWidth * 0.92);
-            }
 
-            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            params.format = PixelFormat.TRANSLUCENT;
+
+            // 【关键修改】设置为全屏宽高
+            params.width = WindowManager.LayoutParams.MATCH_PARENT;
+            params.height = WindowManager.LayoutParams.MATCH_PARENT;
+
+            // 【关键修改】移除 WATCH_OUTSIDE_TOUCH，改为普通全屏
+            params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+
             params.gravity = Gravity.CENTER;
 
-            LayoutInflater inflater = LayoutInflater.from(this);
+            android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
+            LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
+
+            // 【关键修改】点击透明背景关闭窗口
+            View rootView = floatView.findViewById(R.id.window_root);
+            if (rootView != null) {
+                rootView.setOnClickListener(v -> closeWindow(windowManager, floatView));
+            }
+
+            // 【关键修改】点击内容区域不做任何事
+            View cardContent = floatView.findViewById(R.id.window_card_content);
+            if (cardContent != null) {
+                cardContent.setOnClickListener(v -> { /* 拦截点击 */ });
+            }
 
             isWindowShowing = true;
 

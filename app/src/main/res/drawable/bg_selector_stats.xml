@@ -9,5 +9,5 @@
     <!-- 这里简单处理，夜间模式可以让边框和填充色一致，或者去掉边框 -->
     <stroke android:width="0dp" android:color="@android:color/transparent"/>
 
-    <corners android:radius="8dp"/>
+    <corners android:radius="16dp"/>
 </shape>

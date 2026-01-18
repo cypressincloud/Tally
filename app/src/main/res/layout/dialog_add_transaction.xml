@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="320dp"
     android:layout_height="wrap_content"
-    app:cardCornerRadius="16dp"
+    app:cardCornerRadius="32dp"
     app:cardElevation="0dp"
     app:cardBackgroundColor="@color/app_background">
 
@@ -58,25 +58,103 @@
         <Spinner
             android:id="@+id/sp_asset"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
+
+            android:textSize="16sp"
+
             android:background="@drawable/bg_input_field"
-            android:padding="2dp"
+            android:popupBackground="@drawable/bg_input_field"
+
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp"
+
             android:layout_marginBottom="16dp"/>
 
-        <EditText android:id="@+id/et_amount" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="请输入金额" android:inputType="numberDecimal" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:textColorHint="?android:attr/textColorHint" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="16dp"/>
+        <EditText
+            android:id="@+id/et_amount"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:hint="请输入金额"
+            android:inputType="numberDecimal"
+            android:textSize="16sp"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textColorHint="?android:attr/textColorHint"
+            android:background="@drawable/bg_input_field"
 
-        <EditText android:id="@+id/et_custom_category" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="自定义分类*" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:textColorHint="?android:attr/textColorHint" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="16dp" android:visibility="gone"/>
+            android:paddingHorizontal="20dp"
+            android:paddingVertical="10dp"
 
-        <EditText android:id="@+id/et_remark" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="添加备注*" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:textColorHint="?android:attr/textColorHint" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="16dp"/>
 
-        <EditText android:id="@+id/et_note" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="记录标识" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:textColorHint="?android:attr/textColorHint" android:background="@drawable/bg_input_field" android:padding="10dp" android:layout_marginBottom="16dp"/>
+        <EditText
+            android:id="@+id/et_custom_category"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:hint="自定义分类*"
+            android:textSize="16sp"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textColorHint="?android:attr/textColorHint"
+            android:background="@drawable/bg_input_field"
 
+            android:paddingHorizontal="18dp"
+            android:paddingVertical="10dp"
+
+            android:layout_marginBottom="16dp"
+            android:visibility="gone"/>
+
+        <EditText
+            android:id="@+id/et_remark"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:hint="添加备注*"
+            android:textSize="16sp"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textColorHint="?android:attr/textColorHint"
+            android:background="@drawable/bg_input_field"
+
+            android:paddingHorizontal="18dp"
+            android:paddingVertical="10dp"
+
+            android:layout_marginBottom="16dp"/>
+
+        <EditText
+            android:id="@+id/et_note"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:hint="记录标识"
+            android:textSize="14sp"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textColorHint="?android:attr/textColorHint"
+            android:background="@drawable/bg_input_field"
+
+            android:paddingHorizontal="18dp"
+            android:paddingVertical="10dp"
+
+            android:layout_marginBottom="16dp"/>
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
-            <Button android:id="@+id/btn_delete" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginEnd="8dp" android:layout_weight="1" android:backgroundTint="@color/input_bg" android:text="删除" android:textColor="@color/text_primary" android:visibility="gone" />
-            <Button android:id="@+id/btn_save" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:backgroundTint="?attr/colorPrimary" android:text="保存修改" android:textColor="@color/text_white" />
+            <Button
+                android:id="@+id/btn_delete"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:backgroundTint="@color/input_bg"
+                android:text="删除"
+                android:textColor="@color/text_primary"
+                android:visibility="gone"
+                app:cornerRadius="16dp"/>
+            <Button
+                android:id="@+id/btn_save"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:backgroundTint="?attr/colorPrimary"
+                android:text="保存修改"
+                android:textColor="@color/text_white"
+                app:cornerRadius="16dp"/>
         </LinearLayout>
 
     </LinearLayout>

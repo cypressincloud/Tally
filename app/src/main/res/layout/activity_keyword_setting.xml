@@ -37,7 +37,8 @@
             android:id="@+id/spinner_app_selector"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:spinnerMode="dropdown"/>
+            android:spinnerMode="dropdown"
+            android:popupBackground="@drawable/bg_input_field" />
     </LinearLayout>
 
     <RadioGroup

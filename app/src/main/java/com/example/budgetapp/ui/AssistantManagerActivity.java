@@ -230,6 +230,8 @@ public class AssistantManagerActivity extends AppCompatActivity {
         container.addView(labelApp);
 
         final Spinner spinnerApp = new Spinner(this);
+        // 【修改】只设置弹出框背景为圆角，不修改 Spinner 本身的背景
+        spinnerApp.setPopupBackgroundResource(R.drawable.bg_input_field);
         List<AppSpinnerItem> spinnerItems = new ArrayList<>();
         Map<String, String> apps = KeywordManager.getSupportedApps();
         

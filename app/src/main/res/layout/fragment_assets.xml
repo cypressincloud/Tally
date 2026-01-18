@@ -158,7 +158,8 @@
             android:layout_height="match_parent"
             android:paddingHorizontal="16dp"
             android:clipToPadding="false"
-            android:paddingBottom="80dp"/>
+            android:paddingBottom="80dp"
+            app:cornerRadius="16dp"/>
 
     </LinearLayout>
 

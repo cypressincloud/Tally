@@ -4,7 +4,7 @@
     <solid android:color="@color/input_bg"/>
 
     <!-- 圆角：保持和你的按钮风格一致 -->
-    <corners android:radius="8dp"/>
+    <corners android:radius="16dp"/>
 
     <!-- 可选：加一个微弱的边框让它更清晰 (日间浅灰，夜间透明) -->
     <!-- <stroke android:width="1dp" android:color="@color/divider"/> -->

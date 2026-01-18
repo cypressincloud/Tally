@@ -37,6 +37,7 @@
 
     <color name="highlight_bg_color">#FFF59D</color>
 
+    <color name="down_background">#FFFFFF</color>
     <color name="bar_background">#F7F7F7</color>
     <color name="bottom_unselected">#333333</color>
 </resources>

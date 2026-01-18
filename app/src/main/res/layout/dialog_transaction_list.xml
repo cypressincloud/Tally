@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="320dp"
     android:layout_height="480dp"
-    app:cardCornerRadius="16dp"
+    app:cardCornerRadius="32dp"
     app:cardBackgroundColor="@color/white"
     app:cardElevation="8dp">
 
@@ -47,25 +47,25 @@
             <Button
                 android:id="@+id/btn_add_overtime"
                 android:layout_width="0dp"
-                android:layout_height="50dp"
+                android:layout_height="56dp"
                 android:layout_weight="1"
                 android:text="加班"
                 android:layout_marginEnd="8dp"
                 android:backgroundTint="@color/input_bg"
                 android:textColor="@color/text_primary"
-                app:cornerRadius="8dp"
+                app:cornerRadius="16dp"
                 app:icon="@android:drawable/ic_menu_my_calendar"
                 app:iconTint="@color/text_primary"/>
 
             <Button
                 android:id="@+id/btn_add_transaction"
                 android:layout_width="0dp"
-                android:layout_height="50dp"
+                android:layout_height="56dp"
                 android:layout_weight="1"
                 android:text="记一笔"
                 android:backgroundTint="@color/app_yellow"
                 android:textColor="@color/text_white"
-                app:cornerRadius="8dp"
+                app:cornerRadius="16dp"
                 app:icon="@android:drawable/ic_menu_edit"
                 app:iconTint="@android:color/white"/>
         </LinearLayout>
@@ -73,12 +73,12 @@
         <Button
             android:id="@+id/btn_close_dialog"
             android:layout_width="match_parent"
-            android:layout_height="50dp"
+            android:layout_height="56dp"
             android:text="关  闭"
             android:textStyle="bold"
             android:backgroundTint="@color/app_yellow"
             android:textColor="@color/text_white"
-            app:cornerRadius="8dp"/>
+            app:cornerRadius="16dp"/>
 
     </LinearLayout>
 </androidx.cardview.widget.CardView>

@@ -243,30 +243,39 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         try {
             WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
             WindowManager.LayoutParams params = new WindowManager.LayoutParams();
-            params.type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
-            params.format = PixelFormat.TRANSLUCENT;
-            params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
-            
-            // 动态计算宽度
-            DisplayMetrics metrics = getResources().getDisplayMetrics();
-            int screenWidth = metrics.widthPixels;
-            int screenHeight = metrics.heightPixels;
-            
-            if (screenWidth > screenHeight) {
-                // 横屏限制宽度
-                params.width = (int) (400 * metrics.density); 
-            } else {
-                // 竖屏占 92%
-                params.width = (int) (screenWidth * 0.92);
-            }
 
-            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            // 【关键修改】使用 TYPE_ACCESSIBILITY_OVERLAY 且全屏，以拦截点击
+            params.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
+            params.format = PixelFormat.TRANSLUCENT;
+
+            // 设置为全屏宽高
+            params.width = WindowManager.LayoutParams.MATCH_PARENT;
+            params.height = WindowManager.LayoutParams.MATCH_PARENT;
+
+            // 【关键修改】移除 WATCH_OUTSIDE_TOUCH，改为普通的全屏覆盖
+            // FLAG_NOT_FOCUSABLE: 避免抢占输入法焦点（但注意 Spinner 可能需要焦点，这里先保持不抢占，如果 Spinner 无法弹出输入法需移除此 flag）
+            // FLAG_LAYOUT_IN_SCREEN: 延伸到状态栏区域
+            params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+
             params.gravity = Gravity.CENTER;
 
-            LayoutInflater inflater = LayoutInflater.from(this);
+            // 使用 ContextThemeWrapper 确保 Material 样式生效 (圆角等)
+            android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
+            LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
+
+            // 【关键修改】点击透明背景关闭窗口
+            View rootView = floatView.findViewById(R.id.window_root);
+            if (rootView != null) {
+                rootView.setOnClickListener(v -> closeWindow(windowManager, floatView));
+            }
+
+            // 【关键修改】点击内容区域不做任何事（拦截事件，防止关闭）
+            View cardContent = floatView.findViewById(R.id.window_card_content);
+            if (cardContent != null) {
+                cardContent.setOnClickListener(v -> { /* 拦截点击，防止穿透关闭 */ });
+            }
 
             isWindowShowing = true;
 
@@ -291,7 +300,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             } else {
                 rgType.check(R.id.rb_window_expense);
                 rgCategory.setVisibility(View.VISIBLE);
-                etCategory.setVisibility(View.GONE); 
+                etCategory.setVisibility(View.GONE);
             }
 
             if (type == 0) {
