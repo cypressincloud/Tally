@@ -87,7 +87,7 @@ public class QuickAddTileService extends TileService {
         showConfirmWindow();
     }
 
-    // 文件: src/main/java/com/example/budgetapp/service/QuickAddTileService.java
+// 文件: src/main/java/com/example/budgetapp/service/QuickAddTileService.java
 
     private void showConfirmWindow() {
         if (isWindowShowing) return;
@@ -102,19 +102,23 @@ public class QuickAddTileService extends TileService {
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;
 
-            // 【重点 1】移除 NOT_FOCUSABLE
-            params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+            // 1. 允许键盘
+            params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
+                    WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+            params.dimAmount = 0.5f;
 
-            // 【重点 2】使用 ADJUST_PAN 实现整体上移
+            // 2. 平移模式
             params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
 
             params.gravity = Gravity.CENTER;
+
+            // 3. 【核心】向上偏移 350px
+            params.y = -350;
 
             android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
             LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
 
-            // 点击背景关闭
             View rootView = floatView.findViewById(R.id.window_root);
             if (rootView != null) {
                 rootView.setOnClickListener(v -> closeWindow(windowManager, floatView));

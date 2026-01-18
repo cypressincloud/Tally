@@ -41,22 +41,16 @@ import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
-import com.google.android.material.datepicker.MaterialDatePicker;
-import com.google.android.material.timepicker.MaterialTimePicker;
-import com.google.android.material.timepicker.TimeFormat;
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
-import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -128,7 +122,6 @@ public class RecordFragment extends Fragment {
 
         RecyclerView recyclerView = view.findViewById(R.id.calendar_recycler);
         
-        // 【修改点】重写 GridLayoutManager 以禁止垂直滑动
         GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 7) {
             @Override
             public boolean canScrollVertically() {
@@ -136,7 +129,7 @@ public class RecordFragment extends Fragment {
             }
         };
         recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER); // 去除滑动边缘阴影
+        recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER); 
 
         adapter = new CalendarAdapter(date -> {
             if (date.equals(selectedDate)) {
@@ -148,21 +141,17 @@ public class RecordFragment extends Fragment {
         });
         recyclerView.setAdapter(adapter);
 
-        // 在 OnTouchListener 中调用手势检测，但始终返回 false。
-        // 这样既能让 GestureDetector 监听到滑动(onFling)，又不会拦截掉点击事件(onClick)
         recyclerView.setOnTouchListener((v, event) -> {
             gestureDetector.onTouchEvent(event);
             return false;
         });
 
-        // 单独为月份标签设置点击事件
         if (tvMonthLabel != null) {
             tvMonthLabel.setOnClickListener(v -> {
                 Intent intent = new Intent(requireContext(), YearCalendarActivity.class);
                 intent.putExtra("year", currentMonth.getYear());
                 yearCalendarLauncher.launch(intent);
             });
-            // 加上触摸监听，同样返回 false 以免拦截点击
             tvMonthLabel.setOnTouchListener((v, event) -> {
                  gestureDetector.onTouchEvent(event);
                  return false;
@@ -174,7 +163,6 @@ public class RecordFragment extends Fragment {
         layoutExpense.setOnClickListener(v -> switchFilterMode(2));
         layoutOvertime.setOnClickListener(v -> switchFilterMode(3));
 
-        // 点击年份标题，弹出自定义底部滚轮选择器
         tvMonthTitle.setOnClickListener(v -> showCustomDatePicker());
 
         view.findViewById(R.id.btn_prev_month).setOnClickListener(v -> {
@@ -186,7 +174,20 @@ public class RecordFragment extends Fragment {
             updateCalendar();
         });
 
-        viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> updateCalendar());
+        // 【修改】观察数据变化，同时更新日历和可能打开的详情列表
+        viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
+            updateCalendar();
+            
+            // 如果详情列表正在显示，刷新其数据（解决返回后数据不刷新的问题）
+            if (currentDetailAdapter != null && selectedDate != null) {
+                long start = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                long end = selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                List<Transaction> dayList = list.stream()
+                        .filter(t -> t.date >= start && t.date < end)
+                        .collect(Collectors.toList());
+                currentDetailAdapter.setTransactions(dayList);
+            }
+        });
 
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             if (assets != null) {
@@ -201,14 +202,12 @@ public class RecordFragment extends Fragment {
         return view;
     }
 
-    // 【新增】显示底部自定义日期选择器
     private void showCustomDatePicker() {
         if (getContext() == null) return;
 
         final BottomSheetDialog dialog = new BottomSheetDialog(getContext());
         dialog.setContentView(R.layout.dialog_bottom_date_picker);
 
-        // 设置悬浮背景透明
         dialog.setOnShowListener(dialogInterface -> {
             BottomSheetDialog bottomSheetDialog = (BottomSheetDialog) dialogInterface;
             View bottomSheet = bottomSheetDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
@@ -217,7 +216,6 @@ public class RecordFragment extends Fragment {
             }
         });
 
-        // 获取初始日期
         LocalDate baseDate = selectedDate != null ? selectedDate : currentMonth.atDay(1);
         int curYear = baseDate.getYear();
         int curMonth = baseDate.getMonthValue();
@@ -232,7 +230,6 @@ public class RecordFragment extends Fragment {
 
         if (npYear == null || npMonth == null || npDay == null || btnConfirm == null || btnCancel == null) return;
 
-        // 配置滚轮
         npYear.setMinValue(2000);
         npYear.setMaxValue(2050);
         npYear.setValue(curYear);
@@ -246,7 +243,6 @@ public class RecordFragment extends Fragment {
         npDay.setMaxValue(maxDays);
         npDay.setValue(curDay);
 
-        // 联动逻辑
         NumberPicker.OnValueChangeListener dateChangeListener = (picker, oldVal, newVal) -> {
             int y = npYear.getValue();
             int m = npMonth.getValue();
@@ -263,10 +259,8 @@ public class RecordFragment extends Fragment {
         npMonth.setOnValueChangedListener(dateChangeListener);
         npDay.setOnValueChangedListener(dateChangeListener);
         
-        // 初始化预览
         updatePreviewText(tvPreview, curYear, curMonth, curDay);
 
-        // 按钮事件
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnConfirm.setOnClickListener(v -> {
@@ -278,7 +272,6 @@ public class RecordFragment extends Fragment {
             selectedDate = LocalDate.of(year, month, day);
             updateCalendar();
             
-            // 确保适配器选中该日期
             adapter.setSelectedDate(selectedDate);
             
             dialog.dismiss();
@@ -410,7 +403,8 @@ public class RecordFragment extends Fragment {
         rvList.setLayoutManager(new LinearLayoutManager(getContext()));
 
         TransactionListAdapter listAdapter = new TransactionListAdapter(transaction -> {
-            dialog.dismiss();
+            // 【修改】注释掉 dismiss()，保持列表窗口打开
+            // dialog.dismiss(); 
             LocalDate transDate = Instant.ofEpochMilli(transaction.date).atZone(ZoneId.systemDefault()).toLocalDate();
             showAddOrEditDialog(transaction, transDate);
         });
@@ -432,13 +426,15 @@ public class RecordFragment extends Fragment {
         Button btnAddNormal = dialogView.findViewById(R.id.btn_add_transaction);
         if (btnAddNormal != null) {
             btnAddNormal.setOnClickListener(v -> {
-                dialog.dismiss();
+                // 【修改】注释掉 dismiss()，保持列表窗口打开
+                // dialog.dismiss(); 
                 showAddOrEditDialog(null, date);
             });
         }
         Button btnAddOvertime = dialogView.findViewById(R.id.btn_add_overtime);
         if (btnAddOvertime != null) {
             btnAddOvertime.setOnClickListener(v -> {
+                // 加班功能通常是独立的，这里也可以选择不关闭，视需求而定
                 dialog.dismiss();
                 showOvertimeDialog(date);
             });
@@ -607,47 +603,6 @@ public class RecordFragment extends Fragment {
             tvDate.setText(sdf.format(calendar.getTime()));
         };
         updateDateDisplay.run();
-
-//        tvDate.setOnClickListener(v -> {
-//            long currentMillis = calendar.getTimeInMillis();
-//            long offset = TimeZone.getDefault().getOffset(currentMillis);
-//
-//            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
-//                    .setTitleText("选择日期")
-//                    .setSelection(currentMillis + offset)
-//                    .setPositiveButtonText("确认")
-//                    .setNegativeButtonText("取消")
-//                    .build();
-//
-//            datePicker.addOnPositiveButtonClickListener(selection -> {
-//                java.util.Calendar selectedCal = java.util.Calendar.getInstance();
-//                long correctMillis = selection - TimeZone.getDefault().getOffset(selection);
-//                selectedCal.setTimeInMillis(correctMillis);
-//
-//                calendar.set(java.util.Calendar.YEAR, selectedCal.get(java.util.Calendar.YEAR));
-//                calendar.set(java.util.Calendar.MONTH, selectedCal.get(java.util.Calendar.MONTH));
-//                calendar.set(java.util.Calendar.DAY_OF_MONTH, selectedCal.get(java.util.Calendar.DAY_OF_MONTH));
-//
-//                MaterialTimePicker timePicker = new MaterialTimePicker.Builder()
-//                        .setTimeFormat(TimeFormat.CLOCK_24H)
-//                        .setHour(calendar.get(java.util.Calendar.HOUR_OF_DAY))
-//                        .setMinute(calendar.get(java.util.Calendar.MINUTE))
-//                        .setTitleText("选择时间")
-//                        .setPositiveButtonText("确认")
-//                        .setNegativeButtonText("取消")
-//                        .build();
-//
-//                timePicker.addOnPositiveButtonClickListener(view -> {
-//                    calendar.set(java.util.Calendar.HOUR_OF_DAY, timePicker.getHour());
-//                    calendar.set(java.util.Calendar.MINUTE, timePicker.getMinute());
-//                    updateDateDisplay.run();
-//                });
-//
-//                timePicker.show(getParentFragmentManager(), "time_picker");
-//            });
-//
-//            datePicker.show(getParentFragmentManager(), "date_picker");
-//        });
 
         rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.rb_custom) {

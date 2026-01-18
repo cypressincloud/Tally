@@ -248,24 +248,26 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             params.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
             params.format = PixelFormat.TRANSLUCENT;
-
-            // 全屏，为了支持点击空白关闭
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;
 
-            // 【重点 1】移除 NOT_FOCUSABLE，允许键盘弹出
-            params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+            // 1. 允许键盘弹出 (必须有 LAYOUT_IN_SCREEN，必须没有 NOT_FOCUSABLE)
+            params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
+                    WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+            params.dimAmount = 0.5f;
 
-            // 【重点 2】使用 ADJUST_PAN (平移模式)
-            // 该模式会强制整个窗口向上移动，直到焦点输入框可见。
-            // 这不需要修改您的 XML 布局，非常适合您的需求。
+            // 2. 【核心】改回 ADJUST_PAN (平移模式)
+            // 解决"焊死"问题：只要有焦点，系统就会强制推移窗口
             params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
 
             params.gravity = Gravity.CENTER;
 
+            // 3. 【核心】设置初始 Y 轴偏移量 (负值代表向上)
+            // 手动把窗口提起来，这样键盘弹出时，底部内容更容易露出来
+            params.y = -350;
+
             android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
             LayoutInflater inflater = LayoutInflater.from(themeContext);
-            // 加载您原本的布局
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
 
             // 点击背景关闭
@@ -273,7 +275,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             if (rootView != null) {
                 rootView.setOnClickListener(v -> closeWindow(windowManager, floatView));
             }
-
             // 拦截卡片点击
             View cardContent = floatView.findViewById(R.id.window_card_content);
             if (cardContent != null) {
@@ -282,7 +283,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             isWindowShowing = true;
 
-            // --- 绑定控件 (根据您的 XML) ---
+            // --- 绑定控件 ---
             EditText etAmount = floatView.findViewById(R.id.et_window_amount);
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
             RadioGroup rgCategory = floatView.findViewById(R.id.rg_window_category);

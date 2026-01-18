@@ -474,7 +474,6 @@ public class StatsFragment extends Fragment {
         lineChart.animateX(600);
         lineChart.invalidate();
 
-        // --- Pie Chart ---
         List<PieEntry> finalEntries = new ArrayList<>();
         List<Integer> finalColors = new ArrayList<>();
 
@@ -651,10 +650,6 @@ public class StatsFragment extends Fragment {
         tvSummaryContent.setText(ssb);
     }
 
-    /**
-     * 生成沉稳色系 - 随机起始点版
-     * 每次调用都会随机重置起始色相，实现“每次切换界面颜色都不同”的效果
-     */
     private List<Integer> generateThemeColors(int count) {
         List<Integer> colors = new ArrayList<>();
 
@@ -662,40 +657,28 @@ public class StatsFragment extends Fragment {
         boolean isNightMode = uiMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
 
         float goldenRatio = 0.618033988749895f;
-
-        // 【核心修改】：使用随机数生成 0~360 之间的起始色相
-        // 这样每次进入界面或数据刷新时，颜色轮盘的起点都不一样
         float currentHue = (float) (Math.random() * 360f);
 
         int generated = 0;
         int iter = 0;
 
-        // 循环生成直到满足数量，设置最大迭代次数防止死循环
         while (generated < count && iter < 1000) {
-            // 黄金分割步进
             float h = (currentHue + (iter * goldenRatio * 360f)) % 360f;
             iter++;
 
-            // --- 色相过滤逻辑 (保持不变) ---
-            // 绿色区间: ~80 - 160
             boolean isGreen = (h >= 80f && h < 160f);
-            // 青色区间: ~160 - 200
             boolean isCyan = (h >= 160f && h < 200f);
-            // 紫色区间: ~250 - 320
             boolean isPurple = (h >= 250f && h < 320f);
 
-            // 跳过不想要的颜色
             if (isGreen || isCyan || isPurple) {
                 continue;
             }
 
             float s, v;
             if (isNightMode) {
-                // 【夜间模式】沉稳风格
                 s = 0.40f + (generated % 3) * 0.1f;
                 v = 0.70f + (generated % 2) * 0.15f;
             } else {
-                // 【日间模式】商务/大地风格
                 s = 0.35f + (generated % 3) * 0.1f;
                 v = 0.80f + (generated % 2) * 0.15f;
             }
@@ -704,7 +687,6 @@ public class StatsFragment extends Fragment {
             generated++;
         }
 
-        // 兜底补全
         while (colors.size() < count) {
             colors.add(Color.LTGRAY);
         }
@@ -850,7 +832,8 @@ public class StatsFragment extends Fragment {
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
 
         TransactionListAdapter adapter = new TransactionListAdapter(t -> {
-            dialog.dismiss();
+            // 【修改】注释掉 dismiss()，保持分类详情列表窗口打开
+            // dialog.dismiss();
             LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
             showAddOrEditDialog(t, date);
         });
@@ -890,7 +873,6 @@ public class StatsFragment extends Fragment {
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
         
-        // --- Added: Revoke Button ---
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
 
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
@@ -1063,7 +1045,6 @@ public class StatsFragment extends Fragment {
                         .show();
             });
             
-            // --- Added: Revoke Logic ---
             if (tvRevoke != null) {
                 tvRevoke.setVisibility(View.VISIBLE);
                 tvRevoke.setOnClickListener(v -> {
@@ -1141,7 +1122,6 @@ public class StatsFragment extends Fragment {
         dialog.show();
     }
 
-    // --- Added: Revoke Dialog Implementation ---
     private void showRevokeDialog(Transaction transaction, AlertDialog parentDialog) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_revoke_transaction, null);
