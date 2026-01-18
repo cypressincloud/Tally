@@ -164,6 +164,9 @@ public class AutoAssetActivity extends AppCompatActivity {
         container.addView(labelAsset);
 
         final Spinner spinnerAsset = new Spinner(this);
+
+        spinnerAsset.setPopupBackgroundResource(R.drawable.bg_input_field);
+
         List<String> assetNames = new ArrayList<>();
         for(AssetAccount a : cachedAssets) assetNames.add(a.name);
         
