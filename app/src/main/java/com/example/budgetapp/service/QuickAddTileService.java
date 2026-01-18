@@ -87,6 +87,8 @@ public class QuickAddTileService extends TileService {
         showConfirmWindow();
     }
 
+    // 文件: src/main/java/com/example/budgetapp/service/QuickAddTileService.java
+
     private void showConfirmWindow() {
         if (isWindowShowing) return;
 
@@ -94,19 +96,17 @@ public class QuickAddTileService extends TileService {
             WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
             WindowManager.LayoutParams params = new WindowManager.LayoutParams();
 
-            // 【关键修改】TileService 通常使用 TYPE_APPLICATION_OVERLAY
             params.type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
-
             params.format = PixelFormat.TRANSLUCENT;
-
-            // 【关键修改】设置为全屏宽高
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;
 
-            // 【关键修改】移除 WATCH_OUTSIDE_TOUCH，改为普通全屏
-            params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+            // 【重点 1】移除 NOT_FOCUSABLE
+            params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+
+            // 【重点 2】使用 ADJUST_PAN 实现整体上移
+            params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
 
             params.gravity = Gravity.CENTER;
 
@@ -114,16 +114,14 @@ public class QuickAddTileService extends TileService {
             LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
 
-            // 【关键修改】点击透明背景关闭窗口
+            // 点击背景关闭
             View rootView = floatView.findViewById(R.id.window_root);
             if (rootView != null) {
                 rootView.setOnClickListener(v -> closeWindow(windowManager, floatView));
             }
-
-            // 【关键修改】点击内容区域不做任何事
             View cardContent = floatView.findViewById(R.id.window_card_content);
             if (cardContent != null) {
-                cardContent.setOnClickListener(v -> { /* 拦截点击 */ });
+                cardContent.setOnClickListener(v -> { /* 拦截 */ });
             }
 
             isWindowShowing = true;
@@ -140,10 +138,10 @@ public class QuickAddTileService extends TileService {
             Button btnCancel = floatView.findViewById(R.id.btn_window_cancel);
 
             etAmount.setText("");
-            etAmount.requestFocus();
+            etAmount.requestFocus(); // 自动聚焦
             rgType.check(R.id.rb_window_expense);
             rgCategory.check(R.id.rb_cat_food);
-            etCategory.setVisibility(View.GONE); // 初始隐藏
+            etCategory.setVisibility(View.GONE);
 
             SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
             etNote.setText(sdf.format(new Date()) + " shortcut");
@@ -159,28 +157,18 @@ public class QuickAddTileService extends TileService {
 
                 AppDatabase.databaseWriteExecutor.execute(() -> {
                     List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0);
-
                     loadedAssets.clear();
                     AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
                     noAsset.id = 0;
                     loadedAssets.add(noAsset);
-
-                    if (assets != null) {
-                        loadedAssets.addAll(assets);
-                    }
-
+                    if (assets != null) loadedAssets.addAll(assets);
                     List<String> names = new ArrayList<>();
-                    for (AssetAccount a : loadedAssets) {
-                        names.add(a.name);
-                    }
-
+                    for (AssetAccount a : loadedAssets) names.add(a.name);
                     int defaultAssetId = config.getDefaultAssetId();
-
                     new Handler(Looper.getMainLooper()).post(() -> {
                         adapter.clear();
                         adapter.addAll(names);
                         adapter.notifyDataSetChanged();
-
                         if (defaultAssetId != -1) {
                             for (int i = 0; i < loadedAssets.size(); i++) {
                                 if (loadedAssets.get(i).id == defaultAssetId) {
@@ -223,13 +211,11 @@ public class QuickAddTileService extends TileService {
                     Toast.makeText(this, "请输入金额", Toast.LENGTH_SHORT).show();
                     return;
                 }
-
                 try {
                     double finalAmount = Double.parseDouble(amountStr);
                     String finalNote = etNote.getText().toString();
                     String finalRemark = etRemark.getText().toString().trim();
                     int finalType = (rgType.getCheckedRadioButtonId() == R.id.rb_window_income) ? 1 : 0;
-
                     String finalCat = "其他";
                     if (finalType == 1) {
                         finalCat = "收入";
@@ -247,7 +233,6 @@ public class QuickAddTileService extends TileService {
                         else if (checkedId == R.id.rb_cat_ent) finalCat = "娱乐";
                         else if (checkedId == R.id.rb_cat_shop) finalCat = "购物";
                     }
-
                     int assetId = 0;
                     if (isAssetEnabled) {
                         int selectedPos = spAsset.getSelectedItemPosition();
@@ -255,7 +240,6 @@ public class QuickAddTileService extends TileService {
                             assetId = loadedAssets.get(selectedPos).id;
                         }
                     }
-
                     saveToDatabase(finalAmount, finalType, finalCat, finalNote, finalRemark, assetId);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "记账成功", Toast.LENGTH_SHORT).show();
@@ -271,7 +255,6 @@ public class QuickAddTileService extends TileService {
             e.printStackTrace();
         }
     }
-
     private void closeWindow(WindowManager wm, View view) {
         try {
             if (view != null && wm != null) wm.removeView(view);

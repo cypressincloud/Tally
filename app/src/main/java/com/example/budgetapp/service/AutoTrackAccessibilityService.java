@@ -231,6 +231,8 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         handler.post(() -> showConfirmWindow(amount, type, category, timeNote, assetId));
     }
 
+    // 文件: src/main/java/com/example/budgetapp/service/AutoTrackAccessibilityService.java
+
     private void showConfirmWindow(double amount, int type, String category, String note, int matchedAssetId) {
         if (isWindowShowing) return;
 
@@ -244,41 +246,43 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
             WindowManager.LayoutParams params = new WindowManager.LayoutParams();
 
-            // 【关键修改】使用 TYPE_ACCESSIBILITY_OVERLAY 且全屏，以拦截点击
             params.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
             params.format = PixelFormat.TRANSLUCENT;
 
-            // 设置为全屏宽高
+            // 全屏，为了支持点击空白关闭
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;
 
-            // 【关键修改】移除 WATCH_OUTSIDE_TOUCH，改为普通的全屏覆盖
-            // FLAG_NOT_FOCUSABLE: 避免抢占输入法焦点（但注意 Spinner 可能需要焦点，这里先保持不抢占，如果 Spinner 无法弹出输入法需移除此 flag）
-            // FLAG_LAYOUT_IN_SCREEN: 延伸到状态栏区域
-            params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+            // 【重点 1】移除 NOT_FOCUSABLE，允许键盘弹出
+            params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+
+            // 【重点 2】使用 ADJUST_PAN (平移模式)
+            // 该模式会强制整个窗口向上移动，直到焦点输入框可见。
+            // 这不需要修改您的 XML 布局，非常适合您的需求。
+            params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
 
             params.gravity = Gravity.CENTER;
 
-            // 使用 ContextThemeWrapper 确保 Material 样式生效 (圆角等)
             android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
             LayoutInflater inflater = LayoutInflater.from(themeContext);
+            // 加载您原本的布局
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
 
-            // 【关键修改】点击透明背景关闭窗口
+            // 点击背景关闭
             View rootView = floatView.findViewById(R.id.window_root);
             if (rootView != null) {
                 rootView.setOnClickListener(v -> closeWindow(windowManager, floatView));
             }
 
-            // 【关键修改】点击内容区域不做任何事（拦截事件，防止关闭）
+            // 拦截卡片点击
             View cardContent = floatView.findViewById(R.id.window_card_content);
             if (cardContent != null) {
-                cardContent.setOnClickListener(v -> { /* 拦截点击，防止穿透关闭 */ });
+                cardContent.setOnClickListener(v -> {});
             }
 
             isWindowShowing = true;
 
+            // --- 绑定控件 (根据您的 XML) ---
             EditText etAmount = floatView.findViewById(R.id.et_window_amount);
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
             RadioGroup rgCategory = floatView.findViewById(R.id.rg_window_category);
@@ -307,21 +311,17 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 if ("餐饮".equals(category)) {
                     rgCategory.check(R.id.rb_cat_food);
                     etCategory.setVisibility(View.GONE);
-                }
-                else if ("娱乐".equals(category)) {
+                } else if ("娱乐".equals(category)) {
                     rgCategory.check(R.id.rb_cat_ent);
                     etCategory.setVisibility(View.GONE);
-                }
-                else if ("购物".equals(category)) {
+                } else if ("购物".equals(category)) {
                     rgCategory.check(R.id.rb_cat_shop);
                     etCategory.setVisibility(View.GONE);
-                }
-                else if ("交通".equals(category)) {
+                } else if ("交通".equals(category)) {
                     rgCategory.check(R.id.rb_window_custom);
                     etCategory.setText("交通");
                     etCategory.setVisibility(View.VISIBLE);
-                }
-                else {
+                } else {
                     rgCategory.check(R.id.rb_window_custom);
                     etCategory.setText(category);
                     etCategory.setVisibility(View.VISIBLE);
@@ -342,24 +342,18 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 AppDatabase.databaseWriteExecutor.execute(() -> {
                     List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0);
                     loadedAssets.clear();
-
                     AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
                     noAsset.id = 0;
                     loadedAssets.add(noAsset);
-
                     if (assets != null) loadedAssets.addAll(assets);
-
                     List<String> names = new ArrayList<>();
                     for (AssetAccount a : loadedAssets) names.add(a.name);
-
                     int defaultAssetId = config.getDefaultAssetId();
                     int targetAssetId = (matchedAssetId > 0) ? matchedAssetId : defaultAssetId;
-
                     handler.post(() -> {
                         adapter.clear();
                         adapter.addAll(names);
                         adapter.notifyDataSetChanged();
-
                         if (targetAssetId != -1) {
                             for (int i = 0; i < loadedAssets.size(); i++) {
                                 if (loadedAssets.get(i).id == targetAssetId) {
@@ -402,7 +396,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     String finalNote = etNote.getText().toString();
                     String finalRemark = etRemark.getText().toString().trim();
                     int finalType = (rgType.getCheckedRadioButtonId() == R.id.rb_window_income) ? 1 : 0;
-
                     String finalCat = "其他";
                     if (finalType == 1) {
                         finalCat = "收入";
@@ -420,7 +413,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         else if (checkedId == R.id.rb_cat_ent) finalCat = "娱乐";
                         else if (checkedId == R.id.rb_cat_shop) finalCat = "购物";
                     }
-
                     int assetId = 0;
                     if (isAssetEnabled) {
                         int selectedPos = spAsset.getSelectedItemPosition();
@@ -428,7 +420,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                             assetId = loadedAssets.get(selectedPos).id;
                         }
                     }
-
                     saveToDatabase(finalAmount, finalType, finalCat, finalNote, finalRemark, assetId);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "已记账", Toast.LENGTH_SHORT).show();
@@ -445,7 +436,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             isWindowShowing = false;
         }
     }
-
     private void closeWindow(WindowManager wm, View view) {
         try { wm.removeView(view); } catch (Exception e) {}
         finally { isWindowShowing = false; }
