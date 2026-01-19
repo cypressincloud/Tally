@@ -5,7 +5,6 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
-import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -34,7 +33,7 @@ import java.util.List;
 public class AssetsFragment extends Fragment {
 
     private FinanceViewModel viewModel;
-    private AssistantConfig config; // 新增 Config
+    private AssistantConfig config;
     private TextView tvTotalAssets, tvTotalLiability, tvTotalLent, tvListTitle;
     private LinearLayout layoutAssets, layoutLiability, layoutLent;
     private RecyclerView rvAssets;
@@ -49,7 +48,7 @@ public class AssetsFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_assets, container, false);
 
-        config = new AssistantConfig(requireContext()); // 初始化 Config
+        config = new AssistantConfig(requireContext());
 
         initViews(view);
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
@@ -75,21 +74,16 @@ public class AssetsFragment extends Fragment {
         rvAssets = view.findViewById(R.id.rv_assets_list);
         rvAssets.setLayoutManager(new LinearLayoutManager(getContext()));
 
-        // 初始化 Adapter，添加点击和长按监听
         adapter = new AssetAdapter(
-                account -> showAddOrEditDialog(account, account.type), // OnClick: 编辑
-                account -> { // OnLongClick: 设为/取消默认
-                    if (account.type == 0) { // 仅允许“资产”设为默认
-                        // 获取当前已经存储的默认ID
+                account -> showAddOrEditDialog(account, account.type),
+                account -> {
+                    if (account.type == 0) {
                         int currentDefaultId = config.getDefaultAssetId();
-
                         if (currentDefaultId == account.id) {
-                            // 1. 如果当前已经是默认 -> 取消默认 (设为 -1)
                             config.setDefaultAssetId(-1);
                             adapter.setDefaultId(-1);
                             Toast.makeText(getContext(), "已取消默认资产", Toast.LENGTH_SHORT).show();
                         } else {
-                            // 2. 如果不是默认 -> 设为默认
                             config.setDefaultAssetId(account.id);
                             adapter.setDefaultId(account.id);
                             Toast.makeText(getContext(), "已设为默认资产", Toast.LENGTH_SHORT).show();
@@ -143,7 +137,6 @@ public class AssetsFragment extends Fragment {
             }
         }
 
-        // 每次刷新列表时，同步最新的默认 ID
         adapter.setDefaultId(config.getDefaultAssetId());
         adapter.setData(filteredList);
 
@@ -157,8 +150,6 @@ public class AssetsFragment extends Fragment {
     }
 
     private void showAddOrEditDialog(AssetAccount existing, int initType) {
-        // ... (保持原有的 Dialog 逻辑不变) ...
-        // 为了简洁，此处省略未修改的 showAddOrEditDialog 代码，请直接使用原文件内容
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_asset, null);
         builder.setView(view);
@@ -221,7 +212,6 @@ public class AssetsFragment extends Fragment {
                     .setMessage("确定要删除这项记录吗？")
                     .setPositiveButton("删除", (d, w) -> {
                         viewModel.deleteAsset(existing);
-                        // 如果删除了默认资产，可能需要重置默认值（此处暂不强制，下次选择会失效即可）
                         dialog.dismiss();
                     })
                     .setNegativeButton("取消", null)
@@ -263,8 +253,8 @@ public class AssetsFragment extends Fragment {
     private static class AssetAdapter extends RecyclerView.Adapter<AssetAdapter.VH> {
         private List<AssetAccount> data = new ArrayList<>();
         private final OnItemClickListener listener;
-        private final OnItemLongClickListener longListener; // 新增长按监听
-        private int defaultAssetId = -1; // 当前默认资产 ID
+        private final OnItemLongClickListener longListener;
+        private int defaultAssetId = -1;
 
         interface OnItemClickListener {
             void onClick(AssetAccount account);
@@ -304,33 +294,31 @@ public class AssetsFragment extends Fragment {
             boolean isDefault = (item.id == defaultAssetId);
             Context context = holder.itemView.getContext();
 
-            // 1. 核心修改：设置 View 的选中状态
-            // 这会自动触发 selector_asset_bg 切换背景 (高亮 vs 默认)
             holder.itemView.setSelected(isDefault);
 
-            // 2. 处理文字颜色
             if (isDefault) {
-                // 默认资产 (高亮状态)：背景是深色主题色，文字改为白色以保证可读性
+                // 默认状态：白色文字
                 holder.tvName.setTextColor(Color.WHITE);
                 holder.tvAmount.setTextColor(Color.WHITE);
             } else {
-                // 普通资产：恢复原来的文字颜色逻辑
-
-                // 注意：这里请确保你的 colors.xml 里有 text_primary，如果没有，可以用 Color.BLACK 或其他颜色
-                // 这里的 catch 是为了防止资源找不到导致崩溃，如果确定有资源可去掉 try-catch
+                // 普通状态：使用资源颜色以适配夜间模式
                 try {
-                    holder.tvName.setTextColor(context.getResources().getColor(R.color.text_primary, null));
+                    // 资产名称颜色
+                    holder.tvName.setTextColor(context.getColor(R.color.text_primary));
                 } catch (Exception e) {
-                    holder.tvName.setTextColor(Color.BLACK); // Fallback
+                    holder.tvName.setTextColor(Color.BLACK);
                 }
 
-                // 根据类型恢复原来的金额颜色
+                // *** 核心修改：使用 context.getColor 获取主题适配的颜色 ***
                 if (item.type == 0) {
-                    holder.tvAmount.setTextColor(Color.parseColor("#FFC107")); // 资产黄
+                    // 资产 -> app_yellow
+                    holder.tvAmount.setTextColor(context.getColor(R.color.app_yellow));
                 } else if (item.type == 1) {
-                    holder.tvAmount.setTextColor(Color.parseColor("#4CAF50")); // 负债绿
+                    // 负债 -> expense_green
+                    holder.tvAmount.setTextColor(context.getColor(R.color.expense_green));
                 } else {
-                    holder.tvAmount.setTextColor(Color.parseColor("#FF5252")); // 借出红
+                    // 借出 -> income_red
+                    holder.tvAmount.setTextColor(context.getColor(R.color.income_red));
                 }
             }
 
@@ -339,7 +327,7 @@ public class AssetsFragment extends Fragment {
             holder.itemView.setOnClickListener(v -> listener.onClick(item));
             holder.itemView.setOnLongClickListener(v -> {
                 longListener.onLongClick(item);
-                return true; // 消费事件
+                return true;
             });
         }
 

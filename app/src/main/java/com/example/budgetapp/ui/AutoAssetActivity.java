@@ -199,13 +199,14 @@ public class AutoAssetActivity extends AppCompatActivity {
         container.addView(labelKw);
 
         final EditText etKeyword = new EditText(this);
-        etKeyword.setHint(" 例如: 招商银行");
+        etKeyword.setHint("例如: 招商银行");
         // 给输入框也加一点上边距，保持风格统一
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
         inputParams.topMargin = 20;
+        etKeyword.setPadding(24, 24, 24, 24);
         container.addView(etKeyword, inputParams);
 
         if (oldRule != null) {
