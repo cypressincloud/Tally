@@ -72,9 +72,56 @@ public class KeywordManager {
         prefs.edit().putStringSet(key, newKeywords).apply();
     }
 
+    // ================== 新增的方法 (解决编译错误) ==================
+
+    /**
+     * 获取所有应用的收入关键字
+     * 返回 Map<PackageName, Set<Keywords>>
+     */
+    public static Map<String, Set<String>> getIncomeKeywords(Context context) {
+        Map<String, Set<String>> result = new HashMap<>();
+        for (String pkg : getSupportedApps().keySet()) {
+            Set<String> keywords = getKeywords(context, pkg, TYPE_INCOME);
+            if (!keywords.isEmpty()) {
+                result.put(pkg, keywords);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 获取所有应用的支出关键字
+     * 返回 Map<PackageName, Set<Keywords>>
+     */
+    public static Map<String, Set<String>> getExpenseKeywords(Context context) {
+        Map<String, Set<String>> result = new HashMap<>();
+        for (String pkg : getSupportedApps().keySet()) {
+            Set<String> keywords = getKeywords(context, pkg, TYPE_EXPENSE);
+            if (!keywords.isEmpty()) {
+                result.put(pkg, keywords);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 删除收入关键字的快捷方法
+     */
+    public static void removeIncomeKeyword(Context context, String packageName, String keyword) {
+        removeKeyword(context, packageName, TYPE_INCOME, keyword);
+    }
+
+    /**
+     * 删除支出关键字的快捷方法
+     */
+    public static void removeExpenseKeyword(Context context, String packageName, String keyword) {
+        removeKeyword(context, packageName, TYPE_EXPENSE, keyword);
+    }
+
+    // ==============================================================
+
     /**
      * 初始化默认数据
-     * 【更新】增加了退款相关的默认关键字
      */
     public static void initDefaults(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
@@ -84,7 +131,7 @@ public class KeywordManager {
             // 支出
             addKeyword(context, PKG_WECHAT, TYPE_EXPENSE, "付款方式");
             // 收入 (包含收款和退款)
-            addKeyword(context, PKG_WECHAT, TYPE_INCOME, "已存入零钱"); // 新增
+            addKeyword(context, PKG_WECHAT, TYPE_INCOME, "已存入零钱"); 
 
             // --- 支付宝 ---
             // 支出

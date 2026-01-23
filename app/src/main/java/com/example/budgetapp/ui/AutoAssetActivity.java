@@ -13,15 +13,14 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-// [重要] 引入 SwitchCompat
-import androidx.appcompat.widget.SwitchCompat;
-
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat; // 关键导入
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -38,13 +37,11 @@ import java.util.Map;
 
 public class AutoAssetActivity extends AppCompatActivity {
 
-    // [修改] 类型改为 SwitchCompat
     private SwitchCompat switchAutoAsset;
-    
     private RecyclerView rvRules;
     private RuleAdapter adapter;
     private List<AutoAssetManager.AssetRule> ruleList = new ArrayList<>();
-    
+
     private List<AssetAccount> cachedAssets = new ArrayList<>();
     private List<AppItem> cachedApps = new ArrayList<>();
 
@@ -58,14 +55,28 @@ public class AutoAssetActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 1. 沉浸式设置
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+
         setContentView(R.layout.activity_auto_asset);
 
-        LinearLayout rootLayout = findViewById(R.id.root_layout);
+        // 2. 适配内边距 (防止被状态栏/导航栏遮挡)
+        View rootLayout = findViewById(R.id.root_layout);
         if (rootLayout != null) {
             final int originalPaddingTop = rootLayout.getPaddingTop();
+            final int originalPaddingBottom = rootLayout.getPaddingBottom();
+
             ViewCompat.setOnApplyWindowInsetsListener(rootLayout, (v, windowInsets) -> {
                 Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(v.getPaddingLeft(), originalPaddingTop + insets.top, v.getPaddingRight(), v.getPaddingBottom());
+                v.setPadding(
+                        v.getPaddingLeft(),
+                        originalPaddingTop + insets.top,
+                        v.getPaddingRight(),
+                        originalPaddingBottom + insets.bottom
+                );
                 return WindowInsetsCompat.CONSUMED;
             });
         }
@@ -75,7 +86,6 @@ public class AutoAssetActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        // [修改] findViewById 返回的是 SwitchCompat，如果变量类型是 Switch 会报错
         switchAutoAsset = findViewById(R.id.switchAutoAsset);
         switchAutoAsset.setChecked(AutoAssetManager.isEnabled(this));
         switchAutoAsset.setOnCheckedChangeListener((v, isChecked) -> {
@@ -92,8 +102,6 @@ public class AutoAssetActivity extends AppCompatActivity {
         findViewById(R.id.btnAddRule).setOnClickListener(v -> showAddRuleDialog());
     }
 
-    // ... (其余代码保持不变，省略以节省篇幅) ...
-    
     private void loadData() {
         ruleList = AutoAssetManager.getRules(this);
         adapter.notifyDataSetChanged();
@@ -102,8 +110,10 @@ public class AutoAssetActivity extends AppCompatActivity {
         for (Map.Entry<String, String> entry : apps.entrySet()) {
             cachedApps.add(new AppItem(entry.getKey(), entry.getValue()));
         }
+
+        // 异步加载资产数据
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0); 
+            List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0);
             runOnUiThread(() -> {
                 cachedAssets.clear();
                 if (assets != null) cachedAssets.addAll(assets);
@@ -147,6 +157,7 @@ public class AutoAssetActivity extends AppCompatActivity {
 
         final Spinner spinnerApp = new Spinner(this);
         spinnerApp.setBackground(null);
+        // 如果你有 bg_input_field 资源
         spinnerApp.setPopupBackgroundResource(R.drawable.bg_input_field);
         spinnerApp.setPadding(0, 0, 0, 0);
         container.addView(spinnerApp, spinnerParams);
@@ -218,6 +229,7 @@ public class AutoAssetActivity extends AppCompatActivity {
             int selectedAssetIndex = spinnerAsset.getSelectedItemPosition();
             if (selectedAssetIndex < 0 || selectedAssetIndex >= cachedAssets.size()) return;
             AssetAccount selectedAsset = cachedAssets.get(selectedAssetIndex);
+
             AutoAssetManager.AssetRule newRule = new AutoAssetManager.AssetRule(selectedApp.packageName, keyword, selectedAsset.id);
             if (oldRule != null) {
                 AutoAssetManager.removeRule(this, oldRule);
@@ -232,13 +244,14 @@ public class AutoAssetActivity extends AppCompatActivity {
         AlertDialog dialog = builder.create();
         dialog.show();
 
+        // 适配对话框按钮颜色
         int primaryColor = ContextCompat.getColor(this, R.color.text_primary);
         Button btnPos = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
         Button btnNeg = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
         if (btnPos != null) btnPos.setTextColor(primaryColor);
         if (btnNeg != null) btnNeg.setTextColor(primaryColor);
     }
-    
+
     private String getAssetNameById(int id) {
         for (AssetAccount a : cachedAssets) {
             if (a.id == id) return a.name;
@@ -269,7 +282,8 @@ public class AutoAssetActivity extends AppCompatActivity {
             holder.text1.setTextSize(16);
             String assetName = getAssetNameById(rule.assetId);
             holder.text2.setText("自动关联 -> " + assetName);
-            holder.text2.setTextColor(ContextCompat.getColor(AutoAssetActivity.this, R.color.app_yellow)); 
+            holder.text2.setTextColor(ContextCompat.getColor(AutoAssetActivity.this, R.color.app_yellow));
+
             holder.itemView.setOnClickListener(v -> showEditRuleDialog(rule));
             holder.itemView.setOnLongClickListener(v -> {
                 new AlertDialog.Builder(AutoAssetActivity.this)

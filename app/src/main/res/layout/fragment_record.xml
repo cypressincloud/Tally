@@ -12,6 +12,19 @@
         android:background="@color/bar_background">
 
         <ImageButton
+            android:id="@+id/btn_settings_menu"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:background="@null"
+            android:src="@drawable/ic_menu"
+            app:tint="@color/black"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:contentDescription="菜单"
+            android:scaleType="centerInside"
+            android:padding="12dp"/>
+
+        <ImageButton
             android:id="@+id/btn_prev_month"
             android:layout_width="48dp"
             android:layout_height="match_parent"

@@ -1,116 +1,151 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="@color/app_background">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="关键字管理"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:textColor="@color/text_primary"
-        android:layout_marginBottom="16dp"/>
+    android:background="@color/bar_background">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@drawable/bg_input_field"
-        android:padding="12dp"
-        android:layout_marginBottom="12dp"
-        android:elevation="0dp">
-
+        android:paddingBottom="24dp"
+        android:paddingTop="8dp">
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="选择应用："
-            android:textSize="16sp"
-            android:textColor="@color/text_secondary"/>
+            android:text="关键字管理"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"/>
+    </LinearLayout>
 
-        <Spinner
-            android:id="@+id/spinner_app_selector"
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white"
+        android:layout_marginBottom="16dp">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:spinnerMode="dropdown"
-            android:background="@null"
-            android:popupBackground="@drawable/bg_input_field" />
-    </LinearLayout>
+            android:orientation="vertical"
+            android:padding="20dp">
 
-    <RadioGroup
-        android:id="@+id/rg_keyword_type"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_input_field"
+                android:padding="12dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="选择应用："
+                    android:textSize="16sp"
+                    android:textColor="?android:attr/textColorSecondary"/>
+
+                <Spinner
+                    android:id="@+id/spinner_app_selector"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:spinnerMode="dropdown"
+                    android:background="@null"
+                    android:popupBackground="@drawable/bg_input_field" />
+            </LinearLayout>
+
+            <RadioGroup
+                android:id="@+id/rg_keyword_type"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp"
+                android:gravity="center_vertical">
+
+                <RadioButton
+                    android:id="@+id/rb_type_expense"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="支出关键字"
+                    android:checked="true"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:layout_marginEnd="20dp"/>
+
+                <RadioButton
+                    android:id="@+id/rb_type_income"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:text="收入关键字"/>
+            </RadioGroup>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"> <EditText
+                android:id="@+id/et_keyword_input"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:hint="输入触发关键字"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textColorHint="#888888"
+                android:background="@drawable/bg_input_field"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:inputType="text"
+                android:maxLines="1"/>
+
+                <Button
+                    android:id="@+id/btn_add_keyword"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="添加"
+                    android:textSize="13sp"
+                    android:layout_marginStart="12dp"
+                    android:textColor="@color/text_white"
+                    android:background="@drawable/bg_bottom_sheet_rounded"
+                    android:backgroundTint="?android:attr/colorPrimary"/>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_current_app_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="当前显示的关键字仅对上方选中的应用生效"
+                android:textSize="12sp"
+                android:textColor="#888888"
+                android:layout_marginTop="8dp"/>
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="10dp"
-        android:gravity="center_vertical">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white">
 
-        <RadioButton
-            android:id="@+id/rb_type_expense"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="支出关键字"
-            android:checked="true"
-            android:textColor="@color/text_primary"
-            android:layout_marginEnd="20dp"/>
-
-        <RadioButton
-            android:id="@+id/rb_type_income"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/text_primary"
-            android:text="收入关键字"/>
-    </RadioGroup>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="10dp">
-
-        <EditText
-            android:id="@+id/et_keyword_input"
-            android:layout_width="0dp"
-            android:layout_height="50dp"
-            android:layout_weight="1"
-            android:hint="输入触发关键字"
-            android:textColor="@color/text_primary"
-            android:textColorHint="@color/text_secondary"
-            android:background="@drawable/bg_input_field"
-            android:paddingStart="12dp"
-            android:inputType="text"
-            android:maxLines="1"/>
-
-        <Button
-            android:id="@+id/btn_add_keyword"
-            android:layout_width="wrap_content"
-            android:layout_height="50dp"
-            android:text="添加"
-            android:layout_marginStart="8dp"
-            android:backgroundTint="@color/app_yellow"
-            android:textColor="#FFFFFF"/>
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/tv_current_app_hint"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="当前显示的关键字仅对上方选中的应用生效"
-        android:textSize="12sp"
-        android:textColor="@color/text_secondary"
-        android:layout_marginBottom="8dp"/>
-
-    <ListView
-        android:id="@+id/list_keywords"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/bg_input_field"
-        android:divider="@color/divider"
-        android:dividerHeight="1dp"/>
+        <ListView
+            android:id="@+id/list_keywords"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp"
+            android:clipToPadding="false"
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:scrollbarStyle="outsideOverlay"/>
+    </androidx.cardview.widget.CardView>
 
 </LinearLayout>

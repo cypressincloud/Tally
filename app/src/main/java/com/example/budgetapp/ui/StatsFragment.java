@@ -88,11 +88,10 @@ public class StatsFragment extends Fragment {
     private PieChart pieChart;
     private RadioGroup rgTimeScope;
     private TextView tvDateRange;
-    
+
     private TextView tvSummaryTitle;
     private TextView tvSummaryContent;
 
-    // 只使用您原有布局中存在的控件
     private View dividerOvertime;
     private TextView tvOvertimeContent;
 
@@ -115,12 +114,12 @@ public class StatsFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_stats, container, false);
 
         initViews(view);
-        setupGestures(); 
+        setupGestures();
         setupLineChart();
         setupPieChart();
 
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
-        
+
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
             this.allTransactions = list;
             refreshData();
@@ -143,19 +142,18 @@ public class StatsFragment extends Fragment {
         tvDateRange = view.findViewById(R.id.tv_current_date_range);
         tvSummaryTitle = view.findViewById(R.id.tv_summary_title);
         tvSummaryContent = view.findViewById(R.id.tv_summary_content);
-        
-        // 绑定 XML 中原有的 View
+
         dividerOvertime = view.findViewById(R.id.divider_overtime);
         tvOvertimeContent = view.findViewById(R.id.tv_overtime_content);
 
         scrollView = view.findViewById(R.id.scroll_view_stats);
         touchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
     }
-    
+
     private void setupGestures() {
         if (scrollView == null) return;
         gestureDetector = new GestureDetector(requireContext(), new SwipeGestureListener());
-        
+
         scrollView.setOnTouchListener((v, event) -> {
             gestureDetector.onTouchEvent(event);
             switch (event.getAction()) {
@@ -189,7 +187,7 @@ public class StatsFragment extends Fragment {
             gestureDetector.onTouchEvent(event);
             return false;
         };
-        
+
         if (lineChart != null) lineChart.setOnTouchListener(chartTouchListener);
         if (pieChart != null) pieChart.setOnTouchListener(chartTouchListener);
     }
@@ -205,10 +203,10 @@ public class StatsFragment extends Fragment {
             if (e1 == null || e2 == null) return false;
             float diffX = e2.getX() - e1.getX();
             float diffY = e2.getY() - e1.getY();
-            
+
             if (Math.abs(diffX) > Math.abs(diffY)) {
                 if (Math.abs(diffX) > SWIPE_THRESHOLD && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
-                    if (diffX > 0) changeDate(-1); 
+                    if (diffX > 0) changeDate(-1);
                     else changeDate(1);
                     return true;
                 }
@@ -234,14 +232,8 @@ public class StatsFragment extends Fragment {
         btnNext.setOnClickListener(v -> changeDate(1));
 
         tvDateRange.setOnClickListener(v -> showCustomDatePicker());
-
-        tvDateRange.setOnLongClickListener(v -> {
-            Intent intent = new Intent(requireContext(), AssistantManagerActivity.class);
-            startActivity(intent);
-            return true;
-        });
     }
-    
+
     private void changeDate(int offset) {
         if (currentMode == 0) selectedDate = selectedDate.plusYears(offset);
         else if (currentMode == 1) selectedDate = selectedDate.plusMonths(offset);
@@ -342,7 +334,7 @@ public class StatsFragment extends Fragment {
         npYear.setOnValueChangedListener(dateChangeListener);
         npMonth.setOnValueChangedListener(dateChangeListener);
         npDay.setOnValueChangedListener(dateChangeListener);
-        
+
         updatePreviewText(tvPreview, curYear, curMonth, curDay);
 
         btnCancel.setOnClickListener(v -> dialog.dismiss());
@@ -351,7 +343,7 @@ public class StatsFragment extends Fragment {
             int year = npYear.getValue();
             int month = npMonth.getValue();
             int day = npDay.getValue();
-            
+
             selectedDate = LocalDate.of(year, month, day);
             updateDateRangeDisplay();
             refreshData();
@@ -378,7 +370,7 @@ public class StatsFragment extends Fragment {
         else if (currentMode == 1) processMonthlyData();
         else processWeeklyData();
     }
-    
+
     private void processYearlyData() {
         int year = selectedDate.getYear();
         aggregateData(t -> {
@@ -386,7 +378,7 @@ public class StatsFragment extends Fragment {
             return date.getYear() == year ? date.getMonthValue() : -1;
         }, 12, "月", null);
     }
-    
+
     private void processMonthlyData() {
         int year = selectedDate.getYear();
         int month = selectedDate.getMonthValue();
@@ -419,11 +411,11 @@ public class StatsFragment extends Fragment {
         for (Transaction t : allTransactions) {
             int index = extractor.getIndex(t);
             if (index != -1) {
-                if (t.type == 1) { 
+                if (t.type == 1) {
                     if (!"加班".equals(t.category)) {
                         incomeMap.put(index, incomeMap.getOrDefault(index, 0.0) + t.amount);
                     }
-                } else { 
+                } else {
                     expenseMap.put(index, expenseMap.getOrDefault(index, 0.0) + t.amount);
                     pieCats.put(t.category, pieCats.getOrDefault(t.category, 0.0) + t.amount);
                 }
@@ -552,10 +544,10 @@ public class StatsFragment extends Fragment {
 
         pieChart.animateY(800);
         pieChart.invalidate();
-        
+
         updateSummarySection(pieMap, totalPieAmount);
     }
-    
+
     private void updateSummarySection(Map<String, Double> pieMap, double totalAmount) {
         String scopeStr;
         if (currentMode == 0) scopeStr = "本年";
@@ -570,13 +562,13 @@ public class StatsFragment extends Fragment {
         // 计算日期范围
         LocalDate startOfPeriod;
         LocalDate endOfPeriod;
-        if (currentMode == 0) { 
+        if (currentMode == 0) {
             startOfPeriod = selectedDate.with(TemporalAdjusters.firstDayOfYear());
             endOfPeriod = selectedDate.with(TemporalAdjusters.lastDayOfYear());
-        } else if (currentMode == 1) { 
+        } else if (currentMode == 1) {
             startOfPeriod = selectedDate.with(TemporalAdjusters.firstDayOfMonth());
             endOfPeriod = selectedDate.with(TemporalAdjusters.lastDayOfMonth());
-        } else { 
+        } else {
             startOfPeriod = selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
             endOfPeriod = selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
         }
@@ -590,33 +582,33 @@ public class StatsFragment extends Fragment {
 
             SpannableStringBuilder ssb = new SpannableStringBuilder();
             String[] prefixes = {"最多是", "其次是", "然后是"};
-            
+
             int yellowColor = ContextCompat.getColor(requireContext(), R.color.app_yellow);
             int greenColor = ContextCompat.getColor(requireContext(), R.color.expense_green);
             int redColor = ContextCompat.getColor(requireContext(), R.color.income_red);
 
             int count = Math.min(sortedEntries.size(), 3);
             for (int i = 0; i < count; i++) {
-                if (i > 0) ssb.append("\n"); 
+                if (i > 0) ssb.append("\n");
 
                 Map.Entry<String, Double> e = sortedEntries.get(i);
                 double percent = (e.getValue() / totalAmount) * 100;
 
                 ssb.append(prefixes[i]);
-                
+
                 String category = e.getKey();
                 int startCat = ssb.length();
                 ssb.append(category);
                 ssb.setSpan(new ForegroundColorSpan(yellowColor), startCat, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                
+
                 ssb.append(", ");
                 ssb.append("占比");
-                
+
                 String percentStr = String.format(Locale.CHINA, "%.1f%%", percent);
                 int startPer = ssb.length();
                 ssb.append(percentStr);
                 ssb.setSpan(new ForegroundColorSpan(greenColor), startPer, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                
+
                 ssb.append(", ");
                 ssb.append("消费");
 
@@ -629,14 +621,14 @@ public class StatsFragment extends Fragment {
             }
 
             ssb.append("\n");
-            
+
             long days = 1;
             LocalDate today = LocalDate.now();
 
             if (!today.isBefore(startOfPeriod) && !today.isAfter(endOfPeriod)) {
-                 days = ChronoUnit.DAYS.between(startOfPeriod, today) + 1;
+                days = ChronoUnit.DAYS.between(startOfPeriod, today) + 1;
             } else {
-                 days = ChronoUnit.DAYS.between(startOfPeriod, endOfPeriod) + 1;
+                days = ChronoUnit.DAYS.between(startOfPeriod, endOfPeriod) + 1;
             }
             if (days < 1) days = 1;
             double dailyAvg = totalAmount / days;
@@ -646,10 +638,10 @@ public class StatsFragment extends Fragment {
             int startTotal = ssb.length();
             ssb.append(totalStr);
             ssb.setSpan(new ForegroundColorSpan(redColor), startTotal, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            
+
             ssb.append("元, ");
             ssb.append("日均消费");
-            
+
             String avgStr = String.format(Locale.CHINA, "%.2f", dailyAvg);
             int startAvg = ssb.length();
             ssb.append(avgStr);
@@ -662,10 +654,8 @@ public class StatsFragment extends Fragment {
         // 即使没有消费，也要尝试显示加班信息
         calculateAndShowOvertime(startOfPeriod, endOfPeriod, scopeStr);
     }
-    
-    // 之前可能存在的 checkAndAppendOvertimeOnly 已移除，逻辑合并至 updateSummarySection
 
-    // 【新增】计算并显示加班信息 (使用 Spannable 实现标题和内容)
+    // 【修改】计算并显示加班信息 (增加本月工资逻辑)
     private void calculateAndShowOvertime(LocalDate start, LocalDate end, String scopeStr) {
         long startMillis = start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
         long endMillis = end.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
@@ -711,38 +701,37 @@ public class StatsFragment extends Fragment {
             int primaryColor = ContextCompat.getColor(requireContext(), R.color.text_primary);
 
             // --- 标题行: "本周加班" ---
-            // 模拟标题样式：粗体 + 16sp (假设默认14sp, 14*1.15 ≈ 16)
             String title = scopeStr + "加班";
             int startTitle = ssb.length();
             ssb.append(title);
             ssb.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), startTitle, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             ssb.setSpan(new AbsoluteSizeSpan(16, true), startTitle, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             ssb.setSpan(new ForegroundColorSpan(primaryColor), startTitle, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            
-            ssb.append("\n"); // 标题与内容间距，可以通过行高控制，这里简单换行
 
-            // --- 第一行内容: 共计X小时, 共计获得X元 ---
+            ssb.append("\n");
+
+            // --- 第一行内容 ---
             ssb.append("共计");
             String totalHoursStr = String.format(Locale.CHINA, "%.1f", totalOvertimeHours);
             int startTotalH = ssb.length();
             ssb.append(totalHoursStr);
             ssb.setSpan(new ForegroundColorSpan(redColor), startTotalH, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            
+
             ssb.append("小时, 共计获得");
             String amountStr = String.format(Locale.CHINA, "%.2f", totalOvertimeIncome);
             int startAmount = ssb.length();
             ssb.append(amountStr);
             ssb.setSpan(new ForegroundColorSpan(redColor), startAmount, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            
+
             ssb.append("元\n");
 
-            // --- 第二行内容: 工作日加班X小时, 节假日加班X小时 ---
+            // --- 第二行内容 ---
             ssb.append("工作日加班");
             String weekdayHoursStr = String.format(Locale.CHINA, "%.1f", weekdayOvertimeHours);
             int startWeekday = ssb.length();
             ssb.append(weekdayHoursStr);
             ssb.setSpan(new ForegroundColorSpan(redColor), startWeekday, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            
+
             ssb.append("小时, 节假日加班");
             String holidayHoursStr = String.format(Locale.CHINA, "%.1f", holidayOvertimeHours);
             int startHoliday = ssb.length();
@@ -750,55 +739,53 @@ public class StatsFragment extends Fragment {
             ssb.setSpan(new ForegroundColorSpan(redColor), startHoliday, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             ssb.append("小时");
 
+            // --- 新增：如果是“月”模式，且设置了底薪，则显示本月工资 ---
+            if (currentMode == 1) { // 1 represents Month mode
+                AssistantConfig config = new AssistantConfig(requireContext());
+                float baseSalary = config.getMonthlyBaseSalary();
+                if (baseSalary > 0) {
+                    double totalSalary = baseSalary + totalOvertimeIncome;
+                    ssb.append("\n"); // 换行
+                    ssb.append("本月工资");
+                    String salaryStr = String.format(Locale.CHINA, "%.2f", totalSalary);
+                    int startSalary = ssb.length();
+                    ssb.append(salaryStr);
+                    // 设置为红色
+                    ssb.setSpan(new ForegroundColorSpan(redColor), startSalary, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    ssb.append("元");
+                }
+            }
+
             tvOvertimeContent.setText(ssb);
 
-            // 显示控件
             if (dividerOvertime != null) dividerOvertime.setVisibility(View.VISIBLE);
             if (tvOvertimeContent != null) tvOvertimeContent.setVisibility(View.VISIBLE);
         }
     }
 
+    // ... (GenerateThemeColors, CreateLineDataSet, etc. unchanged) ...
+    // 为了节省篇幅，省略了未修改的辅助方法，实际文件中请保留原样
     private List<Integer> generateThemeColors(int count) {
         List<Integer> colors = new ArrayList<>();
-
         int uiMode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
         boolean isNightMode = uiMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-
         float goldenRatio = 0.618033988749895f;
         float currentHue = (float) (Math.random() * 360f);
-
         int generated = 0;
         int iter = 0;
-
         while (generated < count && iter < 1000) {
             float h = (currentHue + (iter * goldenRatio * 360f)) % 360f;
             iter++;
-
             boolean isGreen = (h >= 80f && h < 160f);
             boolean isCyan = (h >= 160f && h < 200f);
             boolean isPurple = (h >= 250f && h < 320f);
-
-            if (isGreen || isCyan || isPurple) {
-                continue;
-            }
-
+            if (isGreen || isCyan || isPurple) { continue; }
             float s, v;
-            if (isNightMode) {
-                s = 0.40f + (generated % 3) * 0.1f;
-                v = 0.70f + (generated % 2) * 0.15f;
-            } else {
-                s = 0.35f + (generated % 3) * 0.1f;
-                v = 0.80f + (generated % 2) * 0.15f;
-            }
-
+            if (isNightMode) { s = 0.40f + (generated % 3) * 0.1f; v = 0.70f + (generated % 2) * 0.15f; } else { s = 0.35f + (generated % 3) * 0.1f; v = 0.80f + (generated % 2) * 0.15f; }
             colors.add(Color.HSVToColor(new float[]{h, s, v}));
             generated++;
         }
-
-        while (colors.size() < count) {
-            colors.add(Color.LTGRAY);
-        }
-
+        while (colors.size() < count) { colors.add(Color.LTGRAY); }
         return colors;
     }
 
@@ -818,18 +805,15 @@ public class StatsFragment extends Fragment {
         lineChart.getDescription().setEnabled(false);
         lineChart.getAxisRight().setEnabled(false);
         lineChart.getAxisLeft().setTextColor(textColor);
-
         XAxis xAxis = lineChart.getXAxis();
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
         xAxis.setGranularity(1f);
         xAxis.setTextColor(textColor);
-
         lineChart.getLegend().setTextColor(textColor);
         lineChart.setExtraBottomOffset(10f);
         lineChart.setDragEnabled(true);
         lineChart.setScaleEnabled(false);
         lineChart.setHighlightPerDragEnabled(false);
-
         if (getContext() != null) {
             markerView = new CustomMarkerView(getContext(), R.layout.view_chart_marker);
             markerView.setChartView(lineChart);
@@ -840,7 +824,6 @@ public class StatsFragment extends Fragment {
     private void setupPieChart() {
         int textColor = ContextCompat.getColor(requireContext(), R.color.text_primary);
         int holeColor = ContextCompat.getColor(requireContext(), R.color.bar_background);
-
         pieChart.getDescription().setEnabled(false);
         pieChart.setHoleRadius(40f);
         pieChart.setTransparentCircleRadius(0);
@@ -848,14 +831,12 @@ public class StatsFragment extends Fragment {
         pieChart.setEntryLabelColor(textColor);
         pieChart.setEntryLabelTextSize(10f);
         pieChart.setRotationEnabled(false);
-
         Legend l = pieChart.getLegend();
         l.setTextColor(textColor);
         l.setVerticalAlignment(Legend.LegendVerticalAlignment.BOTTOM);
         l.setHorizontalAlignment(Legend.LegendHorizontalAlignment.CENTER);
         l.setOrientation(Legend.LegendOrientation.HORIZONTAL);
         l.setDrawInside(false);
-
         pieChart.setOnChartValueSelectedListener(new OnChartValueSelectedListener() {
             @Override
             public void onValueSelected(Entry e, Highlight h) {
@@ -869,23 +850,21 @@ public class StatsFragment extends Fragment {
 
     private void showCategoryDetailDialog(String category) {
         if (allTransactions == null) return;
-
         long startMillis;
         long endMillis;
-        String dateRangeStr = ""; 
+        String dateRangeStr = "";
         ZoneId zone = ZoneId.systemDefault();
-
-        if (currentMode == 0) { 
+        if (currentMode == 0) {
             LocalDate start = LocalDate.of(selectedDate.getYear(), 1, 1);
             startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli();
             endMillis = start.plusYears(1).atStartOfDay(zone).toInstant().toEpochMilli();
             dateRangeStr = selectedDate.format(DateTimeFormatter.ofPattern("yyyy年"));
-        } else if (currentMode == 1) { 
+        } else if (currentMode == 1) {
             LocalDate start = LocalDate.of(selectedDate.getYear(), selectedDate.getMonthValue(), 1);
             startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli();
             endMillis = start.plusMonths(1).atStartOfDay(zone).toInstant().toEpochMilli();
             dateRangeStr = selectedDate.format(DateTimeFormatter.ofPattern("yyyy年MM月"));
-        } else { 
+        } else {
             LocalDate startOfWeek = selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
             LocalDate endOfWeek = selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
             startMillis = startOfWeek.atStartOfDay(zone).toInstant().toEpochMilli();
@@ -893,14 +872,13 @@ public class StatsFragment extends Fragment {
             DateTimeFormatter fmt = DateTimeFormatter.ofPattern("M.d");
             dateRangeStr = startOfWeek.format(fmt) + " - " + endOfWeek.format(fmt);
         }
-
         Map<String, Double> catTotals = new HashMap<>();
         double totalAmount = 0;
         for (Transaction t : allTransactions) {
-             if (t.type == 0 && t.date >= startMillis && t.date < endMillis) {
-                 catTotals.put(t.category, catTotals.getOrDefault(t.category, 0.0) + t.amount);
-                 totalAmount += t.amount;
-             }
+            if (t.type == 0 && t.date >= startMillis && t.date < endMillis) {
+                catTotals.put(t.category, catTotals.getOrDefault(t.category, 0.0) + t.amount);
+                totalAmount += t.amount;
+            }
         }
         double threshold = totalAmount * 0.05;
         List<String> smallCategories = new ArrayList<>();
@@ -909,7 +887,6 @@ public class StatsFragment extends Fragment {
                 smallCategories.add(entry.getKey());
             }
         }
-
         List<Transaction> filteredList = new ArrayList<>();
         for (Transaction t : allTransactions) {
             if (t.type == 0 && t.date >= startMillis && t.date < endMillis) {
@@ -926,47 +903,37 @@ public class StatsFragment extends Fragment {
                 if (match) filteredList.add(t);
             }
         }
-
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_transaction_list, null);
         builder.setView(dialogView);
         AlertDialog dialog = builder.create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-
         TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
         tvTitle.setText(dateRangeStr + " " + category + " - 消费清单");
-
         RecyclerView rv = dialogView.findViewById(R.id.rv_detail_list);
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
-
         TransactionListAdapter adapter = new TransactionListAdapter(t -> {
             LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
             showAddOrEditDialog(t, date);
         });
-        
         adapter.setTransactions(filteredList);
-        adapter.setAssets(assetList); 
-        
+        adapter.setAssets(assetList);
         rv.setAdapter(adapter);
-
         View btnOvertime = dialogView.findViewById(R.id.btn_add_overtime);
         View btnAdd = dialogView.findViewById(R.id.btn_add_transaction);
         if (btnOvertime != null) btnOvertime.setVisibility(View.GONE);
         if (btnAdd != null) btnAdd.setVisibility(View.GONE);
-
         Button btnClose = dialogView.findViewById(R.id.btn_close_dialog);
         if (btnClose != null) btnClose.setOnClickListener(v -> dialog.dismiss());
-
         dialog.show();
     }
-    
+
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_transaction, null);
         builder.setView(dialogView);
         AlertDialog dialog = builder.create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-
         TextView tvDate = dialogView.findViewById(R.id.tv_dialog_date);
         RadioGroup rgType = dialogView.findViewById(R.id.rg_type);
         RadioGroup rgCategory = dialogView.findViewById(R.id.rg_category);
@@ -975,36 +942,27 @@ public class StatsFragment extends Fragment {
         EditText etRemark = dialogView.findViewById(R.id.et_remark);
         EditText etNote = dialogView.findViewById(R.id.et_note);
         Spinner spAsset = dialogView.findViewById(R.id.sp_asset);
-        
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
-        
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
-
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
-
         AssistantConfig config = new AssistantConfig(requireContext());
         boolean isAssetEnabled = config.isAssetsEnabled();
-
         List<AssetAccount> assetList = new ArrayList<>();
         ArrayAdapter<String> assetAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner_dropdown);
-
         if (isAssetEnabled) {
             spAsset.setVisibility(View.VISIBLE);
-
             AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
             noAsset.id = 0;
             assetList.add(noAsset);
-
             assetAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
             spAsset.setAdapter(assetAdapter);
-
             viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
                 assetList.clear();
                 assetList.add(noAsset);
                 if (assets != null) {
                     for (AssetAccount a : assets) {
-                        if (a.type == 0) { 
+                        if (a.type == 0) {
                             assetList.add(a);
                         }
                     }
@@ -1013,7 +971,6 @@ public class StatsFragment extends Fragment {
                 assetAdapter.clear();
                 assetAdapter.addAll(names);
                 assetAdapter.notifyDataSetChanged();
-
                 if (existingTransaction != null && existingTransaction.assetId != 0) {
                     for (int i = 0; i < assetList.size(); i++) {
                         if (assetList.get(i).id == existingTransaction.assetId) {
@@ -1036,7 +993,6 @@ public class StatsFragment extends Fragment {
         } else {
             spAsset.setVisibility(View.GONE);
         }
-
         final java.util.Calendar calendar = java.util.Calendar.getInstance();
         if (existingTransaction != null) {
             calendar.setTimeInMillis(existingTransaction.date);
@@ -1046,43 +1002,24 @@ public class StatsFragment extends Fragment {
             calendar.set(java.util.Calendar.MONTH, date.getMonthValue() - 1);
             calendar.set(java.util.Calendar.DAY_OF_MONTH, date.getDayOfMonth());
         }
-
         Runnable updateDateDisplay = () -> {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA);
             tvDate.setText(sdf.format(calendar.getTime()));
         };
         updateDateDisplay.run();
-
         tvDate.setOnClickListener(v -> {
             long currentMillis = calendar.getTimeInMillis();
             long offset = TimeZone.getDefault().getOffset(currentMillis);
-
-            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
-                    .setTitleText("选择日期")
-                    .setSelection(currentMillis + offset)
-                    .setPositiveButtonText("确认")
-                    .setNegativeButtonText("取消")
-                    .build();
-
+            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker().setTitleText("选择日期").setSelection(currentMillis + offset).setPositiveButtonText("确认").setNegativeButtonText("取消").build();
             datePicker.addOnPositiveButtonClickListener(selection -> {
                 java.util.Calendar selectedCal = java.util.Calendar.getInstance();
                 long correctMillis = selection - TimeZone.getDefault().getOffset(selection);
                 selectedCal.setTimeInMillis(correctMillis);
-
                 calendar.set(java.util.Calendar.YEAR, selectedCal.get(java.util.Calendar.YEAR));
                 calendar.set(java.util.Calendar.MONTH, selectedCal.get(java.util.Calendar.MONTH));
                 calendar.set(java.util.Calendar.DAY_OF_MONTH, selectedCal.get(java.util.Calendar.DAY_OF_MONTH));
-
-                MaterialTimePicker timePicker = new MaterialTimePicker.Builder()
-                        .setTimeFormat(TimeFormat.CLOCK_24H)
-                        .setHour(calendar.get(java.util.Calendar.HOUR_OF_DAY))
-                        .setMinute(calendar.get(java.util.Calendar.MINUTE))
-                        .setTitleText("选择时间")
-                        .setPositiveButtonText("确认")
-                        .setNegativeButtonText("取消")
-                        .build();
-
-                timePicker.addOnPositiveButtonClickListener(view -> {
+                MaterialTimePicker timePicker = new MaterialTimePicker.Builder().setTimeFormat(TimeFormat.CLOCK_24H).setHour(calendar.get(java.util.Calendar.HOUR_OF_DAY)).setMinute(calendar.get(java.util.Calendar.MINUTE)).setTitleText("选择时间").setPositiveButtonText("确认").setNegativeButtonText("取消").build();
+                timePicker.addOnPositiveButtonClickListener(pickerView -> {
                     calendar.set(java.util.Calendar.HOUR_OF_DAY, timePicker.getHour());
                     calendar.set(java.util.Calendar.MINUTE, timePicker.getMinute());
                     updateDateDisplay.run();
@@ -1091,7 +1028,6 @@ public class StatsFragment extends Fragment {
             });
             datePicker.show(getParentFragmentManager(), "date_picker");
         });
-
         rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.rb_custom) {
                 etCustomCategory.setVisibility(View.VISIBLE);
@@ -1100,7 +1036,6 @@ public class StatsFragment extends Fragment {
                 etCustomCategory.setVisibility(View.GONE);
             }
         });
-
         rgType.setOnCheckedChangeListener((g, id) -> {
             boolean isExpense = (id == R.id.rb_expense);
             rgCategory.setVisibility(isExpense ? View.VISIBLE : View.GONE);
@@ -1110,13 +1045,11 @@ public class StatsFragment extends Fragment {
                 etCustomCategory.setVisibility(View.GONE);
             }
         });
-
         if (existingTransaction != null) {
             btnSave.setText("保存修改");
             etAmount.setText(String.valueOf(existingTransaction.amount));
             if (existingTransaction.remark != null) etRemark.setText(existingTransaction.remark);
             if (existingTransaction.note != null) etNote.setText(existingTransaction.note);
-
             if (existingTransaction.type == 1) {
                 rgType.check(R.id.rb_income);
             } else {
@@ -1137,36 +1070,26 @@ public class StatsFragment extends Fragment {
                     etCustomCategory.setText(existingTransaction.category);
                 }
             }
-
             btnDelete.setVisibility(View.VISIBLE);
             btnDelete.setOnClickListener(v -> {
-                new AlertDialog.Builder(getContext())
-                        .setTitle("确认删除")
-                        .setMessage("确定要删除这条记录吗？")
-                        .setPositiveButton("删除", (d, w) -> {
-                            viewModel.deleteTransaction(existingTransaction);
-                            dialog.dismiss();
-                        })
-                        .setNegativeButton("取消", null)
-                        .show();
+                new AlertDialog.Builder(getContext()).setTitle("确认删除").setMessage("确定要删除这条记录吗？").setPositiveButton("删除", (d, w) -> {
+                    viewModel.deleteTransaction(existingTransaction);
+                    dialog.dismiss();
+                }).setNegativeButton("取消", null).show();
             });
-            
             if (tvRevoke != null) {
                 tvRevoke.setVisibility(View.VISIBLE);
                 tvRevoke.setOnClickListener(v -> {
                     showRevokeDialog(existingTransaction, dialog);
                 });
             }
-
         } else {
             btnSave.setText("保存");
             btnDelete.setVisibility(View.GONE);
             if (tvRevoke != null) tvRevoke.setVisibility(View.GONE);
-            
             SimpleDateFormat noteSdf = new SimpleDateFormat("MM月dd日 HH:mm", Locale.CHINA);
             etNote.setText(noteSdf.format(calendar.getTime()) + " 手动");
         }
-
         btnSave.setOnClickListener(v -> {
             String amountStr = etAmount.getText().toString();
             if (!amountStr.isEmpty()) {
@@ -1189,10 +1112,8 @@ public class StatsFragment extends Fragment {
                 }
                 String userRemark = "";
                 if (etRemark != null) userRemark = etRemark.getText().toString().trim();
-
                 String noteContent = etNote.getText().toString().trim();
                 long ts = calendar.getTimeInMillis();
-
                 int selectedAssetId = 0;
                 if (isAssetEnabled) {
                     int selectedPos = spAsset.getSelectedItemPosition();
@@ -1200,21 +1121,18 @@ public class StatsFragment extends Fragment {
                         selectedAssetId = assetList.get(selectedPos).id;
                     }
                 }
-
                 if (existingTransaction == null) {
                     Transaction t = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     t.assetId = selectedAssetId;
                     viewModel.addTransaction(t);
-
                     if (selectedAssetId != 0) {
-                         for (AssetAccount asset : assetList) {
-                             if (asset.id == selectedAssetId) {
-                                 if (type == 1) asset.amount += amount;
-                                 else asset.amount -= amount;
-                                 viewModel.updateAsset(asset);
-                                 break;
-                             }
-                         }
+                        for (AssetAccount asset : assetList) {
+                            if (asset.id == selectedAssetId) {
+                                if (type == 1) asset.amount += amount; else asset.amount -= amount;
+                                viewModel.updateAsset(asset);
+                                break;
+                            }
+                        }
                     }
                 } else {
                     Transaction updateT = new Transaction(ts, type, category, amount, noteContent, userRemark);
@@ -1234,19 +1152,15 @@ public class StatsFragment extends Fragment {
         builder.setView(view);
         AlertDialog revokeDialog = builder.create();
         if (revokeDialog.getWindow() != null) revokeDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-
         Spinner spRevokeAsset = view.findViewById(R.id.sp_revoke_asset);
         Button btnCancel = view.findViewById(R.id.btn_revoke_cancel);
         Button btnConfirm = view.findViewById(R.id.btn_revoke_confirm);
-
         List<AssetAccount> assetList = new ArrayList<>();
         AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
         noAsset.id = 0;
-
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), R.layout.item_spinner_dropdown);
         adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spRevokeAsset.setAdapter(adapter);
-
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             assetList.clear();
             assetList.add(noAsset);
@@ -1261,7 +1175,6 @@ public class StatsFragment extends Fragment {
             adapter.clear();
             adapter.addAll(names);
             adapter.notifyDataSetChanged();
-
             int targetIndex = 0;
             if (transaction.assetId != 0) {
                 for (int i = 0; i < assetList.size(); i++) {
@@ -1273,26 +1186,20 @@ public class StatsFragment extends Fragment {
             }
             spRevokeAsset.setSelection(targetIndex);
         });
-
         btnCancel.setOnClickListener(v -> revokeDialog.dismiss());
-
         btnConfirm.setOnClickListener(v -> {
             int selectedPos = spRevokeAsset.getSelectedItemPosition();
             if (selectedPos >= 0 && selectedPos < assetList.size()) {
                 AssetAccount selectedAsset = assetList.get(selectedPos);
-
                 viewModel.revokeTransaction(transaction, selectedAsset.id);
-
                 String msg = selectedAsset.id == 0 ? "已撤回记录（无资产变动）" : "已撤回并退款至 " + selectedAsset.name;
                 Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
-
                 revokeDialog.dismiss();
                 if (parentDialog != null && parentDialog.isShowing()) {
                     parentDialog.dismiss();
                 }
             }
         });
-
         revokeDialog.show();
     }
 

@@ -8,84 +8,113 @@
     android:padding="16dp"
     android:background="@color/bar_background">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="自动资产设置"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="20dp"
-        android:textColor="@color/text_primary"/>
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@drawable/bg_input_field"
-        android:padding="16dp"
-        android:layout_marginBottom="24dp">
+        android:paddingBottom="24dp"
+        android:paddingTop="8dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="自动资产设置"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"/>
+    </LinearLayout>
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white"
+        android:layout_marginBottom="16dp">
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="20dp">
 
-            <TextView
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="开启自动资产"
+                    android:textSize="16sp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="识别到特定关键字时自动选择资产"
+                    android:textSize="12sp"
+                    android:textColor="#888888"
+                    android:layout_marginTop="4dp"/>
+            </LinearLayout>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switchAutoAsset"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="开启自动资产"
-                android:textSize="16sp"
-                android:textColor="@color/text_primary"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="识别到特定关键字时自动选择资产"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginTop="2dp"/>
+                android:thumb="@drawable/switch_thumb_custom"
+                app:track="@drawable/switch_track_custom"
+                app:showText="false"
+                app:thumbTint="@null"
+                app:trackTint="@null"
+                android:background="@null"/>
         </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
-        <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/switchAutoAsset"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:thumb="@drawable/switch_thumb_custom"
-            app:track="@drawable/switch_track_custom"
-            app:showText="false"
-            app:thumbTint="@null"
-            app:trackTint="@null"
-            android:background="@null"/>
-    </LinearLayout>
-
-    <LinearLayout
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="8dp">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white">
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="关联规则 (长按删除)"
-            android:textSize="14sp"
-            android:textColor="#666666"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="20dp">
 
-        <Button
-            android:id="@+id/btnAddRule"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:text="+ 新增规则"
-            android:textColor="@color/text_white"
-            android:textSize="12sp"/>
-    </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvRules"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="关联规则 (长按删除)"
+                    android:textSize="14sp"
+                    android:textColor="#666666"/>
+
+                <Button
+                    android:id="@+id/btnAddRule"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="+ 新增规则"
+                    android:textColor="@color/text_white"
+                    android:textSize="12sp"
+                    android:background="@drawable/bg_bottom_sheet_rounded"
+                    android:backgroundTint="?android:attr/colorPrimary"/>
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvRules"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
 </LinearLayout>

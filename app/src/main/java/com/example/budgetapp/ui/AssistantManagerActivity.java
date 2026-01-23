@@ -19,15 +19,14 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-// [重要] 引入 SwitchCompat
-import androidx.appcompat.widget.SwitchCompat;
-
+import androidx.appcompat.widget.SwitchCompat; // 关键导入
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -47,7 +46,7 @@ public class AssistantManagerActivity extends AppCompatActivity {
 
     private AssistantConfig config;
     
-    // [修改] 变量类型改为 SwitchCompat
+    // 使用 SwitchCompat
     private SwitchCompat switchAutoTrack;
     private SwitchCompat switchRefundMonitor;
     private SwitchCompat switchAssets;
@@ -88,23 +87,34 @@ public class AssistantManagerActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 1. 沉浸式设置
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+
         setContentView(R.layout.activity_assistant_manager);
 
-        LinearLayout rootLayout = findViewById(R.id.root_layout);
-        final int originalPaddingTop = rootLayout.getPaddingTop();
-
-        ViewCompat.setOnApplyWindowInsetsListener(rootLayout, (v, windowInsets) -> {
-            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(
-                    v.getPaddingLeft(),
-                    originalPaddingTop + insets.top,
-                    v.getPaddingRight(),
-                    v.getPaddingBottom() + insets.bottom
-            );
-            return WindowInsetsCompat.CONSUMED;
-        });
+        // 2. 适配内边距
+        View rootLayout = findViewById(R.id.root_layout);
+        if (rootLayout != null) {
+            final int originalPaddingTop = rootLayout.getPaddingTop();
+            final int originalPaddingBottom = rootLayout.getPaddingBottom();
+            
+            ViewCompat.setOnApplyWindowInsetsListener(rootLayout, (v, windowInsets) -> {
+                Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+                v.setPadding(
+                        v.getPaddingLeft(),
+                        originalPaddingTop + insets.top,
+                        v.getPaddingRight(),
+                        originalPaddingBottom + insets.bottom
+                );
+                return WindowInsetsCompat.CONSUMED;
+            });
+        }
 
         config = new AssistantConfig(this); 
+        // 确保默认关键字已初始化
         KeywordManager.initDefaults(this);
         
         initViews();
@@ -122,18 +132,22 @@ public class AssistantManagerActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        // [修改] 匹配 Layout 中的 SwitchCompat
         switchAutoTrack = findViewById(R.id.switchAutoTrack);
+        switchRefundMonitor = findViewById(R.id.switchRefundMonitor);
+        switchAssets = findViewById(R.id.switchAssets);
+
         switchAutoTrack.setChecked(config.isEnabled());
+        switchRefundMonitor.setChecked(config.isRefundEnabled());
+        switchAssets.setChecked(config.isAssetsEnabled());
+
         switchAutoTrack.setOnCheckedChangeListener((buttonView, isChecked) -> {
             config.setEnabled(isChecked);
             if (isChecked) {
+                checkAccessibilityPermission();
                 Toast.makeText(this, "已开启屏幕自动记账", Toast.LENGTH_SHORT).show();
             }
         });
 
-        switchRefundMonitor = findViewById(R.id.switchRefundMonitor);
-        switchRefundMonitor.setChecked(config.isRefundEnabled());
         switchRefundMonitor.setOnCheckedChangeListener((buttonView, isChecked) -> {
             config.setRefundEnabled(isChecked);
             if (isChecked) {
@@ -144,8 +158,6 @@ public class AssistantManagerActivity extends AppCompatActivity {
             }
         });
 
-        switchAssets = findViewById(R.id.switchAssets);
-        switchAssets.setChecked(config.isAssetsEnabled());
         switchAssets.setOnCheckedChangeListener((buttonView, isChecked) -> {
             config.setAssetsEnabled(isChecked);
             if (isChecked) {
@@ -166,7 +178,34 @@ public class AssistantManagerActivity extends AppCompatActivity {
         });
     }
 
-    // ... (后续方法保持不变) ...
+    private void checkAccessibilityPermission() {
+        if (!isAccessibilitySettingsOn()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("需要开启辅助服务")
+                    .setMessage("屏幕自动记账需要开启'记账屏幕同步助手'服务。")
+                    .setPositiveButton("去开启", (d, w) -> {
+                        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                    })
+                    .setNegativeButton("取消", (d, w) -> switchAutoTrack.setChecked(false))
+                    .show();
+        }
+    }
+
+    private boolean isAccessibilitySettingsOn() {
+        int accessibilityEnabled = 0;
+        final String service = getPackageName() + "/" + com.example.budgetapp.service.AutoTrackAccessibilityService.class.getCanonicalName();
+        try {
+            accessibilityEnabled = Settings.Secure.getInt(getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED);
+        } catch (Settings.SettingNotFoundException e) { }
+
+        if (accessibilityEnabled == 1) {
+            String settingValue = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (settingValue != null) {
+                return settingValue.contains(service);
+            }
+        }
+        return false;
+    }
 
     private void checkNotificationPermission() {
         if (!isNotificationListenerEnabled()) {
@@ -180,7 +219,7 @@ public class AssistantManagerActivity extends AppCompatActivity {
                         Toast.makeText(this, "无法打开设置页，请手动前往设置", Toast.LENGTH_LONG).show();
                     }
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton("取消", (d, w) -> switchRefundMonitor.setChecked(false))
                 .show();
         }
     }
@@ -202,17 +241,25 @@ public class AssistantManagerActivity extends AppCompatActivity {
 
     private void loadData() {
         dataList.clear();
+        // 使用 KeywordManager 的新方法
+        Map<String, Set<String>> incomeMap = KeywordManager.getIncomeKeywords(this);
+        Map<String, Set<String>> expenseMap = KeywordManager.getExpenseKeywords(this);
         Map<String, String> apps = KeywordManager.getSupportedApps();
-        for (Map.Entry<String, String> appEntry : apps.entrySet()) {
-            String pkg = appEntry.getKey();
-            String name = appEntry.getValue();
-            Set<String> expenses = KeywordManager.getKeywords(this, pkg, KeywordManager.TYPE_EXPENSE);
-            for (String k : expenses) {
-                dataList.add(new KeywordItem(pkg, name, k, KeywordManager.TYPE_EXPENSE));
+
+        // 整理收入关键字
+        for (Map.Entry<String, Set<String>> entry : incomeMap.entrySet()) {
+            String pkg = entry.getKey();
+            String appName = apps.getOrDefault(pkg, pkg);
+            for (String kw : entry.getValue()) {
+                dataList.add(new KeywordItem(pkg, appName, kw, KeywordManager.TYPE_INCOME));
             }
-            Set<String> incomes = KeywordManager.getKeywords(this, pkg, KeywordManager.TYPE_INCOME);
-            for (String k : incomes) {
-                dataList.add(new KeywordItem(pkg, name, k, KeywordManager.TYPE_INCOME));
+        }
+        // 整理支出关键字
+        for (Map.Entry<String, Set<String>> entry : expenseMap.entrySet()) {
+            String pkg = entry.getKey();
+            String appName = apps.getOrDefault(pkg, pkg);
+            for (String kw : entry.getValue()) {
+                dataList.add(new KeywordItem(pkg, appName, kw, KeywordManager.TYPE_EXPENSE));
             }
         }
         Collections.sort(dataList);
@@ -297,7 +344,14 @@ public class AssistantManagerActivity extends AppCompatActivity {
             if (newText.isEmpty()) return;
             AppSpinnerItem selectedApp = (AppSpinnerItem) spinnerApp.getSelectedItem();
             int newType = rbExpense.isChecked() ? KeywordManager.TYPE_EXPENSE : KeywordManager.TYPE_INCOME;
-            KeywordManager.removeKeyword(this, oldItem.packageName, oldItem.type, oldItem.text);
+            
+            // 使用 KeywordManager 的新方法
+            if (oldItem.type == KeywordManager.TYPE_INCOME) {
+                KeywordManager.removeIncomeKeyword(this, oldItem.packageName, oldItem.text);
+            } else {
+                KeywordManager.removeExpenseKeyword(this, oldItem.packageName, oldItem.text);
+            }
+            
             KeywordManager.addKeyword(this, selectedApp.packageName, newType, newText);
             loadData();
             Toast.makeText(this, "修改成功", Toast.LENGTH_SHORT).show();
@@ -318,7 +372,12 @@ public class AssistantManagerActivity extends AppCompatActivity {
         builder.setTitle("删除");
         builder.setMessage("确定删除 \"" + item.appName + "\" 的关键字 [" + item.text + "] 吗？");
         builder.setPositiveButton("删除", (d, w) -> {
-            KeywordManager.removeKeyword(this, item.packageName, item.type, item.text);
+            // 使用 KeywordManager 的新方法
+            if (item.type == KeywordManager.TYPE_INCOME) {
+                KeywordManager.removeIncomeKeyword(this, item.packageName, item.text);
+            } else {
+                KeywordManager.removeExpenseKeyword(this, item.packageName, item.text);
+            }
             loadData();
             Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
         });

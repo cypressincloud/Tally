@@ -16,9 +16,10 @@ public class AssistantConfig {
     private static final String KEY_KEYWORDS_EXPENSE = "key_keywords_expense";
     private static final String KEY_KEYWORDS_INCOME = "key_keywords_income";
 
-    // --- 新增：薪资配置 Key ---
+    // 薪资配置 Key
     private static final String KEY_WEEKDAY_RATE = "weekday_overtime_rate";
     private static final String KEY_HOLIDAY_RATE = "holiday_overtime_rate";
+    private static final String KEY_MONTHLY_BASE_SALARY = "monthly_base_salary"; // 新增
 
     private final SharedPreferences prefs;
 
@@ -95,7 +96,7 @@ public class AssistantConfig {
         prefs.edit().putStringSet(KEY_KEYWORDS_INCOME, current).apply();
     }
 
-    // --- 新增方法：薪资配置 ---
+    // --- 薪资配置 ---
 
     public float getWeekdayOvertimeRate() {
         return prefs.getFloat(KEY_WEEKDAY_RATE, 0f);
@@ -111,5 +112,14 @@ public class AssistantConfig {
 
     public void setHolidayOvertimeRate(float rate) {
         prefs.edit().putFloat(KEY_HOLIDAY_RATE, rate).apply();
+    }
+
+    // --- 新增：每月底薪 ---
+    public float getMonthlyBaseSalary() {
+        return prefs.getFloat(KEY_MONTHLY_BASE_SALARY, 0f);
+    }
+
+    public void setMonthlyBaseSalary(float salary) {
+        prefs.edit().putFloat(KEY_MONTHLY_BASE_SALARY, salary).apply();
     }
 }

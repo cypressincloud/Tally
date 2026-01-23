@@ -2,7 +2,9 @@ package com.example.budgetapp.ui;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -18,6 +20,7 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.NumberPicker;
 import android.widget.RadioButton;
@@ -42,6 +45,9 @@ import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import com.google.android.material.timepicker.MaterialTimePicker;
+import com.google.android.material.timepicker.TimeFormat;
 
 import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
@@ -53,6 +59,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -102,12 +109,25 @@ public class RecordFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_record, container, false);
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
-        
+
         if (currentMonth == null) {
             currentMonth = YearMonth.now();
         }
 
         initGestureDetector();
+
+        // === 1. 初始化设置菜单按钮 ===
+        ImageButton btnSettings = view.findViewById(R.id.btn_settings_menu);
+        if (btnSettings != null) {
+            btnSettings.setOnClickListener(v -> {
+                Intent intent = new Intent(requireContext(), SettingsActivity.class);
+                startActivity(intent);
+            });
+            // 初始可见性检查
+            SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+            boolean isMinimalist = prefs.getBoolean("minimalist_mode", false);
+            btnSettings.setVisibility(isMinimalist ? View.GONE : View.VISIBLE);
+        }
 
         tvMonthTitle = view.findViewById(R.id.tv_month_title);
         tvMonthLabel = view.findViewById(R.id.tv_month_label);
@@ -131,7 +151,7 @@ public class RecordFragment extends Fragment {
         }
 
         RecyclerView recyclerView = view.findViewById(R.id.calendar_recycler);
-        
+
         GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 7) {
             @Override
             public boolean canScrollVertically() {
@@ -139,7 +159,7 @@ public class RecordFragment extends Fragment {
             }
         };
         recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER); 
+        recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         adapter = new CalendarAdapter(date -> {
             if (date.equals(selectedDate)) {
@@ -163,21 +183,18 @@ public class RecordFragment extends Fragment {
                 yearCalendarLauncher.launch(intent);
             });
             tvMonthLabel.setOnTouchListener((v, event) -> {
-                 gestureDetector.onTouchEvent(event);
-                 return false;
+                gestureDetector.onTouchEvent(event);
+                return false;
             });
         }
 
         layoutBalance.setOnClickListener(v -> switchFilterMode(0));
         layoutIncome.setOnClickListener(v -> switchFilterMode(1));
         layoutExpense.setOnClickListener(v -> switchFilterMode(2));
-        
-        // 加班卡片点击过滤，长按设置薪资
+
+        // 加班卡片点击过滤
+        // === 2. 移除长按设置薪资逻辑 (已移至设置页) ===
         layoutOvertime.setOnClickListener(v -> switchFilterMode(3));
-        layoutOvertime.setOnLongClickListener(v -> {
-            showSetOvertimeRateDialog();
-            return true; // 返回 true 表示消费了事件，不再触发 onClick
-        });
 
         tvMonthTitle.setOnClickListener(v -> showCustomDatePicker());
 
@@ -192,7 +209,7 @@ public class RecordFragment extends Fragment {
 
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
             updateCalendar();
-            
+
             if (currentDetailAdapter != null && selectedDate != null) {
                 long start = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 long end = selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
@@ -216,43 +233,19 @@ public class RecordFragment extends Fragment {
         return view;
     }
 
-    // 显示设置加班薪资的弹窗
-    private void showSetOvertimeRateDialog() {
-        if (getContext() == null) return;
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-        View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_set_overtime_rate, null);
-        builder.setView(view);
-
-        EditText etWeekday = view.findViewById(R.id.et_weekday_rate);
-        EditText etHoliday = view.findViewById(R.id.et_holiday_rate);
-
-        AssistantConfig config = new AssistantConfig(getContext());
-        float currentWeekday = config.getWeekdayOvertimeRate();
-        float currentHoliday = config.getHolidayOvertimeRate();
-
-        if (currentWeekday > 0) etWeekday.setText(String.valueOf(currentWeekday));
-        if (currentHoliday > 0) etHoliday.setText(String.valueOf(currentHoliday));
-
-        builder.setTitle("设置加班薪资标准")
-                .setPositiveButton("保存", (dialog, which) -> {
-                    String wStr = etWeekday.getText().toString();
-                    String hStr = etHoliday.getText().toString();
-                    
-                    try {
-                        float wRate = wStr.isEmpty() ? 0f : Float.parseFloat(wStr);
-                        float hRate = hStr.isEmpty() ? 0f : Float.parseFloat(hStr);
-                        
-                        config.setWeekdayOvertimeRate(wRate);
-                        config.setHolidayOvertimeRate(hRate);
-                        
-                        Toast.makeText(getContext(), "设置已保存", Toast.LENGTH_SHORT).show();
-                    } catch (NumberFormatException e) {
-                        Toast.makeText(getContext(), "输入格式错误", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+    @Override
+    public void onResume() {
+        super.onResume();
+        // 每次可见时检查是否需要更新菜单按钮的可见性（应对设置变更）
+        View view = getView();
+        if (view != null) {
+            ImageButton btnSettings = view.findViewById(R.id.btn_settings_menu);
+            if (btnSettings != null) {
+                SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+                boolean isMinimalist = prefs.getBoolean("minimalist_mode", false);
+                btnSettings.setVisibility(isMinimalist ? View.GONE : View.VISIBLE);
+            }
+        }
     }
 
     private void showCustomDatePicker() {
@@ -311,7 +304,7 @@ public class RecordFragment extends Fragment {
         npYear.setOnValueChangedListener(dateChangeListener);
         npMonth.setOnValueChangedListener(dateChangeListener);
         npDay.setOnValueChangedListener(dateChangeListener);
-        
+
         updatePreviewText(tvPreview, curYear, curMonth, curDay);
 
         btnCancel.setOnClickListener(v -> dialog.dismiss());
@@ -320,13 +313,13 @@ public class RecordFragment extends Fragment {
             int year = npYear.getValue();
             int month = npMonth.getValue();
             int day = npDay.getValue();
-            
+
             currentMonth = YearMonth.of(year, month);
             selectedDate = LocalDate.of(year, month, day);
             updateCalendar();
-            
+
             adapter.setSelectedDate(selectedDate);
-            
+
             dialog.dismiss();
         });
 
@@ -403,14 +396,14 @@ public class RecordFragment extends Fragment {
 
         adapter.setCurrentMonth(currentMonth);
         adapter.updateData(days, currentList);
-        
+
         if (selectedDate != null && YearMonth.from(selectedDate).equals(currentMonth)) {
             adapter.setSelectedDate(selectedDate);
         }
-        
+
         calculateMonthTotals(currentList);
     }
-    
+
     private void calculateMonthTotals(List<Transaction> transactions) {
         double totalIncome = 0;
         double totalExpense = 0;
@@ -507,7 +500,7 @@ public class RecordFragment extends Fragment {
         TextView tvResult = view.findViewById(R.id.tv_calculated_amount);
         Button btnSave = view.findViewById(R.id.btn_save_overtime);
         Button btnCancel = view.findViewById(R.id.btn_cancel_overtime);
-        
+
         // 自动填充时薪
         AssistantConfig config = new AssistantConfig(requireContext());
         float defaultRate = 0f;
@@ -517,7 +510,7 @@ public class RecordFragment extends Fragment {
         } else {
             defaultRate = config.getWeekdayOvertimeRate();
         }
-        
+
         if (defaultRate > 0) {
             etRate.setText(String.valueOf(defaultRate));
         }
@@ -665,6 +658,47 @@ public class RecordFragment extends Fragment {
             tvDate.setText(sdf.format(calendar.getTime()));
         };
         updateDateDisplay.run();
+
+        // 日期选择逻辑
+        tvDate.setOnClickListener(v -> {
+            long currentMillis = calendar.getTimeInMillis();
+            long offset = TimeZone.getDefault().getOffset(currentMillis);
+
+            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
+                    .setTitleText("选择日期")
+                    .setSelection(currentMillis + offset)
+                    .setPositiveButtonText("确认")
+                    .setNegativeButtonText("取消")
+                    .build();
+
+            datePicker.addOnPositiveButtonClickListener(selection -> {
+                java.util.Calendar selectedCal = java.util.Calendar.getInstance();
+                long correctMillis = selection - TimeZone.getDefault().getOffset(selection);
+                selectedCal.setTimeInMillis(correctMillis);
+
+                calendar.set(java.util.Calendar.YEAR, selectedCal.get(java.util.Calendar.YEAR));
+                calendar.set(java.util.Calendar.MONTH, selectedCal.get(java.util.Calendar.MONTH));
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, selectedCal.get(java.util.Calendar.DAY_OF_MONTH));
+
+                MaterialTimePicker timePicker = new MaterialTimePicker.Builder()
+                        .setTimeFormat(TimeFormat.CLOCK_24H)
+                        .setHour(calendar.get(java.util.Calendar.HOUR_OF_DAY))
+                        .setMinute(calendar.get(java.util.Calendar.MINUTE))
+                        .setTitleText("选择时间")
+                        .setPositiveButtonText("确认")
+                        .setNegativeButtonText("取消")
+                        .build();
+
+                timePicker.addOnPositiveButtonClickListener(pickerView -> {
+                    calendar.set(java.util.Calendar.HOUR_OF_DAY, timePicker.getHour());
+                    calendar.set(java.util.Calendar.MINUTE, timePicker.getMinute());
+                    updateDateDisplay.run();
+                });
+                timePicker.show(getParentFragmentManager(), "time_picker");
+            });
+            datePicker.show(getParentFragmentManager(), "date_picker");
+        });
+
 
         rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.rb_custom) {

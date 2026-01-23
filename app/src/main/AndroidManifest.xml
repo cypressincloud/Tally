@@ -26,6 +26,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:label="设置"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
         <activity android:name=".ui.AssistantManagerActivity" />
 
         <activity

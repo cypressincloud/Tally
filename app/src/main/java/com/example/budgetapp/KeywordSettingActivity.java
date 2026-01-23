@@ -1,6 +1,7 @@
 package com.example.budgetapp;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,8 +21,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat; // 新增
 import androidx.core.view.WindowInsetsCompat;
 
 import com.example.budgetapp.util.KeywordManager;
@@ -33,7 +36,7 @@ import java.util.Set;
 
 public class KeywordSettingActivity extends AppCompatActivity {
 
-    private View rootLayout; // 引用根布局
+    private View rootLayout;
     private Spinner spinnerAppSelector;
     private RadioGroup rgKeywordType;
     private EditText etKeywordInput;
@@ -50,9 +53,14 @@ public class KeywordSettingActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 1. 沉浸式设置
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+
         setContentView(R.layout.activity_keyword_setting);
 
-        // 1. 获取视图引用
         rootLayout = findViewById(R.id.root_layout);
         spinnerAppSelector = findViewById(R.id.spinner_app_selector);
         rgKeywordType = findViewById(R.id.rg_keyword_type);
@@ -61,8 +69,7 @@ public class KeywordSettingActivity extends AppCompatActivity {
         listKeywords = findViewById(R.id.list_keywords);
         tvCurrentAppHint = findViewById(R.id.tv_current_app_hint);
 
-        // 2. 【核心修改】设置沉浸式状态栏 Padding
-        // 记录原始 Padding (即 XML 中写的 16dp)
+        // 2. 适配内边距
         final int originalPaddingTop = rootLayout.getPaddingTop();
         final int originalPaddingBottom = rootLayout.getPaddingBottom();
 
@@ -70,14 +77,13 @@ public class KeywordSettingActivity extends AppCompatActivity {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(
                     v.getPaddingLeft(),
-                    originalPaddingTop + insets.top, // 顶部增加状态栏高度
+                    originalPaddingTop + insets.top,
                     v.getPaddingRight(),
-                    originalPaddingBottom + insets.bottom // 底部增加导航栏高度(可选)
+                    originalPaddingBottom + insets.bottom
             );
             return WindowInsetsCompat.CONSUMED;
         });
 
-        // 3. 初始化默认数据
         KeywordManager.initDefaults(this);
 
         setupAppSpinner();
@@ -101,15 +107,11 @@ public class KeywordSettingActivity extends AppCompatActivity {
                 android.R.layout.simple_spinner_item,
                 appItems
         );
-
-        // 【修改这里】使用自定义的布局文件
         spinnerAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
-
         spinnerAppSelector.setAdapter(spinnerAdapter);
     }
 
     private void setupListeners() {
-        // 下拉选择应用
         spinnerAppSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -121,7 +123,6 @@ public class KeywordSettingActivity extends AppCompatActivity {
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        // 添加按钮
         btnAddKeyword.setOnClickListener(v -> {
             String keyword = etKeywordInput.getText().toString().trim();
             if (keyword.isEmpty()) {
@@ -140,7 +141,6 @@ public class KeywordSettingActivity extends AppCompatActivity {
             Toast.makeText(this, "已添加: " + keyword, Toast.LENGTH_SHORT).show();
         });
 
-        // 长按删除
         listKeywords.setOnItemLongClickListener((parent, view, position, id) -> {
             KeywordDisplayItem item = displayList.get(position);
             new AlertDialog.Builder(this)
@@ -161,20 +161,15 @@ public class KeywordSettingActivity extends AppCompatActivity {
         if (currentSelectedPackage == null) return;
 
         displayList.clear();
-        // 加载支出关键字
         Set<String> expenses = KeywordManager.getKeywords(this, currentSelectedPackage, KeywordManager.TYPE_EXPENSE);
         for (String k : expenses) displayList.add(new KeywordDisplayItem(k, KeywordManager.TYPE_EXPENSE));
 
-        // 加载收入关键字
         Set<String> incomes = KeywordManager.getKeywords(this, currentSelectedPackage, KeywordManager.TYPE_INCOME);
         for (String k : incomes) displayList.add(new KeywordDisplayItem(k, KeywordManager.TYPE_INCOME));
 
         listAdapter.notifyDataSetChanged();
     }
 
-    // --- 内部辅助类 ---
-
-    // 1. 下拉菜单项
     private static class AppItem {
         String packageName;
         String appName;
@@ -182,14 +177,12 @@ public class KeywordSettingActivity extends AppCompatActivity {
         @Override public String toString() { return appName; }
     }
 
-    // 2. 列表显示项
     private static class KeywordDisplayItem {
         String keyword;
         int type;
         KeywordDisplayItem(String k, int t) { this.keyword = k; this.type = t; }
     }
 
-    // 3. 自定义列表适配器 (为了显示颜色区分)
     private class KeywordListAdapter extends ArrayAdapter<KeywordDisplayItem> {
         public KeywordListAdapter(@NonNull Context context, List<KeywordDisplayItem> list) {
             super(context, 0, list);
@@ -205,14 +198,17 @@ public class KeywordSettingActivity extends AppCompatActivity {
             TextView text1 = convertView.findViewById(android.R.id.text1);
             TextView text2 = convertView.findViewById(android.R.id.text2);
 
+            // 修改列表文字颜色以适配浅色卡片背景
             if (item != null) {
                 text1.setText(item.keyword);
+                text1.setTextColor(ContextCompat.getColor(getContext(), R.color.text_primary)); // 主文字色
+                
                 if (item.type == KeywordManager.TYPE_EXPENSE) {
                     text2.setText("支出触发词");
-                    text2.setTextColor(getContext().getColor(R.color.expense_green));
+                    text2.setTextColor(ContextCompat.getColor(getContext(), R.color.expense_green));
                 } else {
                     text2.setText("收入触发词");
-                    text2.setTextColor(getContext().getColor(R.color.income_red));
+                    text2.setTextColor(ContextCompat.getColor(getContext(), R.color.income_red));
                 }
             }
             return convertView;

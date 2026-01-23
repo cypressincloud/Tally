@@ -2,6 +2,7 @@ package com.example.budgetapp;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
@@ -31,6 +32,7 @@ import androidx.navigation.ui.NavigationUI;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.service.AutoTrackAccessibilityService;
+import com.example.budgetapp.ui.SettingsActivity;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -44,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private List<Transaction> allTransactions = new ArrayList<>();
     private List<AssetAccount> allAssets = new ArrayList<>();
 
+    // 导出功能保留在此处作为备份逻辑，但不再通过长按触发
     private final ActivityResultLauncher<String> exportLauncher = registerForActivityResult(
             new ActivityResultContracts.CreateDocument("application/zip"),
             uri -> {
@@ -59,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
             }
     );
 
+    // 导入功能保留在此处作为备份逻辑
     private final ActivityResultLauncher<String[]> importLauncher = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
             uri -> {
@@ -69,7 +73,6 @@ public class MainActivity extends AppCompatActivity {
                         int recordCount = 0;
                         int assetCount = 0;
 
-                        // 1. 恢复交易记录
                         if (data.records != null && !data.records.isEmpty()) {
                             for (Transaction t : data.records) {
                                 Transaction newT = t; 
@@ -79,7 +82,6 @@ public class MainActivity extends AppCompatActivity {
                             recordCount = data.records.size();
                         }
 
-                        // 2. 恢复资产数据
                         if (data.assets != null && !data.assets.isEmpty()) {
                             for (AssetAccount a : data.assets) {
                                 AssetAccount newA = a;
@@ -154,29 +156,35 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             });
 
+            // === 核心修改逻辑 ===
+            // 通过返回 true 来消费长按事件，从而阻止系统默认的 Toast 提示
             bottomNav.post(() -> {
+                // 1. 记账: 屏蔽默认长按提示
                 View recordTab = bottomNav.findViewById(R.id.nav_record);
                 if (recordTab != null) {
-                    recordTab.setOnLongClickListener(v -> {
-                        showBackupOptions();
-                        return true;
-                    });
+                    recordTab.setOnLongClickListener(v -> true);
                 }
+
+                // 2. 统计: 极简模式跳转设置，否则仅屏蔽默认提示
                 View statsTab = bottomNav.findViewById(R.id.nav_stats);
                 if (statsTab != null) {
                     statsTab.setOnLongClickListener(v -> {
-                        toggleNightMode();
-                        return true;
+                        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+                        boolean isMinimalist = prefs.getBoolean("minimalist_mode", false);
+                        
+                        if (isMinimalist) {
+                            Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
+                            startActivity(intent);
+                        }
+                        // 无论是否极简模式，都返回 true，这样系统就不会弹出"统计"两个字的 Toast 了
+                        return true; 
                     });
                 }
-                // 长按资产Tab进入自动资产设置
+                
+                // 3. 资产: 屏蔽默认长按提示
                 View assetsTab = bottomNav.findViewById(R.id.nav_assets);
                 if (assetsTab != null) {
-                    assetsTab.setOnLongClickListener(v -> {
-                        Intent intent = new Intent(MainActivity.this, com.example.budgetapp.ui.AutoAssetActivity.class);
-                        startActivity(intent);
-                        return true;
-                    });
+                    assetsTab.setOnLongClickListener(v -> true);
                 }
             });
         }
@@ -187,19 +195,16 @@ public class MainActivity extends AppCompatActivity {
     private void checkPermissions() {
         AssistantConfig config = new AssistantConfig(this);
 
-        // 1. 检查屏幕同步助手权限 (仅当"自动记账"功能开启时检查)
         if (config.isEnabled() && !isAccessibilitySettingsOn()) {
             showPermissionDialog("开启屏幕同步助手",
                     "为了提取屏幕上的支付金额，请开启‘记账屏幕同步助手’。",
                     Settings.ACTION_ACCESSIBILITY_SETTINGS);
         }
-        // 2. 检查通知权限 (仅当"退款监听"功能开启时检查)
         else if (config.isRefundEnabled() && !isNotificationListenerEnabled()) {
             showPermissionDialog("开启退款监听",
                     "为了监听微信/支付宝的退款通知，请授予‘通知使用权’。",
                     Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
         }
-        // 3. 检查悬浮窗权限 (仅当"自动记账"功能开启时检查，用于显示确认弹窗)
         else if (config.isEnabled() && !Settings.canDrawOverlays(this)) {
             showPermissionDialog("开启悬浮窗权限",
                     "为了在记账时显示确认弹窗，请授予‘显示在其他应用上层’权限。",
@@ -266,7 +271,7 @@ public class MainActivity extends AppCompatActivity {
                         AppCompatDelegate.MODE_NIGHT_NO : AppCompatDelegate.MODE_NIGHT_YES
         );
     }
-
+    
     private void showBackupOptions() {
         String[] options = {"导出数据", "导入数据"};
         new AlertDialog.Builder(this)
