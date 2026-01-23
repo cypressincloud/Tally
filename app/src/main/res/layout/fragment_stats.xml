@@ -150,6 +150,26 @@
                 android:layout_height="300dp"
                 android:layout_marginHorizontal="16dp"/>
 
+            <TextView
+                android:id="@+id/tv_income_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="收入构成"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:paddingStart="20dp"
+                android:paddingTop="24dp"
+                android:paddingBottom="12dp"
+                android:visibility="gone"/>
+
+            <com.github.mikephil.charting.charts.PieChart
+                android:id="@+id/chart_pie_income"
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+                android:layout_marginHorizontal="16dp"
+                android:visibility="gone"/>
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

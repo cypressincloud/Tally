@@ -15,21 +15,30 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RadioGroup;
-import android.widget.Spinner; // 导入 Spinner
+import android.widget.Spinner;
 import android.widget.Toast;
+
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AppDatabase;
+import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.database.TransactionDao;
+import com.example.budgetapp.ui.CategoryAdapter;
 import com.example.budgetapp.util.AssistantConfig;
+import com.example.budgetapp.util.CategoryManager; // 【新增引用】
 import com.example.budgetapp.util.KeywordManager;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -47,6 +56,8 @@ public class NotificationMonitorService extends NotificationListenerService {
     private String lastContentSignature = "";
 
     private final Pattern amountPattern = Pattern.compile("(\\d+(\\.\\d{1,2})?)");
+    
+    private List<AssetAccount> loadedAssets = new ArrayList<>();
 
     @Override
     public void onCreate() {
@@ -144,7 +155,7 @@ public class NotificationMonitorService extends NotificationListenerService {
         if (isWindowShowing) return;
 
         if (!Settings.canDrawOverlays(this)) {
-            saveToDatabase(amount, type, category, note + " (后台)");
+            saveToDatabase(amount, type, category, note + " (后台)", 0);
             return;
         }
 
@@ -160,76 +171,114 @@ public class NotificationMonitorService extends NotificationListenerService {
             params.height = WindowManager.LayoutParams.WRAP_CONTENT;
             params.gravity = Gravity.CENTER;
 
-            LayoutInflater inflater = LayoutInflater.from(this);
+            android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
+            LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
 
             isWindowShowing = true;
 
             EditText etAmount = floatView.findViewById(R.id.et_window_amount);
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
-            RadioGroup rgCategory = floatView.findViewById(R.id.rg_window_category);
+            RecyclerView rvCategory = floatView.findViewById(R.id.rv_window_category);
             EditText etCategory = floatView.findViewById(R.id.et_window_category);
             EditText etNote = floatView.findViewById(R.id.et_window_note);
+            EditText etRemark = floatView.findViewById(R.id.et_window_remark);
             Button btnSave = floatView.findViewById(R.id.btn_window_save);
             Button btnCancel = floatView.findViewById(R.id.btn_window_cancel);
             Spinner spAsset = floatView.findViewById(R.id.sp_asset);
-            
-            // 暂时隐藏资产下拉框，直到此服务也适配资产逻辑
-            if (spAsset != null) spAsset.setVisibility(View.GONE);
 
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
-            if (type == 1) {
-                rgType.check(R.id.rb_window_income);
-                rgCategory.setVisibility(View.GONE);
-                etCategory.setVisibility(View.GONE);
+            // 【修改点】使用 CategoryManager 获取分类
+            List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
+            List<String> incomeCategories = CategoryManager.getIncomeCategories(this);
+
+            rvCategory.setLayoutManager(new GridLayoutManager(themeContext, 5));
+            
+            final String[] selectedCategory = {category};
+            List<String> currentList = (type == 1) ? incomeCategories : expenseCategories;
+
+            if (!currentList.contains(category)) {
+                selectedCategory[0] = "自定义";
+                etCategory.setText(category);
+                etCategory.setVisibility(View.VISIBLE);
             } else {
-                rgType.check(R.id.rb_window_expense);
-                rgCategory.setVisibility(View.VISIBLE);
-                
-                // 初始化分类显示逻辑
-                if ("餐饮".equals(category)) {
-                    rgCategory.check(R.id.rb_cat_food);
-                    etCategory.setVisibility(View.GONE);
-                } else if ("娱乐".equals(category)) {
-                    rgCategory.check(R.id.rb_cat_ent);
-                    etCategory.setVisibility(View.GONE);
-                } else if ("购物".equals(category)) {
-                    rgCategory.check(R.id.rb_cat_shop);
-                    etCategory.setVisibility(View.GONE);
-                } else {
-                    // 交通或其他分类，统一归为自定义
-                    rgCategory.check(R.id.rb_window_custom);
-                    etCategory.setVisibility(View.VISIBLE);
-                    etCategory.setText(category);
-                }
+                etCategory.setVisibility(View.GONE);
             }
 
-            // 监听收支切换，控制分类栏显隐
+            CategoryAdapter categoryAdapter = new CategoryAdapter(themeContext, currentList, selectedCategory[0], cat -> {
+                selectedCategory[0] = cat;
+                if ("自定义".equals(cat)) {
+                    etCategory.setVisibility(View.VISIBLE);
+                    etCategory.requestFocus();
+                } else {
+                    etCategory.setVisibility(View.GONE);
+                }
+            });
+            rvCategory.setAdapter(categoryAdapter);
+
+            if (type == 1) {
+                rgType.check(R.id.rb_window_income);
+            } else {
+                rgType.check(R.id.rb_window_expense);
+            }
+
             rgType.setOnCheckedChangeListener((group, checkedId) -> {
                 if (checkedId == R.id.rb_window_income) {
-                    rgCategory.setVisibility(View.GONE);
-                    etCategory.setVisibility(View.GONE);
+                    categoryAdapter.updateData(incomeCategories);
+                    String first = incomeCategories.isEmpty() ? "自定义" : incomeCategories.get(0);
+                    categoryAdapter.setSelectedCategory(first);
+                    selectedCategory[0] = first;
+                    etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
                 } else {
-                    rgCategory.setVisibility(View.VISIBLE);
-                    // 切换回支出时，检查是否选中了自定义
-                    if (rgCategory.getCheckedRadioButtonId() == R.id.rb_window_custom) {
-                        etCategory.setVisibility(View.VISIBLE);
-                    } else {
-                        etCategory.setVisibility(View.GONE);
-                    }
+                    categoryAdapter.updateData(expenseCategories);
+                    String first = expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0);
+                    categoryAdapter.setSelectedCategory(first);
+                    selectedCategory[0] = first;
+                    etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
                 }
             });
 
-            // 监听分类切换，控制输入框显隐
-            rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
-                if (checkedId == R.id.rb_window_custom) {
-                    etCategory.setVisibility(View.VISIBLE);
-                } else {
-                    etCategory.setVisibility(View.GONE);
-                }
-            });
+            if (config == null) config = new AssistantConfig(this);
+            boolean isAssetEnabled = config.isAssetsEnabled();
+
+            if (isAssetEnabled && spAsset != null) {
+                spAsset.setVisibility(View.VISIBLE);
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.item_spinner_dropdown);
+                adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+                spAsset.setAdapter(adapter);
+
+                AppDatabase.databaseWriteExecutor.execute(() -> {
+                    List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0);
+                    loadedAssets.clear();
+                    AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
+                    noAsset.id = 0;
+                    loadedAssets.add(noAsset);
+                    if (assets != null) loadedAssets.addAll(assets);
+                    
+                    List<String> names = new ArrayList<>();
+                    for (AssetAccount a : loadedAssets) names.add(a.name);
+                    
+                    int defaultAssetId = config.getDefaultAssetId();
+                    
+                    handler.post(() -> {
+                        adapter.clear();
+                        adapter.addAll(names);
+                        adapter.notifyDataSetChanged();
+                        if (defaultAssetId != -1) {
+                            for (int i = 0; i < loadedAssets.size(); i++) {
+                                if (loadedAssets.get(i).id == defaultAssetId) {
+                                    spAsset.setSelection(i);
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                });
+            } else if (spAsset != null) {
+                spAsset.setVisibility(View.GONE);
+            }
 
             btnSave.setOnClickListener(v -> {
                 try {
@@ -237,29 +286,25 @@ public class NotificationMonitorService extends NotificationListenerService {
                     String finalNote = etNote.getText().toString();
                     int finalType = (rgType.getCheckedRadioButtonId() == R.id.rb_window_income) ? 1 : 0;
 
-                    String finalCat = "其他";
-                    if (finalType == 1) {
-                        finalCat = "收入";
-                    } else {
-                        int checkedId = rgCategory.getCheckedRadioButtonId();
-                        // 修复：使用 rb_window_custom 代替 rb_cat_trans
-                        if (checkedId == R.id.rb_window_custom) {
-                            String customInput = etCategory.getText().toString().trim();
-                            if (!customInput.isEmpty()) {
-                                finalCat = customInput;
-                            } else {
-                                finalCat = "其他"; 
-                            }
-                        } else if (checkedId == R.id.rb_cat_food) {
-                            finalCat = "餐饮";
-                        } else if (checkedId == R.id.rb_cat_ent) {
-                            finalCat = "娱乐";
-                        } else if (checkedId == R.id.rb_cat_shop) {
-                            finalCat = "购物";
+                    String finalCat = selectedCategory[0];
+                    if ("自定义".equals(finalCat)) {
+                        String customInput = etCategory.getText().toString().trim();
+                        if (!customInput.isEmpty()) {
+                            finalCat = customInput;
+                        } else {
+                            finalCat = (finalType == 1) ? "退款" : "其他"; 
                         }
                     }
 
-                    saveToDatabase(finalAmount, finalType, finalCat, finalNote);
+                    int assetId = 0;
+                    if (isAssetEnabled && spAsset != null) {
+                        int selectedPos = spAsset.getSelectedItemPosition();
+                        if (selectedPos >= 0 && selectedPos < loadedAssets.size()) {
+                            assetId = loadedAssets.get(selectedPos).id;
+                        }
+                    }
+
+                    saveToDatabase(finalAmount, finalType, finalCat, finalNote, assetId);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "已记账", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -281,15 +326,29 @@ public class NotificationMonitorService extends NotificationListenerService {
         finally { isWindowShowing = false; }
     }
 
-    private void saveToDatabase(double amount, int type, String category, String note) {
+    private void saveToDatabase(double amount, int type, String category, String note, int assetId) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
+            AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
             Transaction t = new Transaction();
             t.date = System.currentTimeMillis();
             t.type = type;
             t.category = category;
             t.amount = amount;
             t.note = note;
+            t.assetId = assetId;
             dao.insert(t);
+
+            if (assetId != 0) {
+                AssetAccount asset = db.assetAccountDao().getAssetByIdSync(assetId);
+                if (asset != null) {
+                    if (type == 1) {
+                        asset.amount += amount;
+                    } else {
+                        asset.amount -= amount;
+                    }
+                    db.assetAccountDao().update(asset);
+                }
+            }
         });
     }
 }

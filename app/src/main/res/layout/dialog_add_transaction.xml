@@ -41,33 +41,70 @@
                 android:visibility="gone"/>
         </RelativeLayout>
 
-        <TextView android:id="@+id/tv_dialog_date" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="12dp" android:textColor="?android:attr/textColorSecondary" android:layout_gravity="start"/>
+        <TextView
+            android:id="@+id/tv_dialog_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:layout_gravity="start"/>
 
-        <RadioGroup android:id="@+id/rg_type" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center" android:layout_marginBottom="12dp">
-            <RadioButton android:id="@+id/rb_expense" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="支出" android:checked="true" android:textColor="?android:attr/textColorPrimary" android:layout_marginEnd="24dp"/>
-            <RadioButton android:id="@+id/rb_income" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="?android:attr/textColorPrimary" android:text="收入"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_category"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:overScrollMode="never" />
+
+        <RadioGroup
+            android:id="@+id/rg_type"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/rb_expense"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="支出"
+                android:gravity="center"
+                android:button="@null"
+                android:background="@drawable/bg_type_selector"
+                android:textColor="@color/text_type_selector"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:checked="true"
+                android:layout_marginEnd="8dp"/>
+
+            <RadioButton
+                android:id="@+id/rb_income"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="收入"
+                android:gravity="center"
+                android:button="@null"
+                android:background="@drawable/bg_type_selector"
+                android:textColor="@color/text_type_selector"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginStart="8dp"/>
         </RadioGroup>
 
-        <RadioGroup android:id="@+id/rg_category" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="8dp">
-            <RadioButton android:id="@+id/rb_food" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="餐饮" android:textColor="?android:attr/textColorPrimary" android:checked="true"/>
-            <RadioButton android:id="@+id/rb_entertainment" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="娱乐" android:textColor="?android:attr/textColorPrimary"/>
-            <RadioButton android:id="@+id/rb_shopping" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="购物" android:textColor="?android:attr/textColorPrimary"/>
-            <RadioButton android:id="@+id/rb_custom" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="自定义" android:textColor="?android:attr/textColorPrimary"/>
-        </RadioGroup>
 
         <Spinner
             android:id="@+id/sp_asset"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-
             android:textSize="16sp"
-
             android:background="@drawable/bg_input_field"
             android:popupBackground="@drawable/bg_input_field"
-
             android:gravity="center_vertical"
             android:paddingHorizontal="12dp"
-
             android:layout_marginBottom="16dp"/>
 
         <EditText
@@ -80,10 +117,8 @@
             android:textColor="?android:attr/textColorPrimary"
             android:textColorHint="?android:attr/textColorHint"
             android:background="@drawable/bg_input_field"
-
             android:paddingHorizontal="20dp"
             android:paddingVertical="10dp"
-
             android:layout_marginBottom="16dp"/>
 
         <EditText
@@ -95,10 +130,8 @@
             android:textColor="?android:attr/textColorPrimary"
             android:textColorHint="?android:attr/textColorHint"
             android:background="@drawable/bg_input_field"
-
             android:paddingHorizontal="18dp"
             android:paddingVertical="10dp"
-
             android:layout_marginBottom="16dp"
             android:visibility="gone"/>
 
@@ -111,10 +144,8 @@
             android:textColor="?android:attr/textColorPrimary"
             android:textColorHint="?android:attr/textColorHint"
             android:background="@drawable/bg_input_field"
-
             android:paddingHorizontal="18dp"
             android:paddingVertical="10dp"
-
             android:layout_marginBottom="16dp"/>
 
         <EditText
@@ -126,11 +157,10 @@
             android:textColor="?android:attr/textColorPrimary"
             android:textColorHint="?android:attr/textColorHint"
             android:background="@drawable/bg_input_field"
-
             android:paddingHorizontal="18dp"
             android:paddingVertical="10dp"
-
             android:layout_marginBottom="16dp"/>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -156,6 +186,5 @@
                 android:textColor="@color/text_white"
                 app:cornerRadius="16dp"/>
         </LinearLayout>
-
     </LinearLayout>
 </androidx.cardview.widget.CardView>

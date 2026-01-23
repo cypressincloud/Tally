@@ -13,7 +13,7 @@
         android:layout_gravity="center"
         app:cardCornerRadius="32dp"
         app:cardElevation="0dp"
-        app:cardBackgroundColor="@color/white">
+        app:cardBackgroundColor="@color/app_background">
 
         <ScrollView
             android:layout_width="match_parent"
@@ -27,22 +27,80 @@
                 android:orientation="vertical"
                 android:padding="20dp">
 
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="自动记账" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/black" android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="记一笔"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginBottom="16dp"/>
 
-                <EditText android:id="@+id/et_window_amount" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="金额" android:inputType="numberDecimal" android:textSize="20sp" android:textStyle="bold" android:textColor="@color/text_primary" android:textColorHint="@color/text_secondary" android:gravity="center" android:background="@null" android:padding="8dp"/>
+                <EditText
+                    android:id="@+id/et_window_amount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="金额"
+                    android:inputType="numberDecimal"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textColorHint="?android:attr/textColorHint"
+                    android:gravity="center"
+                    android:background="@null"
+                    android:padding="8dp"/>
 
-                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#E0E0E0" android:layout_marginBottom="16dp"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"
+                    android:layout_marginBottom="16dp"/>
 
-                <RadioGroup android:id="@+id/rg_window_type" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center" android:layout_marginBottom="16dp">
-                    <RadioButton android:id="@+id/rb_window_expense" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="支出" android:textColor="@color/text_primary" android:buttonTint="@color/app_yellow" android:layout_marginEnd="24dp"/>
-                    <RadioButton android:id="@+id/rb_window_income" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:buttonTint="@color/app_yellow" android:text="收入"/>
-                </RadioGroup>
 
-                <RadioGroup android:id="@+id/rg_window_category" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center" android:layout_marginBottom="12dp">
-                    <RadioButton android:id="@+id/rb_cat_food" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="餐饮" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary" android:checked="true"/>
-                    <RadioButton android:id="@+id/rb_cat_ent" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="娱乐" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary"/>
-                    <RadioButton android:id="@+id/rb_cat_shop" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="购物" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary"/>
-                    <RadioButton android:id="@+id/rb_window_custom" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="自定义" android:gravity="center_vertical" android:buttonTint="@color/app_yellow" android:textColor="@color/text_primary"/>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_window_category"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:overScrollMode="never" />
+
+                <RadioGroup
+                    android:id="@+id/rg_window_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginBottom="16dp">
+
+                    <RadioButton
+                        android:id="@+id/rb_window_expense"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="支出"
+                        android:gravity="center"
+                        android:button="@null"
+                        android:background="@drawable/bg_type_selector"
+                        android:textColor="@color/text_type_selector"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginEnd="8dp"/>
+
+                    <RadioButton
+                        android:id="@+id/rb_window_income"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="收入"
+                        android:gravity="center"
+                        android:button="@null"
+                        android:background="@drawable/bg_type_selector"
+                        android:textColor="@color/text_type_selector"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="8dp"/>
                 </RadioGroup>
 
                 <Spinner
@@ -60,8 +118,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:hint="自定义分类*"
-                    android:textColor="@color/text_primary"
-                    android:textColorHint="@color/text_secondary"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textColorHint="?android:attr/textColorHint"
                     android:textSize="16sp"
                     android:background="@drawable/bg_input_field"
                     android:paddingHorizontal="18dp"
@@ -73,8 +131,8 @@
                     android:id="@+id/et_window_note"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:textColor="@color/text_primary"
-                    android:textColorHint="@color/text_secondary"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textColorHint="?android:attr/textColorHint"
                     android:hint="记录时间 (可选)"
                     android:textSize="16sp"
                     android:background="@drawable/bg_input_field"
@@ -86,8 +144,8 @@
                     android:id="@+id/et_window_remark"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
-                    android:textColor="@color/text_primary"
-                    android:textColorHint="@color/text_secondary"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textColorHint="?android:attr/textColorHint"
                     android:hint="添加备注*"
                     android:textSize="16sp"
                     android:background="@drawable/bg_input_field"

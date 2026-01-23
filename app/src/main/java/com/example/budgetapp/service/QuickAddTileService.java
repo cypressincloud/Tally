@@ -10,7 +10,6 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
-import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -22,11 +21,16 @@ import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.Toast;
 
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AppDatabase;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
-import com.example.budgetapp.util.AssistantConfig; 
+import com.example.budgetapp.ui.CategoryAdapter;
+import com.example.budgetapp.util.AssistantConfig;
+import com.example.budgetapp.util.CategoryManager; // 【新增引用】
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -87,8 +91,6 @@ public class QuickAddTileService extends TileService {
         showConfirmWindow();
     }
 
-// 文件: src/main/java/com/example/budgetapp/service/QuickAddTileService.java
-
     private void showConfirmWindow() {
         if (isWindowShowing) return;
 
@@ -102,17 +104,11 @@ public class QuickAddTileService extends TileService {
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;
 
-            // 1. 允许键盘
             params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
                     WindowManager.LayoutParams.FLAG_DIM_BEHIND;
             params.dimAmount = 0.5f;
-
-            // 2. 平移模式
             params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
-
             params.gravity = Gravity.CENTER;
-
-            // 3. 【核心】向上偏移 350px
             params.y = -350;
 
             android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
@@ -132,7 +128,7 @@ public class QuickAddTileService extends TileService {
 
             EditText etAmount = floatView.findViewById(R.id.et_window_amount);
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
-            RadioGroup rgCategory = floatView.findViewById(R.id.rg_window_category);
+            RecyclerView rvCategory = floatView.findViewById(R.id.rv_window_category); 
             EditText etCategory = floatView.findViewById(R.id.et_window_category);
             EditText etNote = floatView.findViewById(R.id.et_window_note);
             EditText etRemark = floatView.findViewById(R.id.et_window_remark);
@@ -142,10 +138,43 @@ public class QuickAddTileService extends TileService {
             Button btnCancel = floatView.findViewById(R.id.btn_window_cancel);
 
             etAmount.setText("");
-            etAmount.requestFocus(); // 自动聚焦
+            etAmount.requestFocus(); 
             rgType.check(R.id.rb_window_expense);
-            rgCategory.check(R.id.rb_cat_food);
-            etCategory.setVisibility(View.GONE);
+            
+            // 【修改点】：使用 CategoryManager 获取分类
+            List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
+            List<String> incomeCategories = CategoryManager.getIncomeCategories(this);
+            
+            rvCategory.setLayoutManager(new GridLayoutManager(themeContext, 5));
+            final String[] selectedCategory = {expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0)};
+
+            CategoryAdapter categoryAdapter = new CategoryAdapter(themeContext, expenseCategories, selectedCategory[0], cat -> {
+                selectedCategory[0] = cat;
+                if ("自定义".equals(cat)) {
+                    etCategory.setVisibility(View.VISIBLE);
+                    etCategory.requestFocus();
+                } else {
+                    etCategory.setVisibility(View.GONE);
+                }
+            });
+            rvCategory.setAdapter(categoryAdapter);
+            
+            rgType.setOnCheckedChangeListener((group, checkedId) -> {
+                if (checkedId == R.id.rb_window_income) {
+                    categoryAdapter.updateData(incomeCategories);
+                    // 切换时默认选中第一个
+                    String first = incomeCategories.isEmpty() ? "自定义" : incomeCategories.get(0);
+                    categoryAdapter.setSelectedCategory(first);
+                    selectedCategory[0] = first;
+                    etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
+                } else {
+                    categoryAdapter.updateData(expenseCategories);
+                    String first = expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0);
+                    categoryAdapter.setSelectedCategory(first);
+                    selectedCategory[0] = first;
+                    etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
+                }
+            });
 
             SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
             etNote.setText(sdf.format(new Date()) + " shortcut");
@@ -187,28 +216,6 @@ public class QuickAddTileService extends TileService {
                 spAsset.setVisibility(View.GONE);
             }
 
-            rgType.setOnCheckedChangeListener((group, checkedId) -> {
-                if (checkedId == R.id.rb_window_income) {
-                    rgCategory.setVisibility(View.GONE);
-                    etCategory.setVisibility(View.GONE);
-                } else {
-                    rgCategory.setVisibility(View.VISIBLE);
-                    if (rgCategory.getCheckedRadioButtonId() == R.id.rb_window_custom) {
-                        etCategory.setVisibility(View.VISIBLE);
-                    } else {
-                        etCategory.setVisibility(View.GONE);
-                    }
-                }
-            });
-
-            rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
-                if (checkedId == R.id.rb_window_custom) {
-                    etCategory.setVisibility(View.VISIBLE);
-                } else {
-                    etCategory.setVisibility(View.GONE);
-                }
-            });
-
             btnSave.setOnClickListener(v -> {
                 String amountStr = etAmount.getText().toString();
                 if (amountStr.isEmpty()) {
@@ -220,23 +227,18 @@ public class QuickAddTileService extends TileService {
                     String finalNote = etNote.getText().toString();
                     String finalRemark = etRemark.getText().toString().trim();
                     int finalType = (rgType.getCheckedRadioButtonId() == R.id.rb_window_income) ? 1 : 0;
-                    String finalCat = "其他";
-                    if (finalType == 1) {
-                        finalCat = "收入";
-                    } else {
-                        int checkedId = rgCategory.getCheckedRadioButtonId();
-                        if (checkedId == R.id.rb_window_custom) {
-                            String customInput = etCategory.getText().toString().trim();
-                            if (!customInput.isEmpty()) {
-                                finalCat = customInput;
-                            } else {
-                                Toast.makeText(this, "自定义分类*", Toast.LENGTH_SHORT).show();
-                                return;
-                            }
-                        } else if (checkedId == R.id.rb_cat_food) finalCat = "餐饮";
-                        else if (checkedId == R.id.rb_cat_ent) finalCat = "娱乐";
-                        else if (checkedId == R.id.rb_cat_shop) finalCat = "购物";
+                    
+                    String finalCat = selectedCategory[0];
+                    if ("自定义".equals(finalCat)) {
+                        String customInput = etCategory.getText().toString().trim();
+                        if (!customInput.isEmpty()) {
+                            finalCat = customInput;
+                        } else {
+                            Toast.makeText(this, "请输入自定义分类", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
                     }
+
                     int assetId = 0;
                     if (isAssetEnabled) {
                         int selectedPos = spAsset.getSelectedItemPosition();
@@ -259,6 +261,7 @@ public class QuickAddTileService extends TileService {
             e.printStackTrace();
         }
     }
+    
     private void closeWindow(WindowManager wm, View view) {
         try {
             if (view != null && wm != null) wm.removeView(view);

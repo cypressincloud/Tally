@@ -23,7 +23,6 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.NumberPicker;
-import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -42,6 +41,7 @@ import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
+import com.example.budgetapp.util.CategoryManager; // 【新增引用】
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -57,6 +57,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -191,9 +192,6 @@ public class RecordFragment extends Fragment {
         layoutBalance.setOnClickListener(v -> switchFilterMode(0));
         layoutIncome.setOnClickListener(v -> switchFilterMode(1));
         layoutExpense.setOnClickListener(v -> switchFilterMode(2));
-
-        // 加班卡片点击过滤
-        // === 2. 移除长按设置薪资逻辑 (已移至设置页) ===
         layoutOvertime.setOnClickListener(v -> switchFilterMode(3));
 
         tvMonthTitle.setOnClickListener(v -> showCustomDatePicker());
@@ -236,7 +234,6 @@ public class RecordFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // 每次可见时检查是否需要更新菜单按钮的可见性（应对设置变更）
         View view = getView();
         if (view != null) {
             ImageButton btnSettings = view.findViewById(R.id.btn_settings_menu);
@@ -567,6 +564,8 @@ public class RecordFragment extends Fragment {
     }
 
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
+        if (getContext() == null) return;
+
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_transaction, null);
         builder.setView(dialogView);
@@ -575,7 +574,8 @@ public class RecordFragment extends Fragment {
 
         TextView tvDate = dialogView.findViewById(R.id.tv_dialog_date);
         RadioGroup rgType = dialogView.findViewById(R.id.rg_type);
-        RadioGroup rgCategory = dialogView.findViewById(R.id.rg_category);
+        // 替换为 RecyclerView
+        RecyclerView rvCategory = dialogView.findViewById(R.id.rv_category); 
         EditText etAmount = dialogView.findViewById(R.id.et_amount);
         EditText etCustomCategory = dialogView.findViewById(R.id.et_custom_category);
         EditText etRemark = dialogView.findViewById(R.id.et_remark);
@@ -584,11 +584,33 @@ public class RecordFragment extends Fragment {
 
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
-
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
 
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
 
+        // 【修改】从 CategoryManager 获取分类
+        List<String> expenseCategories = CategoryManager.getExpenseCategories(getContext());
+        List<String> incomeCategories = CategoryManager.getIncomeCategories(getContext());
+
+        // 配置 RecyclerView (5列)
+        rvCategory.setLayoutManager(new GridLayoutManager(getContext(), 5));
+        
+        final boolean[] isExpense = {true}; // 默认支出
+        final String[] selectedCategory = {expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0)};
+
+        // 创建 Adapter
+        CategoryAdapter categoryAdapter = new CategoryAdapter(getContext(), expenseCategories, selectedCategory[0], category -> {
+            selectedCategory[0] = category;
+            if ("自定义".equals(category)) {
+                etCustomCategory.setVisibility(View.VISIBLE);
+                etCustomCategory.requestFocus();
+            } else {
+                etCustomCategory.setVisibility(View.GONE);
+            }
+        });
+        rvCategory.setAdapter(categoryAdapter);
+
+        // === 资产配置（保留原逻辑）===
         AssistantConfig config = new AssistantConfig(requireContext());
         boolean isAssetEnabled = config.isAssetsEnabled();
 
@@ -597,7 +619,6 @@ public class RecordFragment extends Fragment {
 
         if (isAssetEnabled) {
             spAsset.setVisibility(View.VISIBLE);
-
             AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
             noAsset.id = 0;
             assetList.add(noAsset);
@@ -659,36 +680,18 @@ public class RecordFragment extends Fragment {
         };
         updateDateDisplay.run();
 
-        // 日期选择逻辑
         tvDate.setOnClickListener(v -> {
             long currentMillis = calendar.getTimeInMillis();
             long offset = TimeZone.getDefault().getOffset(currentMillis);
-
-            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
-                    .setTitleText("选择日期")
-                    .setSelection(currentMillis + offset)
-                    .setPositiveButtonText("确认")
-                    .setNegativeButtonText("取消")
-                    .build();
-
+            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker().setTitleText("选择日期").setSelection(currentMillis + offset).setPositiveButtonText("确认").setNegativeButtonText("取消").build();
             datePicker.addOnPositiveButtonClickListener(selection -> {
                 java.util.Calendar selectedCal = java.util.Calendar.getInstance();
                 long correctMillis = selection - TimeZone.getDefault().getOffset(selection);
                 selectedCal.setTimeInMillis(correctMillis);
-
                 calendar.set(java.util.Calendar.YEAR, selectedCal.get(java.util.Calendar.YEAR));
                 calendar.set(java.util.Calendar.MONTH, selectedCal.get(java.util.Calendar.MONTH));
                 calendar.set(java.util.Calendar.DAY_OF_MONTH, selectedCal.get(java.util.Calendar.DAY_OF_MONTH));
-
-                MaterialTimePicker timePicker = new MaterialTimePicker.Builder()
-                        .setTimeFormat(TimeFormat.CLOCK_24H)
-                        .setHour(calendar.get(java.util.Calendar.HOUR_OF_DAY))
-                        .setMinute(calendar.get(java.util.Calendar.MINUTE))
-                        .setTitleText("选择时间")
-                        .setPositiveButtonText("确认")
-                        .setNegativeButtonText("取消")
-                        .build();
-
+                MaterialTimePicker timePicker = new MaterialTimePicker.Builder().setTimeFormat(TimeFormat.CLOCK_24H).setHour(calendar.get(java.util.Calendar.HOUR_OF_DAY)).setMinute(calendar.get(java.util.Calendar.MINUTE)).setTitleText("选择时间").setPositiveButtonText("确认").setNegativeButtonText("取消").build();
                 timePicker.addOnPositiveButtonClickListener(pickerView -> {
                     calendar.set(java.util.Calendar.HOUR_OF_DAY, timePicker.getHour());
                     calendar.set(java.util.Calendar.MINUTE, timePicker.getMinute());
@@ -699,21 +702,25 @@ public class RecordFragment extends Fragment {
             datePicker.show(getParentFragmentManager(), "date_picker");
         });
 
-
-        rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
-            if (checkedId == R.id.rb_custom) {
-                etCustomCategory.setVisibility(View.VISIBLE);
-                etCustomCategory.requestFocus();
-            } else {
-                etCustomCategory.setVisibility(View.GONE);
-            }
-        });
-
+        // 监听收入/支出切换
         rgType.setOnCheckedChangeListener((g, id) -> {
-            boolean isExpense = (id == R.id.rb_expense);
-            rgCategory.setVisibility(isExpense ? View.VISIBLE : View.GONE);
-            if (isExpense) {
-                etCustomCategory.setVisibility(rgCategory.getCheckedRadioButtonId() == R.id.rb_custom ? View.VISIBLE : View.GONE);
+            boolean switchToExpense = (id == R.id.rb_expense);
+            isExpense[0] = switchToExpense;
+            
+            // 切换数据源
+            List<String> targetCategories = switchToExpense ? expenseCategories : incomeCategories;
+            
+            // 【修改】安全获取第一个元素
+            String defaultCat = targetCategories.isEmpty() ? "自定义" : targetCategories.get(0);
+            
+            // 更新 Adapter
+            categoryAdapter.updateData(targetCategories);
+            categoryAdapter.setSelectedCategory(defaultCat);
+            selectedCategory[0] = defaultCat;
+
+            // 重置输入框状态
+            if ("自定义".equals(defaultCat)) {
+                etCustomCategory.setVisibility(View.VISIBLE);
             } else {
                 etCustomCategory.setVisibility(View.GONE);
             }
@@ -727,36 +734,35 @@ public class RecordFragment extends Fragment {
 
             if (existingTransaction.type == 1) {
                 rgType.check(R.id.rb_income);
+                isExpense[0] = false;
+                categoryAdapter.updateData(incomeCategories);
             } else {
                 rgType.check(R.id.rb_expense);
-                boolean isStandardCategory = false;
-                for (int i = 0; i < rgCategory.getChildCount(); i++) {
-                    View child = rgCategory.getChildAt(i);
-                    if (child instanceof RadioButton) {
-                        if (((RadioButton) child).getText().toString().equals(existingTransaction.category)) {
-                            ((RadioButton) child).setChecked(true);
-                            isStandardCategory = true;
-                            break;
-                        }
-                    }
-                }
-                if (!isStandardCategory) {
-                    rgCategory.check(R.id.rb_custom);
-                    etCustomCategory.setText(existingTransaction.category);
-                }
+                isExpense[0] = true;
+                categoryAdapter.updateData(expenseCategories);
+            }
+
+            // 回显分类
+            String currentCat = existingTransaction.category;
+            List<String> currentList = isExpense[0] ? expenseCategories : incomeCategories;
+            
+            if (currentList.contains(currentCat)) {
+                categoryAdapter.setSelectedCategory(currentCat);
+                selectedCategory[0] = currentCat;
+                etCustomCategory.setVisibility(View.GONE);
+            } else {
+                categoryAdapter.setSelectedCategory("自定义");
+                selectedCategory[0] = "自定义";
+                etCustomCategory.setVisibility(View.VISIBLE);
+                etCustomCategory.setText(currentCat);
             }
 
             btnDelete.setVisibility(View.VISIBLE);
             btnDelete.setOnClickListener(v -> {
-                new AlertDialog.Builder(getContext())
-                        .setTitle("确认删除")
-                        .setMessage("确定要删除这条记录吗？")
-                        .setPositiveButton("删除", (d, w) -> {
-                            viewModel.deleteTransaction(existingTransaction);
-                            dialog.dismiss();
-                        })
-                        .setNegativeButton("取消", null)
-                        .show();
+                new AlertDialog.Builder(getContext()).setTitle("确认删除").setMessage("确定要删除这条记录吗？").setPositiveButton("删除", (d, w) -> {
+                    viewModel.deleteTransaction(existingTransaction);
+                    dialog.dismiss();
+                }).setNegativeButton("取消", null).show();
             });
 
             tvRevoke.setVisibility(View.VISIBLE);
@@ -777,21 +783,17 @@ public class RecordFragment extends Fragment {
             if (!amountStr.isEmpty()) {
                 double amount = Double.parseDouble(amountStr);
                 int type = rgType.getCheckedRadioButtonId() == R.id.rb_income ? 1 : 0;
-                String category = "收入";
-                if (type == 0) {
-                    int checkedId = rgCategory.getCheckedRadioButtonId();
-                    if (checkedId == R.id.rb_custom) {
-                        category = etCustomCategory.getText().toString().trim();
-                        if (category.isEmpty()) {
-                            Toast.makeText(getContext(), "请输入自定义分类", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                    } else if (checkedId != -1) {
-                        category = ((RadioButton) dialogView.findViewById(checkedId)).getText().toString();
-                    } else {
-                        category = "其他";
+                
+                // 获取分类
+                String category = selectedCategory[0];
+                if ("自定义".equals(category)) {
+                    category = etCustomCategory.getText().toString().trim();
+                    if (category.isEmpty()) {
+                        Toast.makeText(getContext(), "请输入自定义分类", Toast.LENGTH_SHORT).show();
+                        return;
                     }
                 }
+
                 String userRemark = etRemark.getText().toString().trim();
                 String noteContent = etNote.getText().toString().trim();
                 long ts = calendar.getTimeInMillis();
@@ -883,12 +885,9 @@ public class RecordFragment extends Fragment {
             int selectedPos = spRevokeAsset.getSelectedItemPosition();
             if (selectedPos >= 0 && selectedPos < assetList.size()) {
                 AssetAccount selectedAsset = assetList.get(selectedPos);
-
                 viewModel.revokeTransaction(transaction, selectedAsset.id);
-
                 String msg = selectedAsset.id == 0 ? "已撤回记录（无资产变动）" : "已撤回并退款至 " + selectedAsset.name;
                 Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
-
                 revokeDialog.dismiss();
                 if (parentDialog != null && parentDialog.isShowing()) {
                     parentDialog.dismiss();

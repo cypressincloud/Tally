@@ -1,7 +1,6 @@
 package com.example.budgetapp.ui;
 
 import android.app.AlertDialog;
-import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -22,7 +21,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.NumberPicker;
-import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -34,6 +32,7 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -41,6 +40,7 @@ import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
+import com.example.budgetapp.util.CategoryManager;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
@@ -71,6 +71,7 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.WeekFields;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -85,7 +86,10 @@ public class StatsFragment extends Fragment {
 
     private FinanceViewModel viewModel;
     private LineChart lineChart;
-    private PieChart pieChart;
+    private PieChart expensePieChart; // 原 chart_pie
+    private PieChart incomePieChart;  // 【新增】收入饼图
+    private TextView tvIncomeTitle;   // 【新增】收入标题
+    
     private RadioGroup rgTimeScope;
     private TextView tvDateRange;
 
@@ -116,7 +120,7 @@ public class StatsFragment extends Fragment {
         initViews(view);
         setupGestures();
         setupLineChart();
-        setupPieChart();
+        setupPieCharts(); // 同时初始化两个饼图
 
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
 
@@ -137,7 +141,12 @@ public class StatsFragment extends Fragment {
 
     private void initViews(View view) {
         lineChart = view.findViewById(R.id.chart_line);
-        pieChart = view.findViewById(R.id.chart_pie);
+        expensePieChart = view.findViewById(R.id.chart_pie); // 支出饼图
+        
+        // 【新增】绑定收入饼图和标题
+        incomePieChart = view.findViewById(R.id.chart_pie_income);
+        tvIncomeTitle = view.findViewById(R.id.tv_income_title);
+        
         rgTimeScope = view.findViewById(R.id.rg_time_scope);
         tvDateRange = view.findViewById(R.id.tv_current_date_range);
         tvSummaryTitle = view.findViewById(R.id.tv_summary_title);
@@ -189,7 +198,8 @@ public class StatsFragment extends Fragment {
         };
 
         if (lineChart != null) lineChart.setOnTouchListener(chartTouchListener);
-        if (pieChart != null) pieChart.setOnTouchListener(chartTouchListener);
+        if (expensePieChart != null) expensePieChart.setOnTouchListener(chartTouchListener);
+        if (incomePieChart != null) incomePieChart.setOnTouchListener(chartTouchListener);
     }
 
     private class SwipeGestureListener extends GestureDetector.SimpleOnGestureListener {
@@ -406,26 +416,31 @@ public class StatsFragment extends Fragment {
     private void aggregateData(IndexExtractor extractor, int maxX, String suffix, String[] customLabels) {
         Map<Integer, Double> incomeMap = new HashMap<>();
         Map<Integer, Double> expenseMap = new HashMap<>();
-        Map<String, Double> pieCats = new HashMap<>();
+        Map<String, Double> expensePieCats = new HashMap<>();
+        Map<String, Double> incomePieCats = new HashMap<>(); // 【新增】收入分类统计
 
         for (Transaction t : allTransactions) {
             int index = extractor.getIndex(t);
             if (index != -1) {
-                if (t.type == 1) {
+                if (t.type == 1) { // 收入
+                    // 线图逻辑：排除加班
                     if (!"加班".equals(t.category)) {
                         incomeMap.put(index, incomeMap.getOrDefault(index, 0.0) + t.amount);
                     }
-                } else {
+                    // 饼图逻辑：所有收入（包括加班）都统计
+                    incomePieCats.put(t.category, incomePieCats.getOrDefault(t.category, 0.0) + t.amount);
+                } else { // 支出
                     expenseMap.put(index, expenseMap.getOrDefault(index, 0.0) + t.amount);
-                    pieCats.put(t.category, pieCats.getOrDefault(t.category, 0.0) + t.amount);
+                    expensePieCats.put(t.category, expensePieCats.getOrDefault(t.category, 0.0) + t.amount);
                 }
             }
         }
-        updateCharts(incomeMap, expenseMap, pieCats, maxX, suffix, customLabels);
+        updateCharts(incomeMap, expenseMap, expensePieCats, incomePieCats, maxX, suffix, customLabels);
     }
 
     private void updateCharts(Map<Integer, Double> incomeMap, Map<Integer, Double> expenseMap,
-                              Map<String, Double> pieMap, int maxX, String suffix, String[] customLabels) {
+                              Map<String, Double> expensePieMap, Map<String, Double> incomePieMap, 
+                              int maxX, String suffix, String[] customLabels) {
         List<Entry> inEntries = new ArrayList<>();
         List<Entry> outEntries = new ArrayList<>();
         List<Entry> netEntries = new ArrayList<>();
@@ -476,13 +491,37 @@ public class StatsFragment extends Fragment {
         lineChart.animateX(600);
         lineChart.invalidate();
 
+        // 更新支出饼图 (Expense Pie Chart)
+        updateSinglePieChart(expensePieChart, expensePieMap);
+
+        // 【新增】更新收入饼图 (Income Pie Chart)
+        double totalIncome = 0;
+        for (Double val : incomePieMap.values()) totalIncome += val;
+        
+        if (totalIncome > 0) {
+            tvIncomeTitle.setVisibility(View.VISIBLE);
+            incomePieChart.setVisibility(View.VISIBLE);
+            updateSinglePieChart(incomePieChart, incomePieMap);
+        } else {
+            tvIncomeTitle.setVisibility(View.GONE);
+            incomePieChart.setVisibility(View.GONE);
+        }
+
+        // 更新总结部分
+        double totalExpense = 0;
+        for (Double val : expensePieMap.values()) totalExpense += val;
+        updateSummarySection(expensePieMap, totalExpense);
+    }
+
+    // 【重构】提取通用的饼图更新逻辑
+    private void updateSinglePieChart(PieChart chart, Map<String, Double> pieMap) {
         List<PieEntry> finalEntries = new ArrayList<>();
         List<Integer> finalColors = new ArrayList<>();
 
-        double totalPieAmount = 0;
-        for (Double val : pieMap.values()) totalPieAmount += val;
+        double totalAmount = 0;
+        for (Double val : pieMap.values()) totalAmount += val;
 
-        double threshold = totalPieAmount * 0.05;
+        double threshold = totalAmount * 0.05;
         double otherAmount = 0;
 
         List<Map.Entry<String, Double>> largeEntries = new ArrayList<>();
@@ -536,16 +575,14 @@ public class StatsFragment extends Fragment {
         pieData.setValueTextSize(11f);
         pieData.setValueTextColor(primaryTextColor);
 
-        pieChart.setData(pieData);
-        pieChart.setUsePercentValues(true);
-        pieChart.setExtraOffsets(25f, 10f, 25f, 10f);
-        pieChart.setCenterTextColor(primaryTextColor);
-        pieChart.getLegend().setTextColor(primaryTextColor);
+        chart.setData(pieData);
+        chart.setUsePercentValues(true);
+        chart.setExtraOffsets(25f, 10f, 25f, 10f);
+        chart.setCenterTextColor(primaryTextColor);
+        chart.getLegend().setTextColor(primaryTextColor);
 
-        pieChart.animateY(800);
-        pieChart.invalidate();
-
-        updateSummarySection(pieMap, totalPieAmount);
+        chart.animateY(800);
+        chart.invalidate();
     }
 
     private void updateSummarySection(Map<String, Double> pieMap, double totalAmount) {
@@ -555,11 +592,9 @@ public class StatsFragment extends Fragment {
         else scopeStr = "本周";
         tvSummaryTitle.setText(scopeStr + "消费");
 
-        // 默认隐藏加班模块
         if (dividerOvertime != null) dividerOvertime.setVisibility(View.GONE);
         if (tvOvertimeContent != null) tvOvertimeContent.setVisibility(View.GONE);
 
-        // 计算日期范围
         LocalDate startOfPeriod;
         LocalDate endOfPeriod;
         if (currentMode == 0) {
@@ -573,7 +608,6 @@ public class StatsFragment extends Fragment {
             endOfPeriod = selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
         }
 
-        // --- 消费总结逻辑 ---
         if (pieMap.isEmpty() || totalAmount == 0) {
             tvSummaryContent.setText("暂无消费记录");
         } else {
@@ -651,11 +685,9 @@ public class StatsFragment extends Fragment {
             tvSummaryContent.setText(ssb);
         }
 
-        // 即使没有消费，也要尝试显示加班信息
         calculateAndShowOvertime(startOfPeriod, endOfPeriod, scopeStr);
     }
 
-    // 【修改】计算并显示加班信息 (增加本月工资逻辑)
     private void calculateAndShowOvertime(LocalDate start, LocalDate end, String scopeStr) {
         long startMillis = start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
         long endMillis = end.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
@@ -700,7 +732,6 @@ public class StatsFragment extends Fragment {
             int redColor = ContextCompat.getColor(requireContext(), R.color.income_red);
             int primaryColor = ContextCompat.getColor(requireContext(), R.color.text_primary);
 
-            // --- 标题行: "本周加班" ---
             String title = scopeStr + "加班";
             int startTitle = ssb.length();
             ssb.append(title);
@@ -710,7 +741,6 @@ public class StatsFragment extends Fragment {
 
             ssb.append("\n");
 
-            // --- 第一行内容 ---
             ssb.append("共计");
             String totalHoursStr = String.format(Locale.CHINA, "%.1f", totalOvertimeHours);
             int startTotalH = ssb.length();
@@ -725,7 +755,6 @@ public class StatsFragment extends Fragment {
 
             ssb.append("元\n");
 
-            // --- 第二行内容 ---
             ssb.append("工作日加班");
             String weekdayHoursStr = String.format(Locale.CHINA, "%.1f", weekdayOvertimeHours);
             int startWeekday = ssb.length();
@@ -739,18 +768,16 @@ public class StatsFragment extends Fragment {
             ssb.setSpan(new ForegroundColorSpan(redColor), startHoliday, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             ssb.append("小时");
 
-            // --- 新增：如果是“月”模式，且设置了底薪，则显示本月工资 ---
-            if (currentMode == 1) { // 1 represents Month mode
+            if (currentMode == 1) { 
                 AssistantConfig config = new AssistantConfig(requireContext());
                 float baseSalary = config.getMonthlyBaseSalary();
                 if (baseSalary > 0) {
                     double totalSalary = baseSalary + totalOvertimeIncome;
-                    ssb.append("\n"); // 换行
+                    ssb.append("\n"); 
                     ssb.append("本月工资");
                     String salaryStr = String.format(Locale.CHINA, "%.2f", totalSalary);
                     int startSalary = ssb.length();
                     ssb.append(salaryStr);
-                    // 设置为红色
                     ssb.setSpan(new ForegroundColorSpan(redColor), startSalary, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                     ssb.append("元");
                 }
@@ -763,8 +790,6 @@ public class StatsFragment extends Fragment {
         }
     }
 
-    // ... (GenerateThemeColors, CreateLineDataSet, etc. unchanged) ...
-    // 为了节省篇幅，省略了未修改的辅助方法，实际文件中请保留原样
     private List<Integer> generateThemeColors(int count) {
         List<Integer> colors = new ArrayList<>();
         int uiMode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
@@ -821,23 +846,29 @@ public class StatsFragment extends Fragment {
         }
     }
 
-    private void setupPieChart() {
+    private void setupPieCharts() {
+        initPieChartStyle(expensePieChart);
+        initPieChartStyle(incomePieChart);
+    }
+
+    private void initPieChartStyle(PieChart chart) {
+        if (chart == null) return;
         int textColor = ContextCompat.getColor(requireContext(), R.color.text_primary);
         int holeColor = ContextCompat.getColor(requireContext(), R.color.bar_background);
-        pieChart.getDescription().setEnabled(false);
-        pieChart.setHoleRadius(40f);
-        pieChart.setTransparentCircleRadius(0);
-        pieChart.setHoleColor(holeColor);
-        pieChart.setEntryLabelColor(textColor);
-        pieChart.setEntryLabelTextSize(10f);
-        pieChart.setRotationEnabled(false);
-        Legend l = pieChart.getLegend();
+        chart.getDescription().setEnabled(false);
+        chart.setHoleRadius(40f);
+        chart.setTransparentCircleRadius(0);
+        chart.setHoleColor(holeColor);
+        chart.setEntryLabelColor(textColor);
+        chart.setEntryLabelTextSize(10f);
+        chart.setRotationEnabled(false);
+        Legend l = chart.getLegend();
         l.setTextColor(textColor);
         l.setVerticalAlignment(Legend.LegendVerticalAlignment.BOTTOM);
         l.setHorizontalAlignment(Legend.LegendHorizontalAlignment.CENTER);
         l.setOrientation(Legend.LegendOrientation.HORIZONTAL);
         l.setDrawInside(false);
-        pieChart.setOnChartValueSelectedListener(new OnChartValueSelectedListener() {
+        chart.setOnChartValueSelectedListener(new OnChartValueSelectedListener() {
             @Override
             public void onValueSelected(Entry e, Highlight h) {
                 String category = ((PieEntry) e).getLabel();
@@ -875,34 +906,21 @@ public class StatsFragment extends Fragment {
         Map<String, Double> catTotals = new HashMap<>();
         double totalAmount = 0;
         for (Transaction t : allTransactions) {
-            if (t.type == 0 && t.date >= startMillis && t.date < endMillis) {
+            if (t.date >= startMillis && t.date < endMillis && t.category.equals(category)) {
                 catTotals.put(t.category, catTotals.getOrDefault(t.category, 0.0) + t.amount);
                 totalAmount += t.amount;
             }
         }
-        double threshold = totalAmount * 0.05;
-        List<String> smallCategories = new ArrayList<>();
-        for (Map.Entry<String, Double> entry : catTotals.entrySet()) {
-            if (entry.getValue() < threshold) {
-                smallCategories.add(entry.getKey());
-            }
-        }
+        
         List<Transaction> filteredList = new ArrayList<>();
         for (Transaction t : allTransactions) {
-            if (t.type == 0 && t.date >= startMillis && t.date < endMillis) {
-                boolean match = false;
-                if ("其他".equals(category)) {
-                    if ("其他".equals(t.category) || smallCategories.contains(t.category)) {
-                        match = true;
-                    }
-                } else {
-                    if (t.category.equals(category)) {
-                        match = true;
-                    }
+            if (t.date >= startMillis && t.date < endMillis) {
+                if (t.category.equals(category) || ("其他".equals(category) && "其他".equals(t.category))) {
+                    filteredList.add(t);
                 }
-                if (match) filteredList.add(t);
             }
         }
+        
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_transaction_list, null);
         builder.setView(dialogView);
@@ -929,34 +947,64 @@ public class StatsFragment extends Fragment {
     }
 
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
+        if (getContext() == null) return;
+
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_transaction, null);
         builder.setView(dialogView);
         AlertDialog dialog = builder.create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
         TextView tvDate = dialogView.findViewById(R.id.tv_dialog_date);
         RadioGroup rgType = dialogView.findViewById(R.id.rg_type);
-        RadioGroup rgCategory = dialogView.findViewById(R.id.rg_category);
+        RecyclerView rvCategory = dialogView.findViewById(R.id.rv_category); 
+        
         EditText etAmount = dialogView.findViewById(R.id.et_amount);
         EditText etCustomCategory = dialogView.findViewById(R.id.et_custom_category);
         EditText etRemark = dialogView.findViewById(R.id.et_remark);
         EditText etNote = dialogView.findViewById(R.id.et_note);
         Spinner spAsset = dialogView.findViewById(R.id.sp_asset);
+
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
+
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
+
+        List<String> expenseCategories = CategoryManager.getExpenseCategories(getContext());
+        List<String> incomeCategories = CategoryManager.getIncomeCategories(getContext());
+
+        rvCategory.setLayoutManager(new GridLayoutManager(getContext(), 5));
+        
+        final boolean[] isExpense = {true}; 
+        final String[] selectedCategory = {expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0)};
+
+        CategoryAdapter categoryAdapter = new CategoryAdapter(getContext(), expenseCategories, selectedCategory[0], category -> {
+            selectedCategory[0] = category;
+            if ("自定义".equals(category)) {
+                etCustomCategory.setVisibility(View.VISIBLE);
+                etCustomCategory.requestFocus();
+            } else {
+                etCustomCategory.setVisibility(View.GONE);
+            }
+        });
+        rvCategory.setAdapter(categoryAdapter);
+
         AssistantConfig config = new AssistantConfig(requireContext());
         boolean isAssetEnabled = config.isAssetsEnabled();
+
         List<AssetAccount> assetList = new ArrayList<>();
-        ArrayAdapter<String> assetAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner_dropdown);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner_dropdown);
+
         if (isAssetEnabled) {
             spAsset.setVisibility(View.VISIBLE);
             AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
             noAsset.id = 0;
             assetList.add(noAsset);
-            assetAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
-            spAsset.setAdapter(assetAdapter);
+
+            adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+            spAsset.setAdapter(adapter);
+
             viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
                 assetList.clear();
                 assetList.add(noAsset);
@@ -968,9 +1016,10 @@ public class StatsFragment extends Fragment {
                     }
                 }
                 List<String> names = assetList.stream().map(a -> a.name).collect(Collectors.toList());
-                assetAdapter.clear();
-                assetAdapter.addAll(names);
-                assetAdapter.notifyDataSetChanged();
+                adapter.clear();
+                adapter.addAll(names);
+                adapter.notifyDataSetChanged();
+
                 if (existingTransaction != null && existingTransaction.assetId != 0) {
                     for (int i = 0; i < assetList.size(); i++) {
                         if (assetList.get(i).id == existingTransaction.assetId) {
@@ -993,6 +1042,7 @@ public class StatsFragment extends Fragment {
         } else {
             spAsset.setVisibility(View.GONE);
         }
+
         final java.util.Calendar calendar = java.util.Calendar.getInstance();
         if (existingTransaction != null) {
             calendar.setTimeInMillis(existingTransaction.date);
@@ -1002,11 +1052,13 @@ public class StatsFragment extends Fragment {
             calendar.set(java.util.Calendar.MONTH, date.getMonthValue() - 1);
             calendar.set(java.util.Calendar.DAY_OF_MONTH, date.getDayOfMonth());
         }
+
         Runnable updateDateDisplay = () -> {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA);
             tvDate.setText(sdf.format(calendar.getTime()));
         };
         updateDateDisplay.run();
+
         tvDate.setOnClickListener(v -> {
             long currentMillis = calendar.getTimeInMillis();
             long offset = TimeZone.getDefault().getOffset(currentMillis);
@@ -1028,48 +1080,55 @@ public class StatsFragment extends Fragment {
             });
             datePicker.show(getParentFragmentManager(), "date_picker");
         });
-        rgCategory.setOnCheckedChangeListener((group, checkedId) -> {
-            if (checkedId == R.id.rb_custom) {
-                etCustomCategory.setVisibility(View.VISIBLE);
-                etCustomCategory.requestFocus();
-            } else {
-                etCustomCategory.setVisibility(View.GONE);
-            }
-        });
+
         rgType.setOnCheckedChangeListener((g, id) -> {
-            boolean isExpense = (id == R.id.rb_expense);
-            rgCategory.setVisibility(isExpense ? View.VISIBLE : View.GONE);
-            if (isExpense) {
-                etCustomCategory.setVisibility(rgCategory.getCheckedRadioButtonId() == R.id.rb_custom ? View.VISIBLE : View.GONE);
+            boolean switchToExpense = (id == R.id.rb_expense);
+            isExpense[0] = switchToExpense;
+            
+            List<String> targetCategories = switchToExpense ? expenseCategories : incomeCategories;
+            String defaultCat = targetCategories.get(0);
+            
+            categoryAdapter.updateData(targetCategories);
+            categoryAdapter.setSelectedCategory(defaultCat);
+            selectedCategory[0] = defaultCat;
+
+            if ("自定义".equals(defaultCat)) {
+                etCustomCategory.setVisibility(View.VISIBLE);
             } else {
                 etCustomCategory.setVisibility(View.GONE);
             }
         });
+
         if (existingTransaction != null) {
             btnSave.setText("保存修改");
             etAmount.setText(String.valueOf(existingTransaction.amount));
             if (existingTransaction.remark != null) etRemark.setText(existingTransaction.remark);
             if (existingTransaction.note != null) etNote.setText(existingTransaction.note);
+
             if (existingTransaction.type == 1) {
                 rgType.check(R.id.rb_income);
+                isExpense[0] = false;
+                categoryAdapter.updateData(incomeCategories);
             } else {
                 rgType.check(R.id.rb_expense);
-                boolean isStandardCategory = false;
-                for (int i = 0; i < rgCategory.getChildCount(); i++) {
-                    View child = rgCategory.getChildAt(i);
-                    if (child instanceof RadioButton) {
-                        if (((RadioButton) child).getText().toString().equals(existingTransaction.category)) {
-                            ((RadioButton) child).setChecked(true);
-                            isStandardCategory = true;
-                            break;
-                        }
-                    }
-                }
-                if (!isStandardCategory) {
-                    rgCategory.check(R.id.rb_custom);
-                    etCustomCategory.setText(existingTransaction.category);
-                }
+                isExpense[0] = true;
+                categoryAdapter.updateData(expenseCategories);
             }
+
+            String currentCat = existingTransaction.category;
+            List<String> currentList = isExpense[0] ? expenseCategories : incomeCategories;
+            
+            if (currentList.contains(currentCat)) {
+                categoryAdapter.setSelectedCategory(currentCat);
+                selectedCategory[0] = currentCat;
+                etCustomCategory.setVisibility(View.GONE);
+            } else {
+                categoryAdapter.setSelectedCategory("自定义");
+                selectedCategory[0] = "自定义";
+                etCustomCategory.setVisibility(View.VISIBLE);
+                etCustomCategory.setText(currentCat);
+            }
+
             btnDelete.setVisibility(View.VISIBLE);
             btnDelete.setOnClickListener(v -> {
                 new AlertDialog.Builder(getContext()).setTitle("确认删除").setMessage("确定要删除这条记录吗？").setPositiveButton("删除", (d, w) -> {
@@ -1077,6 +1136,7 @@ public class StatsFragment extends Fragment {
                     dialog.dismiss();
                 }).setNegativeButton("取消", null).show();
             });
+
             if (tvRevoke != null) {
                 tvRevoke.setVisibility(View.VISIBLE);
                 tvRevoke.setOnClickListener(v -> {
@@ -1090,26 +1150,22 @@ public class StatsFragment extends Fragment {
             SimpleDateFormat noteSdf = new SimpleDateFormat("MM月dd日 HH:mm", Locale.CHINA);
             etNote.setText(noteSdf.format(calendar.getTime()) + " 手动");
         }
+
         btnSave.setOnClickListener(v -> {
             String amountStr = etAmount.getText().toString();
             if (!amountStr.isEmpty()) {
                 double amount = Double.parseDouble(amountStr);
                 int type = rgType.getCheckedRadioButtonId() == R.id.rb_income ? 1 : 0;
-                String category = "收入";
-                if (type == 0) {
-                    int checkedId = rgCategory.getCheckedRadioButtonId();
-                    if (checkedId == R.id.rb_custom) {
-                        category = etCustomCategory.getText().toString().trim();
-                        if (category.isEmpty()) {
-                            Toast.makeText(getContext(), "请输入自定义分类", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                    } else if (checkedId != -1) {
-                        category = ((RadioButton) dialogView.findViewById(checkedId)).getText().toString();
-                    } else {
-                        category = "其他";
+                
+                String category = selectedCategory[0];
+                if ("自定义".equals(category)) {
+                    category = etCustomCategory.getText().toString().trim();
+                    if (category.isEmpty()) {
+                        Toast.makeText(getContext(), "请输入自定义分类", Toast.LENGTH_SHORT).show();
+                        return;
                     }
                 }
+
                 String userRemark = "";
                 if (etRemark != null) userRemark = etRemark.getText().toString().trim();
                 String noteContent = etNote.getText().toString().trim();
@@ -1145,22 +1201,26 @@ public class StatsFragment extends Fragment {
         });
         dialog.show();
     }
-
+    
     private void showRevokeDialog(Transaction transaction, AlertDialog parentDialog) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_revoke_transaction, null);
         builder.setView(view);
         AlertDialog revokeDialog = builder.create();
         if (revokeDialog.getWindow() != null) revokeDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
         Spinner spRevokeAsset = view.findViewById(R.id.sp_revoke_asset);
         Button btnCancel = view.findViewById(R.id.btn_revoke_cancel);
         Button btnConfirm = view.findViewById(R.id.btn_revoke_confirm);
+
         List<AssetAccount> assetList = new ArrayList<>();
         AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
         noAsset.id = 0;
+
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), R.layout.item_spinner_dropdown);
         adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spRevokeAsset.setAdapter(adapter);
+
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             assetList.clear();
             assetList.add(noAsset);
@@ -1175,6 +1235,7 @@ public class StatsFragment extends Fragment {
             adapter.clear();
             adapter.addAll(names);
             adapter.notifyDataSetChanged();
+
             int targetIndex = 0;
             if (transaction.assetId != 0) {
                 for (int i = 0; i < assetList.size(); i++) {
@@ -1186,7 +1247,9 @@ public class StatsFragment extends Fragment {
             }
             spRevokeAsset.setSelection(targetIndex);
         });
+
         btnCancel.setOnClickListener(v -> revokeDialog.dismiss());
+
         btnConfirm.setOnClickListener(v -> {
             int selectedPos = spRevokeAsset.getSelectedItemPosition();
             if (selectedPos >= 0 && selectedPos < assetList.size()) {
@@ -1200,6 +1263,7 @@ public class StatsFragment extends Fragment {
                 }
             }
         });
+
         revokeDialog.show();
     }
 

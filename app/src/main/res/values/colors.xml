@@ -43,4 +43,8 @@
 
     <color name="switch_track_off">#E9E9EA</color>
     <color name="real_white">#FFFFFF</color>
+
+    <color name="cat_unselected_bg">#F5F5F5</color>
+    <color name="cat_unselected_text">#333333</color>
+    <color name="cat_selected_text">#FFFFFF</color>
 </resources>

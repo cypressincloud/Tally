@@ -104,10 +104,6 @@ public class SettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        // 如果需要透明状态栏，可保留这些设置；或者使用主题默认
-        // getWindow().setStatusBarColor(Color.TRANSPARENT);
-        // getWindow().setNavigationBarColor(Color.TRANSPARENT);
-
         setContentView(R.layout.activity_settings);
 
         View rootView = findViewById(R.id.settings_root);
@@ -130,6 +126,11 @@ public class SettingsActivity extends AppCompatActivity {
         financeViewModel = new ViewModelProvider(this).get(FinanceViewModel.class);
         financeViewModel.getAllTransactions().observe(this, list -> allTransactions = list);
         financeViewModel.getAllAssets().observe(this, list -> allAssets = list);
+
+        // 跳转到分类设置
+        findViewById(R.id.btn_category_setting).setOnClickListener(v -> {
+            startActivity(new Intent(this, CategorySettingsActivity.class));
+        });
 
         findViewById(R.id.btn_backup_restore).setOnClickListener(v -> showBackupOptions());
 

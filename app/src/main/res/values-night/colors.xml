@@ -33,4 +33,14 @@
 
     <color name="switch_track_off">#39393D</color>
     <color name="real_white">#FFFFFF</color>
+
+    <color name="selector_text">#E0E0E0</color>
+    <color name="text_white">#E0E0E0</color>
+    <color name="marker_bg">#2C2C2C</color>
+    <color name="text_on_dark">#E0E0E0</color>
+
+    <color name="cat_unselected_bg">#2C2C2C</color>
+    <color name="cat_unselected_text">#E0E0E0</color>
+
+    <color name="cat_selected_text">#E0E0E0</color>
 </resources>

@@ -32,6 +32,12 @@
             android:theme="@style/Theme.BudgetApp"
             android:exported="false"/>
 
+        <activity
+            android:name=".ui.CategorySettingsActivity"
+            android:label="分类预设管理"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
         <activity android:name=".ui.AssistantManagerActivity" />
 
         <activity
