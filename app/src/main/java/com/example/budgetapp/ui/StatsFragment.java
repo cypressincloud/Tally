@@ -10,6 +10,7 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -91,6 +92,10 @@ public class StatsFragment extends Fragment {
     private TextView tvSummaryTitle;
     private TextView tvSummaryContent;
 
+    // 只使用您原有布局中存在的控件
+    private View dividerOvertime;
+    private TextView tvOvertimeContent;
+
     private ScrollView scrollView;
     private GestureDetector gestureDetector;
     private float touchStartX, touchStartY;
@@ -138,6 +143,11 @@ public class StatsFragment extends Fragment {
         tvDateRange = view.findViewById(R.id.tv_current_date_range);
         tvSummaryTitle = view.findViewById(R.id.tv_summary_title);
         tvSummaryContent = view.findViewById(R.id.tv_summary_content);
+        
+        // 绑定 XML 中原有的 View
+        dividerOvertime = view.findViewById(R.id.divider_overtime);
+        tvOvertimeContent = view.findViewById(R.id.tv_overtime_content);
+
         scrollView = view.findViewById(R.id.scroll_view_stats);
         touchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
     }
@@ -553,61 +563,13 @@ public class StatsFragment extends Fragment {
         else scopeStr = "本周";
         tvSummaryTitle.setText(scopeStr + "消费");
 
-        if (pieMap.isEmpty() || totalAmount == 0) {
-            tvSummaryContent.setText("暂无消费记录");
-            return;
-        }
+        // 默认隐藏加班模块
+        if (dividerOvertime != null) dividerOvertime.setVisibility(View.GONE);
+        if (tvOvertimeContent != null) tvOvertimeContent.setVisibility(View.GONE);
 
-        List<Map.Entry<String, Double>> sortedEntries = new ArrayList<>(pieMap.entrySet());
-        Collections.sort(sortedEntries, (e1, e2) -> Double.compare(e2.getValue(), e1.getValue()));
-
-        SpannableStringBuilder ssb = new SpannableStringBuilder();
-        String[] prefixes = {"最多是", "其次是", "然后是"};
-        
-        int yellowColor = ContextCompat.getColor(requireContext(), R.color.app_yellow);
-        int greenColor = ContextCompat.getColor(requireContext(), R.color.expense_green);
-        int redColor = ContextCompat.getColor(requireContext(), R.color.income_red);
-
-        int count = Math.min(sortedEntries.size(), 3);
-        for (int i = 0; i < count; i++) {
-            if (i > 0) ssb.append("\n"); 
-
-            Map.Entry<String, Double> e = sortedEntries.get(i);
-            double percent = (e.getValue() / totalAmount) * 100;
-
-            ssb.append(prefixes[i]);
-            
-            String category = e.getKey();
-            int startCat = ssb.length();
-            ssb.append(category);
-            ssb.setSpan(new ForegroundColorSpan(yellowColor), startCat, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            
-            ssb.append(", ");
-            ssb.append("占比");
-            
-            String percentStr = String.format(Locale.CHINA, "%.1f%%", percent);
-            int startPer = ssb.length();
-            ssb.append(percentStr);
-            ssb.setSpan(new ForegroundColorSpan(greenColor), startPer, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            
-            ssb.append(", ");
-            ssb.append("消费");
-
-            String amountStr = String.format(Locale.CHINA, "%.2f", e.getValue());
-            int startAmt = ssb.length();
-            ssb.append(amountStr);
-            ssb.setSpan(new ForegroundColorSpan(redColor), startAmt, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-            ssb.append("元");
-        }
-
-        ssb.append("\n");
-        
-        long days = 1;
-        LocalDate today = LocalDate.now();
+        // 计算日期范围
         LocalDate startOfPeriod;
         LocalDate endOfPeriod;
-
         if (currentMode == 0) { 
             startOfPeriod = selectedDate.with(TemporalAdjusters.firstDayOfYear());
             endOfPeriod = selectedDate.with(TemporalAdjusters.lastDayOfYear());
@@ -619,35 +581,181 @@ public class StatsFragment extends Fragment {
             endOfPeriod = selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
         }
 
-        if (!today.isBefore(startOfPeriod) && !today.isAfter(endOfPeriod)) {
-             days = ChronoUnit.DAYS.between(startOfPeriod, today) + 1;
+        // --- 消费总结逻辑 ---
+        if (pieMap.isEmpty() || totalAmount == 0) {
+            tvSummaryContent.setText("暂无消费记录");
         } else {
-             days = ChronoUnit.DAYS.between(startOfPeriod, endOfPeriod) + 1;
+            List<Map.Entry<String, Double>> sortedEntries = new ArrayList<>(pieMap.entrySet());
+            Collections.sort(sortedEntries, (e1, e2) -> Double.compare(e2.getValue(), e1.getValue()));
+
+            SpannableStringBuilder ssb = new SpannableStringBuilder();
+            String[] prefixes = {"最多是", "其次是", "然后是"};
+            
+            int yellowColor = ContextCompat.getColor(requireContext(), R.color.app_yellow);
+            int greenColor = ContextCompat.getColor(requireContext(), R.color.expense_green);
+            int redColor = ContextCompat.getColor(requireContext(), R.color.income_red);
+
+            int count = Math.min(sortedEntries.size(), 3);
+            for (int i = 0; i < count; i++) {
+                if (i > 0) ssb.append("\n"); 
+
+                Map.Entry<String, Double> e = sortedEntries.get(i);
+                double percent = (e.getValue() / totalAmount) * 100;
+
+                ssb.append(prefixes[i]);
+                
+                String category = e.getKey();
+                int startCat = ssb.length();
+                ssb.append(category);
+                ssb.setSpan(new ForegroundColorSpan(yellowColor), startCat, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                
+                ssb.append(", ");
+                ssb.append("占比");
+                
+                String percentStr = String.format(Locale.CHINA, "%.1f%%", percent);
+                int startPer = ssb.length();
+                ssb.append(percentStr);
+                ssb.setSpan(new ForegroundColorSpan(greenColor), startPer, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                
+                ssb.append(", ");
+                ssb.append("消费");
+
+                String amountStr = String.format(Locale.CHINA, "%.2f", e.getValue());
+                int startAmt = ssb.length();
+                ssb.append(amountStr);
+                ssb.setSpan(new ForegroundColorSpan(redColor), startAmt, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+                ssb.append("元");
+            }
+
+            ssb.append("\n");
+            
+            long days = 1;
+            LocalDate today = LocalDate.now();
+
+            if (!today.isBefore(startOfPeriod) && !today.isAfter(endOfPeriod)) {
+                 days = ChronoUnit.DAYS.between(startOfPeriod, today) + 1;
+            } else {
+                 days = ChronoUnit.DAYS.between(startOfPeriod, endOfPeriod) + 1;
+            }
+            if (days < 1) days = 1;
+            double dailyAvg = totalAmount / days;
+
+            ssb.append("共计消费");
+            String totalStr = String.format(Locale.CHINA, "%.2f", totalAmount);
+            int startTotal = ssb.length();
+            ssb.append(totalStr);
+            ssb.setSpan(new ForegroundColorSpan(redColor), startTotal, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            
+            ssb.append("元, ");
+            ssb.append("日均消费");
+            
+            String avgStr = String.format(Locale.CHINA, "%.2f", dailyAvg);
+            int startAvg = ssb.length();
+            ssb.append(avgStr);
+            ssb.setSpan(new ForegroundColorSpan(redColor), startAvg, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ssb.append("元");
+
+            tvSummaryContent.setText(ssb);
         }
 
-        if (days < 1) days = 1;
+        // 即使没有消费，也要尝试显示加班信息
+        calculateAndShowOvertime(startOfPeriod, endOfPeriod, scopeStr);
+    }
+    
+    // 之前可能存在的 checkAndAppendOvertimeOnly 已移除，逻辑合并至 updateSummarySection
 
-        double dailyAvg = totalAmount / days;
+    // 【新增】计算并显示加班信息 (使用 Spannable 实现标题和内容)
+    private void calculateAndShowOvertime(LocalDate start, LocalDate end, String scopeStr) {
+        long startMillis = start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        long endMillis = end.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 
-        ssb.append("共计消费");
-        
-        String totalStr = String.format(Locale.CHINA, "%.2f", totalAmount);
-        int startTotal = ssb.length();
-        ssb.append(totalStr);
-        ssb.setSpan(new ForegroundColorSpan(redColor), startTotal, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        
-        ssb.append("元, ");
-        
-        ssb.append("日均消费");
-        
-        String avgStr = String.format(Locale.CHINA, "%.2f", dailyAvg);
-        int startAvg = ssb.length();
-        ssb.append(avgStr);
-        ssb.setSpan(new ForegroundColorSpan(redColor), startAvg, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        
-        ssb.append("元");
+        double totalOvertimeHours = 0;
+        double weekdayOvertimeHours = 0;
+        double holidayOvertimeHours = 0;
+        double totalOvertimeIncome = 0;
+        boolean hasOvertime = false;
 
-        tvSummaryContent.setText(ssb);
+        Pattern pattern = Pattern.compile("时长:\\s*([0-9.]+)\\s*小时");
+
+        for (Transaction t : allTransactions) {
+            if (t.date >= startMillis && t.date < endMillis && t.type == 1 && "加班".equals(t.category)) {
+                hasOvertime = true;
+                totalOvertimeIncome += t.amount;
+
+                if (t.note != null) {
+                    Matcher matcher = pattern.matcher(t.note);
+                    if (matcher.find()) {
+                        try {
+                            double hours = Double.parseDouble(matcher.group(1));
+                            totalOvertimeHours += hours;
+
+                            LocalDate transDate = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
+                            DayOfWeek dayOfWeek = transDate.getDayOfWeek();
+                            if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
+                                holidayOvertimeHours += hours;
+                            } else {
+                                weekdayOvertimeHours += hours;
+                            }
+                        } catch (NumberFormatException e) {
+                            // ignore error
+                        }
+                    }
+                }
+            }
+        }
+
+        if (hasOvertime) {
+            SpannableStringBuilder ssb = new SpannableStringBuilder();
+            int redColor = ContextCompat.getColor(requireContext(), R.color.income_red);
+            int primaryColor = ContextCompat.getColor(requireContext(), R.color.text_primary);
+
+            // --- 标题行: "本周加班" ---
+            // 模拟标题样式：粗体 + 16sp (假设默认14sp, 14*1.15 ≈ 16)
+            String title = scopeStr + "加班";
+            int startTitle = ssb.length();
+            ssb.append(title);
+            ssb.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), startTitle, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ssb.setSpan(new AbsoluteSizeSpan(16, true), startTitle, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ssb.setSpan(new ForegroundColorSpan(primaryColor), startTitle, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            
+            ssb.append("\n"); // 标题与内容间距，可以通过行高控制，这里简单换行
+
+            // --- 第一行内容: 共计X小时, 共计获得X元 ---
+            ssb.append("共计");
+            String totalHoursStr = String.format(Locale.CHINA, "%.1f", totalOvertimeHours);
+            int startTotalH = ssb.length();
+            ssb.append(totalHoursStr);
+            ssb.setSpan(new ForegroundColorSpan(redColor), startTotalH, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            
+            ssb.append("小时, 共计获得");
+            String amountStr = String.format(Locale.CHINA, "%.2f", totalOvertimeIncome);
+            int startAmount = ssb.length();
+            ssb.append(amountStr);
+            ssb.setSpan(new ForegroundColorSpan(redColor), startAmount, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            
+            ssb.append("元\n");
+
+            // --- 第二行内容: 工作日加班X小时, 节假日加班X小时 ---
+            ssb.append("工作日加班");
+            String weekdayHoursStr = String.format(Locale.CHINA, "%.1f", weekdayOvertimeHours);
+            int startWeekday = ssb.length();
+            ssb.append(weekdayHoursStr);
+            ssb.setSpan(new ForegroundColorSpan(redColor), startWeekday, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            
+            ssb.append("小时, 节假日加班");
+            String holidayHoursStr = String.format(Locale.CHINA, "%.1f", holidayOvertimeHours);
+            int startHoliday = ssb.length();
+            ssb.append(holidayHoursStr);
+            ssb.setSpan(new ForegroundColorSpan(redColor), startHoliday, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ssb.append("小时");
+
+            tvOvertimeContent.setText(ssb);
+
+            // 显示控件
+            if (dividerOvertime != null) dividerOvertime.setVisibility(View.VISIBLE);
+            if (tvOvertimeContent != null) tvOvertimeContent.setVisibility(View.VISIBLE);
+        }
     }
 
     private List<Integer> generateThemeColors(int count) {
@@ -832,8 +940,6 @@ public class StatsFragment extends Fragment {
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
 
         TransactionListAdapter adapter = new TransactionListAdapter(t -> {
-            // 【修改】注释掉 dismiss()，保持分类详情列表窗口打开
-            // dialog.dismiss();
             LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
             showAddOrEditDialog(t, date);
         });

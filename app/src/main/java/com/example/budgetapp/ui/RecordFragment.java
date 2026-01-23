@@ -41,8 +41,10 @@ import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.text.SimpleDateFormat;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -120,6 +122,14 @@ public class RecordFragment extends Fragment {
         layoutBalance = view.findViewById(R.id.layout_stat_balance);
         layoutOvertime = view.findViewById(R.id.layout_stat_overtime);
 
+        // 快速记账按钮逻辑
+        FloatingActionButton btnQuickRecord = view.findViewById(R.id.btn_quick_record);
+        if (btnQuickRecord != null) {
+            btnQuickRecord.setOnClickListener(v -> {
+                showDateDetailDialog(LocalDate.now());
+            });
+        }
+
         RecyclerView recyclerView = view.findViewById(R.id.calendar_recycler);
         
         GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 7) {
@@ -161,7 +171,13 @@ public class RecordFragment extends Fragment {
         layoutBalance.setOnClickListener(v -> switchFilterMode(0));
         layoutIncome.setOnClickListener(v -> switchFilterMode(1));
         layoutExpense.setOnClickListener(v -> switchFilterMode(2));
+        
+        // 加班卡片点击过滤，长按设置薪资
         layoutOvertime.setOnClickListener(v -> switchFilterMode(3));
+        layoutOvertime.setOnLongClickListener(v -> {
+            showSetOvertimeRateDialog();
+            return true; // 返回 true 表示消费了事件，不再触发 onClick
+        });
 
         tvMonthTitle.setOnClickListener(v -> showCustomDatePicker());
 
@@ -174,11 +190,9 @@ public class RecordFragment extends Fragment {
             updateCalendar();
         });
 
-        // 【修改】观察数据变化，同时更新日历和可能打开的详情列表
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
             updateCalendar();
             
-            // 如果详情列表正在显示，刷新其数据（解决返回后数据不刷新的问题）
             if (currentDetailAdapter != null && selectedDate != null) {
                 long start = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 long end = selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
@@ -200,6 +214,45 @@ public class RecordFragment extends Fragment {
 
         updateCalendar();
         return view;
+    }
+
+    // 显示设置加班薪资的弹窗
+    private void showSetOvertimeRateDialog() {
+        if (getContext() == null) return;
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_set_overtime_rate, null);
+        builder.setView(view);
+
+        EditText etWeekday = view.findViewById(R.id.et_weekday_rate);
+        EditText etHoliday = view.findViewById(R.id.et_holiday_rate);
+
+        AssistantConfig config = new AssistantConfig(getContext());
+        float currentWeekday = config.getWeekdayOvertimeRate();
+        float currentHoliday = config.getHolidayOvertimeRate();
+
+        if (currentWeekday > 0) etWeekday.setText(String.valueOf(currentWeekday));
+        if (currentHoliday > 0) etHoliday.setText(String.valueOf(currentHoliday));
+
+        builder.setTitle("设置加班薪资标准")
+                .setPositiveButton("保存", (dialog, which) -> {
+                    String wStr = etWeekday.getText().toString();
+                    String hStr = etHoliday.getText().toString();
+                    
+                    try {
+                        float wRate = wStr.isEmpty() ? 0f : Float.parseFloat(wStr);
+                        float hRate = hStr.isEmpty() ? 0f : Float.parseFloat(hStr);
+                        
+                        config.setWeekdayOvertimeRate(wRate);
+                        config.setHolidayOvertimeRate(hRate);
+                        
+                        Toast.makeText(getContext(), "设置已保存", Toast.LENGTH_SHORT).show();
+                    } catch (NumberFormatException e) {
+                        Toast.makeText(getContext(), "输入格式错误", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private void showCustomDatePicker() {
@@ -403,8 +456,6 @@ public class RecordFragment extends Fragment {
         rvList.setLayoutManager(new LinearLayoutManager(getContext()));
 
         TransactionListAdapter listAdapter = new TransactionListAdapter(transaction -> {
-            // 【修改】注释掉 dismiss()，保持列表窗口打开
-            // dialog.dismiss(); 
             LocalDate transDate = Instant.ofEpochMilli(transaction.date).atZone(ZoneId.systemDefault()).toLocalDate();
             showAddOrEditDialog(transaction, transDate);
         });
@@ -426,15 +477,12 @@ public class RecordFragment extends Fragment {
         Button btnAddNormal = dialogView.findViewById(R.id.btn_add_transaction);
         if (btnAddNormal != null) {
             btnAddNormal.setOnClickListener(v -> {
-                // 【修改】注释掉 dismiss()，保持列表窗口打开
-                // dialog.dismiss(); 
                 showAddOrEditDialog(null, date);
             });
         }
         Button btnAddOvertime = dialogView.findViewById(R.id.btn_add_overtime);
         if (btnAddOvertime != null) {
             btnAddOvertime.setOnClickListener(v -> {
-                // 加班功能通常是独立的，这里也可以选择不关闭，视需求而定
                 dialog.dismiss();
                 showOvertimeDialog(date);
             });
@@ -459,6 +507,20 @@ public class RecordFragment extends Fragment {
         TextView tvResult = view.findViewById(R.id.tv_calculated_amount);
         Button btnSave = view.findViewById(R.id.btn_save_overtime);
         Button btnCancel = view.findViewById(R.id.btn_cancel_overtime);
+        
+        // 自动填充时薪
+        AssistantConfig config = new AssistantConfig(requireContext());
+        float defaultRate = 0f;
+        DayOfWeek day = date.getDayOfWeek();
+        if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
+            defaultRate = config.getHolidayOvertimeRate();
+        } else {
+            defaultRate = config.getWeekdayOvertimeRate();
+        }
+        
+        if (defaultRate > 0) {
+            etRate.setText(String.valueOf(defaultRate));
+        }
 
         etRate.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
 

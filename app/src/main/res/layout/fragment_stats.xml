@@ -180,7 +180,7 @@
                     android:id="@+id/tv_summary_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="本周"
+                    android:text="本周消费"
                     android:textColor="@color/text_primary"
                     android:textSize="16sp"
                     android:textStyle="bold"
@@ -193,6 +193,35 @@
                     android:textColor="@color/text_primary"
                     android:textSize="14sp"
                     android:lineSpacingExtra="6dp"/>
+
+                <View
+                    android:id="@+id/divider_overtime"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#EEEEEE"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="12dp"
+                    android:visibility="gone"/>
+
+                <TextView
+                    android:id="@+id/tv_overtime_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="本周加班"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp"
+                    android:visibility="gone"/>
+
+                <TextView
+                    android:id="@+id/tv_overtime_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="6dp"
+                    android:visibility="gone"/>
             </LinearLayout>
 
         </LinearLayout>

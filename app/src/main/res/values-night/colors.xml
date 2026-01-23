@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="app_yellow">#4086DE</color>
+    <color name="app_yellow">#3683f7</color>
     <color name="ripple_yellow">#263238</color>
 
     <color name="app_background">#121212</color>
@@ -31,4 +31,6 @@
 
     <color name="bottom_unselected">#FFFFFF</color>
 
+    <color name="switch_track_off">#39393D</color>
+    <color name="real_white">#FFFFFF</color>
 </resources>

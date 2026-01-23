@@ -1,6 +1,5 @@
 package com.example.budgetapp.ui;
 
-import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -11,9 +10,11 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+
+// [重要] 引入 SwitchCompat
+import androidx.appcompat.widget.SwitchCompat;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
@@ -37,12 +38,13 @@ import java.util.Map;
 
 public class AutoAssetActivity extends AppCompatActivity {
 
-    private Switch switchAutoAsset;
+    // [修改] 类型改为 SwitchCompat
+    private SwitchCompat switchAutoAsset;
+    
     private RecyclerView rvRules;
     private RuleAdapter adapter;
     private List<AutoAssetManager.AssetRule> ruleList = new ArrayList<>();
     
-    // 缓存数据用于弹窗
     private List<AssetAccount> cachedAssets = new ArrayList<>();
     private List<AppItem> cachedApps = new ArrayList<>();
 
@@ -73,6 +75,7 @@ public class AutoAssetActivity extends AppCompatActivity {
     }
 
     private void initViews() {
+        // [修改] findViewById 返回的是 SwitchCompat，如果变量类型是 Switch 会报错
         switchAutoAsset = findViewById(R.id.switchAutoAsset);
         switchAutoAsset.setChecked(AutoAssetManager.isEnabled(this));
         switchAutoAsset.setOnCheckedChangeListener((v, isChecked) -> {
@@ -89,22 +92,18 @@ public class AutoAssetActivity extends AppCompatActivity {
         findViewById(R.id.btnAddRule).setOnClickListener(v -> showAddRuleDialog());
     }
 
+    // ... (其余代码保持不变，省略以节省篇幅) ...
+    
     private void loadData() {
-        // 1. 先加载规则 (同步操作)
         ruleList = AutoAssetManager.getRules(this);
         adapter.notifyDataSetChanged();
-
-        // 2. 加载应用列表
         Map<String, String> apps = KeywordManager.getSupportedApps();
         cachedApps.clear();
         for (Map.Entry<String, String> entry : apps.entrySet()) {
             cachedApps.add(new AppItem(entry.getKey(), entry.getValue()));
         }
-
-        // 3. 异步加载资产数据
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0); // 只取资产账户
-            
+            List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0); 
             runOnUiThread(() -> {
                 cachedAssets.clear();
                 if (assets != null) cachedAssets.addAll(assets);
@@ -118,70 +117,53 @@ public class AutoAssetActivity extends AppCompatActivity {
             Toast.makeText(this, "暂无资产或资产数据加载中...", Toast.LENGTH_SHORT).show();
             return;
         }
-
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("新增关联规则");
-        // 复用构建视图的逻辑
         buildDialogView(builder, null);
     }
 
-    // 新增：编辑规则弹窗
     private void showEditRuleDialog(AutoAssetManager.AssetRule oldRule) {
         if (cachedAssets.isEmpty()) return;
-
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("编辑关联规则");
         buildDialogView(builder, oldRule);
     }
 
-    // 统一构建弹窗视图（用于新增和编辑）
     private void buildDialogView(AlertDialog.Builder builder, AutoAssetManager.AssetRule oldRule) {
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
         container.setPadding(60, 40, 60, 20);
 
-        // 定义通用的 Spinner 布局参数：增加上边距 (例如 30px)
         LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        spinnerParams.topMargin = 30; // 【修改 1】增加上边距，拉开与标题的距离
+        spinnerParams.topMargin = 30;
 
-        // 1. 应用选择
         TextView labelApp = new TextView(this);
         labelApp.setText("生效应用:");
         labelApp.setTextColor(Color.GRAY);
         container.addView(labelApp);
 
         final Spinner spinnerApp = new Spinner(this);
-        spinnerApp.setBackground(null); // 去掉箭头和背景
+        spinnerApp.setBackground(null);
         spinnerApp.setPopupBackgroundResource(R.drawable.bg_input_field);
-
-        // 【修改 2】设置内边距为 0，确保文字与上方的标题 ("生效应用") 严格左对齐
         spinnerApp.setPadding(0, 0, 0, 0);
-
-        // 应用布局参数
         container.addView(spinnerApp, spinnerParams);
 
         ArrayAdapter<AppItem> appAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, cachedApps);
         appAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerApp.setAdapter(appAdapter);
 
-
-        // 2. 资产选择
         TextView labelAsset = new TextView(this);
         labelAsset.setText("\n关联资产:");
         labelAsset.setTextColor(Color.GRAY);
         container.addView(labelAsset);
 
         final Spinner spinnerAsset = new Spinner(this);
-        spinnerAsset.setBackground(null); // 去掉箭头和背景
+        spinnerAsset.setBackground(null);
         spinnerAsset.setPopupBackgroundResource(R.drawable.bg_input_field);
-
-        // 【修改 2】同样设置内边距为 0，确保对齐
         spinnerAsset.setPadding(0, 0, 0, 0);
-
-        // 应用布局参数
         container.addView(spinnerAsset, spinnerParams);
 
         List<String> assetNames = new ArrayList<>();
@@ -191,8 +173,6 @@ public class AutoAssetActivity extends AppCompatActivity {
         assetAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerAsset.setAdapter(assetAdapter);
 
-
-        // 3. 关键字输入
         TextView labelKw = new TextView(this);
         labelKw.setText("\n屏幕关键字 (包含即触发):");
         labelKw.setTextColor(Color.GRAY);
@@ -200,7 +180,6 @@ public class AutoAssetActivity extends AppCompatActivity {
 
         final EditText etKeyword = new EditText(this);
         etKeyword.setHint("例如: 招商银行");
-        // 给输入框也加一点上边距，保持风格统一
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -227,30 +206,23 @@ public class AutoAssetActivity extends AppCompatActivity {
 
         builder.setView(container);
 
-        // ... (后续按钮监听代码保持不变) ...
         builder.setPositiveButton("保存", (dialog, which) -> {
             String keyword = etKeyword.getText().toString().trim();
             if (keyword.isEmpty()) {
                 Toast.makeText(this, "请输入关键字", Toast.LENGTH_SHORT).show();
                 return;
             }
-
             AppItem selectedApp = (AppItem) spinnerApp.getSelectedItem();
             if (selectedApp == null || cachedAssets.isEmpty()) return;
 
             int selectedAssetIndex = spinnerAsset.getSelectedItemPosition();
             if (selectedAssetIndex < 0 || selectedAssetIndex >= cachedAssets.size()) return;
-
             AssetAccount selectedAsset = cachedAssets.get(selectedAssetIndex);
-
             AutoAssetManager.AssetRule newRule = new AutoAssetManager.AssetRule(selectedApp.packageName, keyword, selectedAsset.id);
-
             if (oldRule != null) {
                 AutoAssetManager.removeRule(this, oldRule);
             }
-
             AutoAssetManager.addRule(this, newRule);
-
             loadData();
             String msg = (oldRule != null) ? "规则已更新" : "规则已添加";
             Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
@@ -266,6 +238,7 @@ public class AutoAssetActivity extends AppCompatActivity {
         if (btnPos != null) btnPos.setTextColor(primaryColor);
         if (btnNeg != null) btnNeg.setTextColor(primaryColor);
     }
+    
     private String getAssetNameById(int id) {
         for (AssetAccount a : cachedAssets) {
             if (a.id == id) return a.name;
@@ -280,7 +253,6 @@ public class AutoAssetActivity extends AppCompatActivity {
         return "未知应用";
     }
 
-    // --- Adapter ---
     class RuleAdapter extends RecyclerView.Adapter<RuleAdapter.VH> {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -291,20 +263,14 @@ public class AutoAssetActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(@NonNull VH holder, int position) {
             AutoAssetManager.AssetRule rule = ruleList.get(position);
-            
             String appName = getAppNameByPkg(rule.packageName);
             holder.text1.setText("[" + appName + "] 关键字: " + rule.keyword);
             holder.text1.setTextColor(ContextCompat.getColor(AutoAssetActivity.this, R.color.text_primary));
             holder.text1.setTextSize(16);
-
             String assetName = getAssetNameById(rule.assetId);
             holder.text2.setText("自动关联 -> " + assetName);
             holder.text2.setTextColor(ContextCompat.getColor(AutoAssetActivity.this, R.color.app_yellow)); 
-
-            // 单击编辑
             holder.itemView.setOnClickListener(v -> showEditRuleDialog(rule));
-
-            // 长按删除
             holder.itemView.setOnLongClickListener(v -> {
                 new AlertDialog.Builder(AutoAssetActivity.this)
                         .setTitle("删除规则")
@@ -318,10 +284,8 @@ public class AutoAssetActivity extends AppCompatActivity {
                 return true;
             });
         }
-
         @Override
         public int getItemCount() { return ruleList.size(); }
-
         class VH extends RecyclerView.ViewHolder {
             TextView text1, text2;
             VH(View v) { super(v); text1 = v.findViewById(android.R.id.text1); text2 = v.findViewById(android.R.id.text2); }

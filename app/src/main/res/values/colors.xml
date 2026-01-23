@@ -7,7 +7,7 @@
 
     <color name="text_white">#FFFFFFFF</color>
 
-    <color name="app_yellow">#1677FF</color>
+    <color name="app_yellow">#327ffc</color>
     <color name="ripple_yellow">#FFF59D</color>
     <color name="app_background">#FFFFFF</color>
 
@@ -40,4 +40,7 @@
     <color name="down_background">#FFFFFF</color>
     <color name="bar_background">#F7F7F7</color>
     <color name="bottom_unselected">#333333</color>
+
+    <color name="switch_track_off">#E9E9EA</color>
+    <color name="real_white">#FFFFFF</color>
 </resources>

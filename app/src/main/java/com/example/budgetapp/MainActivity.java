@@ -169,7 +169,7 @@ public class MainActivity extends AppCompatActivity {
                         return true;
                     });
                 }
-                // 【新增】长按资产Tab进入自动资产设置
+                // 长按资产Tab进入自动资产设置
                 View assetsTab = bottomNav.findViewById(R.id.nav_assets);
                 if (assetsTab != null) {
                     assetsTab.setOnLongClickListener(v -> {
@@ -185,17 +185,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkPermissions() {
-        if (!isAccessibilitySettingsOn()) {
+        AssistantConfig config = new AssistantConfig(this);
+
+        // 1. 检查屏幕同步助手权限 (仅当"自动记账"功能开启时检查)
+        if (config.isEnabled() && !isAccessibilitySettingsOn()) {
             showPermissionDialog("开启屏幕同步助手",
                     "为了提取屏幕上的支付金额，请开启‘记账屏幕同步助手’。",
                     Settings.ACTION_ACCESSIBILITY_SETTINGS);
         }
-        else if (!isNotificationListenerEnabled()) {
+        // 2. 检查通知权限 (仅当"退款监听"功能开启时检查)
+        else if (config.isRefundEnabled() && !isNotificationListenerEnabled()) {
             showPermissionDialog("开启退款监听",
                     "为了监听微信/支付宝的退款通知，请授予‘通知使用权’。",
                     Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
         }
-        else if (!Settings.canDrawOverlays(this)) {
+        // 3. 检查悬浮窗权限 (仅当"自动记账"功能开启时检查，用于显示确认弹窗)
+        else if (config.isEnabled() && !Settings.canDrawOverlays(this)) {
             showPermissionDialog("开启悬浮窗权限",
                     "为了在记账时显示确认弹窗，请授予‘显示在其他应用上层’权限。",
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION);

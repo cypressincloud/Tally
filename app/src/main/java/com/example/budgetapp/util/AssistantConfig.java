@@ -11,10 +11,14 @@ public class AssistantConfig {
     private static final String KEY_ENABLE = "key_enable_auto_track";
     private static final String KEY_ENABLE_REFUND = "key_enable_refund_monitor";
     private static final String KEY_ENABLE_ASSETS = "key_enable_assets_module";
-    private static final String KEY_DEFAULT_ASSET_ID = "key_default_asset_id"; // 新增
+    private static final String KEY_DEFAULT_ASSET_ID = "key_default_asset_id"; 
 
     private static final String KEY_KEYWORDS_EXPENSE = "key_keywords_expense";
     private static final String KEY_KEYWORDS_INCOME = "key_keywords_income";
+
+    // --- 新增：薪资配置 Key ---
+    private static final String KEY_WEEKDAY_RATE = "weekday_overtime_rate";
+    private static final String KEY_HOLIDAY_RATE = "holiday_overtime_rate";
 
     private final SharedPreferences prefs;
 
@@ -49,7 +53,7 @@ public class AssistantConfig {
         prefs.edit().putBoolean(KEY_ENABLE_ASSETS, enabled).apply();
     }
 
-    // --- 默认资产设置 (新增) ---
+    // --- 默认资产设置 ---
     public int getDefaultAssetId() {
         return prefs.getInt(KEY_DEFAULT_ASSET_ID, -1);
     }
@@ -89,5 +93,23 @@ public class AssistantConfig {
         Set<String> current = getIncomeKeywords();
         current.remove(keyword);
         prefs.edit().putStringSet(KEY_KEYWORDS_INCOME, current).apply();
+    }
+
+    // --- 新增方法：薪资配置 ---
+
+    public float getWeekdayOvertimeRate() {
+        return prefs.getFloat(KEY_WEEKDAY_RATE, 0f);
+    }
+
+    public void setWeekdayOvertimeRate(float rate) {
+        prefs.edit().putFloat(KEY_WEEKDAY_RATE, rate).apply();
+    }
+
+    public float getHolidayOvertimeRate() {
+        return prefs.getFloat(KEY_HOLIDAY_RATE, 0f);
+    }
+
+    public void setHolidayOvertimeRate(float rate) {
+        prefs.edit().putFloat(KEY_HOLIDAY_RATE, rate).apply();
     }
 }

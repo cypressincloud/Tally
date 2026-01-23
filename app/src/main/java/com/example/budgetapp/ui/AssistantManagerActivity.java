@@ -16,9 +16,11 @@ import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+
+// [重要] 引入 SwitchCompat
+import androidx.appcompat.widget.SwitchCompat;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
@@ -44,9 +46,12 @@ import java.util.Set;
 public class AssistantManagerActivity extends AppCompatActivity {
 
     private AssistantConfig config;
-    private Switch switchAutoTrack;
-    private Switch switchRefundMonitor;
-    private Switch switchAssets;
+    
+    // [修改] 变量类型改为 SwitchCompat
+    private SwitchCompat switchAutoTrack;
+    private SwitchCompat switchRefundMonitor;
+    private SwitchCompat switchAssets;
+    
     private RecyclerView rvKeywords;
     private KeywordAdapter adapter;
     private List<KeywordItem> dataList = new ArrayList<>();
@@ -109,7 +114,6 @@ public class AssistantManagerActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadData(); 
-        
         if (switchRefundMonitor != null) {
             if (config.isRefundEnabled() && !isNotificationListenerEnabled()) {
                 // 可选：提醒用户权限缺失
@@ -118,6 +122,7 @@ public class AssistantManagerActivity extends AppCompatActivity {
     }
 
     private void initViews() {
+        // [修改] 匹配 Layout 中的 SwitchCompat
         switchAutoTrack = findViewById(R.id.switchAutoTrack);
         switchAutoTrack.setChecked(config.isEnabled());
         switchAutoTrack.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -161,6 +166,8 @@ public class AssistantManagerActivity extends AppCompatActivity {
         });
     }
 
+    // ... (后续方法保持不变) ...
+
     private void checkNotificationPermission() {
         if (!isNotificationListenerEnabled()) {
             new AlertDialog.Builder(this)
@@ -196,22 +203,18 @@ public class AssistantManagerActivity extends AppCompatActivity {
     private void loadData() {
         dataList.clear();
         Map<String, String> apps = KeywordManager.getSupportedApps();
-
         for (Map.Entry<String, String> appEntry : apps.entrySet()) {
             String pkg = appEntry.getKey();
             String name = appEntry.getValue();
-
             Set<String> expenses = KeywordManager.getKeywords(this, pkg, KeywordManager.TYPE_EXPENSE);
             for (String k : expenses) {
                 dataList.add(new KeywordItem(pkg, name, k, KeywordManager.TYPE_EXPENSE));
             }
-
             Set<String> incomes = KeywordManager.getKeywords(this, pkg, KeywordManager.TYPE_INCOME);
             for (String k : incomes) {
                 dataList.add(new KeywordItem(pkg, name, k, KeywordManager.TYPE_INCOME));
             }
         }
-
         Collections.sort(dataList);
         adapter.notifyDataSetChanged();
     }
@@ -219,10 +222,15 @@ public class AssistantManagerActivity extends AppCompatActivity {
     private void showEditDialog(KeywordItem oldItem) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("修改关键字");
-
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
         container.setPadding(60, 40, 60, 20);
+
+        LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        spinnerParams.topMargin = 30;
 
         TextView labelApp = new TextView(this);
         labelApp.setText("所属应用:");
@@ -230,10 +238,10 @@ public class AssistantManagerActivity extends AppCompatActivity {
         container.addView(labelApp);
 
         final Spinner spinnerApp = new Spinner(this);
-        // 【修改】设置背景资源为圆角矩形 (替换默认带箭头的背景)
-        spinnerApp.setBackgroundResource(R.drawable.bg_input_field);
-        // 【新增】设置内边距，防止文字紧贴边框
-        spinnerApp.setPadding(30, 30, 30, 30);
+        spinnerApp.setBackground(null);
+        spinnerApp.setPopupBackgroundResource(R.drawable.bg_input_field);
+        spinnerApp.setPadding(0, 0, 0, 0);
+
         List<AppSpinnerItem> spinnerItems = new ArrayList<>();
         Map<String, String> apps = KeywordManager.getSupportedApps();
         
@@ -246,11 +254,11 @@ public class AssistantManagerActivity extends AppCompatActivity {
             }
             i++;
         }
-        
-        ArrayAdapter<AppSpinnerItem> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, spinnerItems);
+        ArrayAdapter<AppSpinnerItem> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, spinnerItems);
+        spinnerAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerApp.setAdapter(spinnerAdapter);
         spinnerApp.setSelection(selectedIndex);
-        container.addView(spinnerApp);
+        container.addView(spinnerApp, spinnerParams);
 
         TextView labelType = new TextView(this);
         labelType.setText("\n收支类型:");
@@ -276,10 +284,14 @@ public class AssistantManagerActivity extends AppCompatActivity {
 
         final EditText etInput = new EditText(this);
         etInput.setText(oldItem.text);
-        container.addView(etInput);
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        inputParams.topMargin = 20;
+        container.addView(etInput, inputParams);
 
         builder.setView(container);
-
         builder.setPositiveButton("保存", (dialogInterface, which) -> {
             String newText = etInput.getText().toString().trim();
             if (newText.isEmpty()) return;
@@ -290,7 +302,6 @@ public class AssistantManagerActivity extends AppCompatActivity {
             loadData();
             Toast.makeText(this, "修改成功", Toast.LENGTH_SHORT).show();
         });
-
         builder.setNegativeButton("取消", null);
         AlertDialog dialog = builder.create();
         dialog.show();
@@ -342,10 +353,8 @@ public class AssistantManagerActivity extends AppCompatActivity {
                 return true;
             });
         }
-
         @Override
         public int getItemCount() { return dataList.size(); }
-
         class VH extends RecyclerView.ViewHolder {
             TextView text1, text2;
             VH(View v) { super(v); text1 = v.findViewById(android.R.id.text1); text2 = v.findViewById(android.R.id.text2); }
