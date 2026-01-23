@@ -1,7 +1,6 @@
 package com.example.budgetapp.ui;
 
 import android.app.AlertDialog;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
@@ -27,8 +26,13 @@ import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
+import com.example.budgetapp.util.ExternalImportHelper; // 【记得导入这个】
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -42,6 +46,7 @@ public class SettingsActivity extends AppCompatActivity {
     private List<AssetAccount> allAssets = new ArrayList<>();
     private SwitchCompat switchMinimalist;
 
+    // ... 原有的 exportLauncher 代码保持不变 ...
     private final ActivityResultLauncher<String> exportLauncher = registerForActivityResult(
             new ActivityResultContracts.CreateDocument("application/zip"),
             uri -> {
@@ -57,19 +62,21 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
+    // ... 原有的 importLauncher 代码保持不变 ...
     private final ActivityResultLauncher<String[]> importLauncher = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
             uri -> {
                 if (uri != null) {
                     try {
                         BackupData data = BackupManager.importFromZip(this, uri);
+                        // ... (原有的导入逻辑保持不变) ...
                         int recordCount = 0;
                         int assetCount = 0;
 
                         if (data.records != null && !data.records.isEmpty()) {
                             for (Transaction t : data.records) {
                                 Transaction newT = t;
-                                newT.id = 0; 
+                                newT.id = 0;
                                 financeViewModel.addTransaction(newT);
                             }
                             recordCount = data.records.size();
@@ -78,19 +85,12 @@ public class SettingsActivity extends AppCompatActivity {
                         if (data.assets != null && !data.assets.isEmpty()) {
                             for (AssetAccount a : data.assets) {
                                 AssetAccount newA = a;
-                                newA.id = 0; 
+                                newA.id = 0;
                                 financeViewModel.addAsset(newA);
                             }
                             assetCount = data.assets.size();
                         }
-
-                        if (recordCount > 0 || assetCount > 0) {
-                            Toast.makeText(this,
-                                    String.format("成功导入: %d条账单, %d个资产", recordCount, assetCount),
-                                    Toast.LENGTH_LONG).show();
-                        } else {
-                            Toast.makeText(this, "备份文件中未发现数据", Toast.LENGTH_SHORT).show();
-                        }
+                        Toast.makeText(this, String.format("成功导入: %d条账单, %d个资产", recordCount, assetCount), Toast.LENGTH_LONG).show();
                     } catch (Exception e) {
                         e.printStackTrace();
                         Toast.makeText(this, "导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -99,81 +99,110 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
+    // 【新增】处理外部 JSON 文件导入的 Launcher
+    private final ActivityResultLauncher<String[]> importExternalJsonLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        // 1. 读取文件内容
+                        InputStream inputStream = getContentResolver().openInputStream(uri);
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            sb.append(line);
+                        }
+                        reader.close();
+                        inputStream.close();
+
+                        // 2. 调用工具类解析
+                        String jsonContent = sb.toString();
+                        List<Transaction> externalTransactions = ExternalImportHelper.parseExternalData(jsonContent);
+
+                        // 3. 插入数据库
+                        if (!externalTransactions.isEmpty()) {
+                            for (Transaction t : externalTransactions) {
+                                // 直接调用 ViewModel 添加
+                                financeViewModel.addTransaction(t);
+                            }
+                            Toast.makeText(this, "成功导入 " + externalTransactions.size() + " 条外部数据", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(this, "未解析到有效数据，请检查文件格式", Toast.LENGTH_LONG).show();
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "外部导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_settings);
 
+        // ... (onCreate 中的原有视图初始化代码保持不变) ...
         View rootView = findViewById(R.id.settings_root);
         final int originalPaddingLeft = rootView.getPaddingLeft();
         final int originalPaddingTop = rootView.getPaddingTop();
         final int originalPaddingRight = rootView.getPaddingRight();
         final int originalPaddingBottom = rootView.getPaddingBottom();
-
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, windowInsets) -> {
-            androidx.core.graphics.Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(
-                originalPaddingLeft + insets.left,
-                originalPaddingTop + insets.top,
-                originalPaddingRight + insets.right,
-                originalPaddingBottom + insets.bottom
-            );
-            return WindowInsetsCompat.CONSUMED;
+             androidx.core.graphics.Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+             v.setPadding(originalPaddingLeft + insets.left, originalPaddingTop + insets.top, originalPaddingRight + insets.right, originalPaddingBottom + insets.bottom);
+             return WindowInsetsCompat.CONSUMED;
         });
 
         financeViewModel = new ViewModelProvider(this).get(FinanceViewModel.class);
         financeViewModel.getAllTransactions().observe(this, list -> allTransactions = list);
         financeViewModel.getAllAssets().observe(this, list -> allAssets = list);
 
-        // 跳转到分类设置
-        findViewById(R.id.btn_category_setting).setOnClickListener(v -> {
-            startActivity(new Intent(this, CategorySettingsActivity.class));
-        });
-
-        findViewById(R.id.btn_backup_restore).setOnClickListener(v -> showBackupOptions());
-
-        findViewById(R.id.btn_auto_asset).setOnClickListener(v -> {
-            startActivity(new Intent(this, AutoAssetActivity.class));
-        });
-
+        findViewById(R.id.btn_category_setting).setOnClickListener(v -> startActivity(new Intent(this, CategorySettingsActivity.class)));
+        findViewById(R.id.btn_backup_restore).setOnClickListener(v -> showBackupOptions()); // 这里的点击事件处理函数被更新了
+        findViewById(R.id.btn_auto_asset).setOnClickListener(v -> startActivity(new Intent(this, AutoAssetActivity.class)));
         findViewById(R.id.btn_toggle_night_mode).setOnClickListener(v -> toggleNightMode());
-
-        findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> {
-            startActivity(new Intent(this, AssistantManagerActivity.class));
-        });
-
+        findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
 
         switchMinimalist = findViewById(R.id.switch_minimalist);
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         boolean isMinimalist = prefs.getBoolean("minimalist_mode", false);
         switchMinimalist.setChecked(isMinimalist);
-
         switchMinimalist.setOnCheckedChangeListener((buttonView, isChecked) -> {
             prefs.edit().putBoolean("minimalist_mode", isChecked).apply();
             Toast.makeText(this, isChecked ? "极简模式已开启" : "极简模式已关闭", Toast.LENGTH_SHORT).show();
         });
     }
 
+    // 【修改】更新菜单，增加第三个选项
     private void showBackupOptions() {
-        String[] options = {"导出数据", "导入数据"};
+        String[] options = {"导出数据 (Zip)", "导入数据 (Zip)", "导入外部账单 (JSON)"};
         new AlertDialog.Builder(this)
                 .setTitle("数据备份与恢复")
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
+                        // 导出
                         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
                         String timeStr = sdf.format(new Date()).replace(":", "-");
                         String fileName = "Tally " + timeStr + ".zip";
                         exportLauncher.launch(fileName);
-                    } else {
+                    } else if (which == 1) {
+                        // 原有导入
                         importLauncher.launch(new String[]{"application/zip"});
+                    } else if (which == 2) {
+                        // 【新增】外部 JSON 导入
+                        // 这里传入 "application/json" 或者 "*/*" 以防不同文件管理器识别MIME类型有误
+                        importExternalJsonLauncher.launch(new String[]{"application/json", "text/plain", "*/*"});
                     }
                 })
                 .show();
     }
 
+    // ... (toggleNightMode 和 showSetOvertimeRateDialog 保持不变) ...
     private void toggleNightMode() {
         int currentMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
         AppCompatDelegate.setDefaultNightMode(
@@ -183,44 +212,42 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void showSetOvertimeRateDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        View view = LayoutInflater.from(this).inflate(R.layout.dialog_set_overtime_rate, null);
-        builder.setView(view);
+         // ... 代码保持不变 ...
+         AlertDialog.Builder builder = new AlertDialog.Builder(this);
+         View view = LayoutInflater.from(this).inflate(R.layout.dialog_set_overtime_rate, null);
+         builder.setView(view);
+         // ... 原有逻辑 ...
+         EditText etBaseSalary = view.findViewById(R.id.et_base_salary);
+         EditText etWeekday = view.findViewById(R.id.et_weekday_rate);
+         EditText etHoliday = view.findViewById(R.id.et_holiday_rate);
 
-        EditText etBaseSalary = view.findViewById(R.id.et_base_salary);
-        EditText etWeekday = view.findViewById(R.id.et_weekday_rate);
-        EditText etHoliday = view.findViewById(R.id.et_holiday_rate);
+         AssistantConfig config = new AssistantConfig(this);
+         float currentBase = config.getMonthlyBaseSalary();
+         float currentWeekday = config.getWeekdayOvertimeRate();
+         float currentHoliday = config.getHolidayOvertimeRate();
 
-        AssistantConfig config = new AssistantConfig(this);
-        float currentBase = config.getMonthlyBaseSalary();
-        float currentWeekday = config.getWeekdayOvertimeRate();
-        float currentHoliday = config.getHolidayOvertimeRate();
+         if (currentBase > 0) etBaseSalary.setText(String.valueOf(currentBase));
+         if (currentWeekday > 0) etWeekday.setText(String.valueOf(currentWeekday));
+         if (currentHoliday > 0) etHoliday.setText(String.valueOf(currentHoliday));
 
-        if (currentBase > 0) etBaseSalary.setText(String.valueOf(currentBase));
-        if (currentWeekday > 0) etWeekday.setText(String.valueOf(currentWeekday));
-        if (currentHoliday > 0) etHoliday.setText(String.valueOf(currentHoliday));
-
-        builder.setTitle("设置加班薪资标准")
-                .setPositiveButton("保存", (dialog, which) -> {
-                    String bStr = etBaseSalary.getText().toString();
-                    String wStr = etWeekday.getText().toString();
-                    String hStr = etHoliday.getText().toString();
-
-                    try {
-                        float bRate = bStr.isEmpty() ? 0f : Float.parseFloat(bStr);
-                        float wRate = wStr.isEmpty() ? 0f : Float.parseFloat(wStr);
-                        float hRate = hStr.isEmpty() ? 0f : Float.parseFloat(hStr);
-
-                        config.setMonthlyBaseSalary(bRate);
-                        config.setWeekdayOvertimeRate(wRate);
-                        config.setHolidayOvertimeRate(hRate);
-
-                        Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show();
-                    } catch (NumberFormatException e) {
-                        Toast.makeText(this, "输入格式错误", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+         builder.setTitle("设置加班薪资标准")
+                 .setPositiveButton("保存", (dialog, which) -> {
+                     String bStr = etBaseSalary.getText().toString();
+                     String wStr = etWeekday.getText().toString();
+                     String hStr = etHoliday.getText().toString();
+                     try {
+                         float bRate = bStr.isEmpty() ? 0f : Float.parseFloat(bStr);
+                         float wRate = wStr.isEmpty() ? 0f : Float.parseFloat(wStr);
+                         float hRate = hStr.isEmpty() ? 0f : Float.parseFloat(hStr);
+                         config.setMonthlyBaseSalary(bRate);
+                         config.setWeekdayOvertimeRate(wRate);
+                         config.setHolidayOvertimeRate(hRate);
+                         Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show();
+                     } catch (NumberFormatException e) {
+                         Toast.makeText(this, "输入格式错误", Toast.LENGTH_SHORT).show();
+                     }
+                 })
+                 .setNegativeButton("取消", null)
+                 .show();
     }
 }

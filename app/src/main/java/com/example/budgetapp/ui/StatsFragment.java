@@ -417,18 +417,19 @@ public class StatsFragment extends Fragment {
         Map<Integer, Double> incomeMap = new HashMap<>();
         Map<Integer, Double> expenseMap = new HashMap<>();
         Map<String, Double> expensePieCats = new HashMap<>();
-        Map<String, Double> incomePieCats = new HashMap<>(); // 【新增】收入分类统计
+        Map<String, Double> incomePieCats = new HashMap<>(); // 收入分类统计
 
         for (Transaction t : allTransactions) {
             int index = extractor.getIndex(t);
             if (index != -1) {
                 if (t.type == 1) { // 收入
-                    // 线图逻辑：排除加班
+                    // 【修改点】 统一排除 "加班" 类别
+                    // 只有当分类不是 "加班" 时，才计入线图数据 (incomeMap) 和 饼图数据 (incomePieCats)
                     if (!"加班".equals(t.category)) {
                         incomeMap.put(index, incomeMap.getOrDefault(index, 0.0) + t.amount);
+                        incomePieCats.put(t.category, incomePieCats.getOrDefault(t.category, 0.0) + t.amount);
                     }
-                    // 饼图逻辑：所有收入（包括加班）都统计
-                    incomePieCats.put(t.category, incomePieCats.getOrDefault(t.category, 0.0) + t.amount);
+
                 } else { // 支出
                     expenseMap.put(index, expenseMap.getOrDefault(index, 0.0) + t.amount);
                     expensePieCats.put(t.category, expensePieCats.getOrDefault(t.category, 0.0) + t.amount);
