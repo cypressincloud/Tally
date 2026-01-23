@@ -3,7 +3,6 @@ package com.example.budgetapp.ui;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -155,10 +154,14 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_category_setting).setOnClickListener(v -> startActivity(new Intent(this, CategorySettingsActivity.class)));
         findViewById(R.id.btn_backup_restore).setOnClickListener(v -> showBackupOptions());
         findViewById(R.id.btn_auto_asset).setOnClickListener(v -> startActivity(new Intent(this, AutoAssetActivity.class)));
-        // 修改点击事件，调用显示主题设置对话框
         findViewById(R.id.btn_toggle_night_mode).setOnClickListener(v -> showThemeSettingDialog());
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
+
+        // 修改：点击按钮直接跳转到 DonateActivity
+        findViewById(R.id.btn_donate).setOnClickListener(v -> {
+            startActivity(new Intent(this, DonateActivity.class));
+        });
 
         switchMinimalist = findViewById(R.id.switch_minimalist);
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
@@ -189,11 +192,9 @@ public class SettingsActivity extends AppCompatActivity {
                 .show();
     }
 
-    // 新增：显示主题设置对话框
     private void showThemeSettingDialog() {
         String[] themes = {"跟随系统", "日间模式", "夜间模式"};
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-        // 默认跟随系统 (MODE_NIGHT_FOLLOW_SYSTEM = -1)
         int currentMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         
         int checkedItem = 0;
@@ -213,9 +214,7 @@ public class SettingsActivity extends AppCompatActivity {
                         selectedMode = AppCompatDelegate.MODE_NIGHT_YES;
                     }
 
-                    // 保存设置
                     prefs.edit().putInt("theme_mode", selectedMode).apply();
-                    // 应用主题
                     AppCompatDelegate.setDefaultNightMode(selectedMode);
                     dialog.dismiss();
                 })
