@@ -37,26 +37,6 @@
                     android:layout_gravity="center_horizontal"
                     android:layout_marginBottom="16dp"/>
 
-                <EditText
-                    android:id="@+id/et_window_amount"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="金额"
-                    android:inputType="numberDecimal"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    android:textColor="?android:attr/textColorPrimary"
-                    android:textColorHint="?android:attr/textColorHint"
-                    android:gravity="center"
-                    android:background="@null"
-                    android:padding="8dp"/>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="#E0E0E0"
-                    android:layout_marginBottom="16dp"/>
-
 
 
                 <androidx.recyclerview.widget.RecyclerView
@@ -72,7 +52,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center"
-                    android:layout_marginBottom="16dp">
+                    android:layout_marginBottom="12dp">
 
                     <RadioButton
                         android:id="@+id/rb_window_expense"
@@ -114,6 +94,20 @@
                     android:layout_marginBottom="16dp"/>
 
                 <EditText
+                    android:id="@+id/et_window_amount"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:hint="金额"
+                    android:inputType="numberDecimal"
+                    android:textSize="16sp"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textColorHint="?android:attr/textColorHint"
+                    android:background="@drawable/bg_input_field"
+                    android:paddingHorizontal="20dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginBottom="16dp"/>
+
+                <EditText
                     android:id="@+id/et_window_category"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
@@ -124,21 +118,8 @@
                     android:background="@drawable/bg_input_field"
                     android:paddingHorizontal="18dp"
                     android:paddingVertical="10dp"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="16dp"
                     android:visibility="gone"/>
-
-                <EditText
-                    android:id="@+id/et_window_note"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:textColor="?android:attr/textColorPrimary"
-                    android:textColorHint="?android:attr/textColorHint"
-                    android:hint="记录时间 (可选)"
-                    android:textSize="16sp"
-                    android:background="@drawable/bg_input_field"
-                    android:paddingHorizontal="18dp"
-                    android:paddingVertical="10dp"
-                    android:layout_marginBottom="20dp"/>
 
                 <EditText
                     android:id="@+id/et_window_remark"
@@ -147,6 +128,19 @@
                     android:textColor="?android:attr/textColorPrimary"
                     android:textColorHint="?android:attr/textColorHint"
                     android:hint="添加备注*"
+                    android:textSize="16sp"
+                    android:background="@drawable/bg_input_field"
+                    android:paddingHorizontal="18dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginBottom="16dp"/>
+
+                <EditText
+                    android:id="@+id/et_window_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textColorHint="?android:attr/textColorHint"
+                    android:hint="记录时间 (可选)"
                     android:textSize="16sp"
                     android:background="@drawable/bg_input_field"
                     android:paddingHorizontal="18dp"

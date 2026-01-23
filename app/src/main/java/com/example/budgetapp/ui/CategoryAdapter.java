@@ -38,10 +38,9 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
         this.selectedCategory = currentCategory;
         this.listener = listener;
         
-        // 选中时的背景色 (通常是主题黄)
+        // 选中时的背景色
         this.selectedColor = ContextCompat.getColor(context, R.color.app_yellow);
-        
-        // 【核心修改】选中时的文字颜色：不再写死，而是从资源读取，实现日夜间区分
+        // 选中时的文字颜色 (从资源读取，支持日夜模式)
         this.selectedTextColor = ContextCompat.getColor(context, R.color.cat_selected_text);
         
         // 未选中时的颜色
@@ -87,7 +86,12 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
         boolean isSelected = category.equals(selectedCategory);
         
         GradientDrawable background = new GradientDrawable();
-        background.setShape(GradientDrawable.OVAL);
+        // 【核心修改】将形状改为矩形
+        background.setShape(GradientDrawable.RECTANGLE);
+        
+        // 【新增】设置圆角半径 (14dp 转像素)
+        float radius = 16 * context.getResources().getDisplayMetrics().density;
+        background.setCornerRadius(radius);
 
         if (isSelected) {
             background.setColor(selectedColor);

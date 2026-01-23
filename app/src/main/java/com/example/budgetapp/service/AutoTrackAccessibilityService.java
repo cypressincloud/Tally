@@ -70,10 +70,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private List<AssetAccount> loadedAssets = new ArrayList<>();
 
-    // 匹配金额的正则：支持整数和小数
+    // 优化后的金额匹配正则：支持整数和小数，且前面可能有货币符号
     private final Pattern amountPattern = Pattern.compile("(\\d+(\\.\\d{1,2})?)");
     // 匹配数量单位的正则：用于过滤 "1件"、"2个" 等非金额数字
-    private final Pattern quantityPattern = Pattern.compile("\\[?\\d+\\s*[件个笔条单]\\]?");
+    private final Pattern quantityPattern = Pattern.compile("\\[?\\d+\\s*[件个笔条单]\\s*\\]?");
 
     private final Runnable scanRunnable = new Runnable() {
         @Override
@@ -175,7 +175,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         collectAllNumbers(root, candidates); 
 
         double bestAmount = -1;
-        // 简单策略：优先取带小数点的数字（更像金额），否则取第一个合理的数字
+        // 策略：优先取带小数点的数字（更像金额），否则取第一个合理的数字
         for (Double amount : candidates) {
             String strAmt = String.valueOf(amount);
             // 如果包含小数点且不以.0结尾（例如 12.50），优先级最高
@@ -193,7 +193,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         }
     }
 
-    // 【核心修复】修复了之前因包含冒号而被过滤的 bug
     private void collectAllNumbers(AccessibilityNodeInfo node, List<Double> list) {
         if (node == null) return;
         String text = getTextOrDescription(node);
@@ -205,6 +204,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             if (!isStrictTime) {
                 // 先移除数量单位（如 1件），避免误判
                 String cleanText = quantityPattern.matcher(text).replaceAll("");
+                
                 Matcher matcher = amountPattern.matcher(cleanText);
                 while (matcher.find()) {
                     try {
@@ -215,6 +215,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         // 1. 必须大于0
                         // 2. 必须小于20万（避免提取到订单号等长数字）
                         // 3. 过滤掉可能是年份的数字（2020-2035之间的整数）
+                        // 4. 过滤掉可能是手机号的（大于10000000000）
                         if (val > 0 && val < 200000 && !(val >= 2020 && val <= 2035 && val % 1 == 0)) {
                             list.add(val);
                         }
@@ -265,7 +266,8 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
             WindowManager.LayoutParams params = new WindowManager.LayoutParams();
 
-            params.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
+            params.type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ? 
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
             params.format = PixelFormat.TRANSLUCENT;
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;
@@ -274,7 +276,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             params.dimAmount = 0.5f;
             params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
             params.gravity = Gravity.CENTER;
-            params.y = -350;
+            params.y = -350; // 稍微向上偏移
 
             android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
             LayoutInflater inflater = LayoutInflater.from(themeContext);
@@ -286,11 +288,12 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             }
             View cardContent = floatView.findViewById(R.id.window_card_content);
             if (cardContent != null) {
-                cardContent.setOnClickListener(v -> {});
+                cardContent.setOnClickListener(v -> {}); // 拦截点击
             }
 
             isWindowShowing = true;
 
+            // 绑定控件
             EditText etAmount = floatView.findViewById(R.id.et_window_amount);
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
             RecyclerView rvCategory = floatView.findViewById(R.id.rv_window_category); 
@@ -314,6 +317,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             List<String> currentList = (type == 1) ? incomeCategories : expenseCategories;
             
+            // 检查分类是否在列表中
             if (!currentList.contains(category)) {
                  if (type == 0 && (category.equals("淘宝") || category.equals("京东") || category.equals("拼多多"))) {
                      selectedCategory[0] = "购物";
@@ -339,12 +343,14 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             });
             rvCategory.setAdapter(categoryAdapter);
 
+            // 初始化选中状态
             if (type == 1) {
                 rgType.check(R.id.rb_window_income);
             } else {
                 rgType.check(R.id.rb_window_expense);
             }
 
+            // 监听收支切换
             rgType.setOnCheckedChangeListener((group, checkedId) -> {
                 if (checkedId == R.id.rb_window_income) {
                     categoryAdapter.updateData(incomeCategories);
@@ -361,6 +367,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 }
             });
 
+            // 资产选择逻辑
             if (config == null) config = new AssistantConfig(this);
             boolean isAssetEnabled = config.isAssetsEnabled();
 
@@ -370,6 +377,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
                 spAsset.setAdapter(adapter);
 
+                // 异步加载资产数据
                 AppDatabase.databaseWriteExecutor.execute(() -> {
                     List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0);
                     loadedAssets.clear();
@@ -377,10 +385,13 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     noAsset.id = 0;
                     loadedAssets.add(noAsset);
                     if (assets != null) loadedAssets.addAll(assets);
+                    
                     List<String> names = new ArrayList<>();
                     for (AssetAccount a : loadedAssets) names.add(a.name);
+                    
                     int defaultAssetId = config.getDefaultAssetId();
                     int targetAssetId = (matchedAssetId > 0) ? matchedAssetId : defaultAssetId;
+                    
                     handler.post(() -> {
                         adapter.clear();
                         adapter.addAll(names);
@@ -412,8 +423,8 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         if (!customInput.isEmpty()) {
                             finalCat = customInput;
                         } else {
-                            Toast.makeText(this, "请输入自定义分类", Toast.LENGTH_SHORT).show();
-                            return;
+                            // 退款/其他 兜底
+                            finalCat = (finalType == 1) ? "退款" : "其他"; 
                         }
                     }
 
