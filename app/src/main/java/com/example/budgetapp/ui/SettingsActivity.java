@@ -26,7 +26,7 @@ import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
-import com.example.budgetapp.util.ExternalImportHelper; // 【记得导入这个】
+import com.example.budgetapp.util.ExternalImportHelper;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 
 import java.io.BufferedReader;
@@ -46,7 +46,6 @@ public class SettingsActivity extends AppCompatActivity {
     private List<AssetAccount> allAssets = new ArrayList<>();
     private SwitchCompat switchMinimalist;
 
-    // ... 原有的 exportLauncher 代码保持不变 ...
     private final ActivityResultLauncher<String> exportLauncher = registerForActivityResult(
             new ActivityResultContracts.CreateDocument("application/zip"),
             uri -> {
@@ -62,14 +61,12 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
-    // ... 原有的 importLauncher 代码保持不变 ...
     private final ActivityResultLauncher<String[]> importLauncher = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
             uri -> {
                 if (uri != null) {
                     try {
                         BackupData data = BackupManager.importFromZip(this, uri);
-                        // ... (原有的导入逻辑保持不变) ...
                         int recordCount = 0;
                         int assetCount = 0;
 
@@ -99,13 +96,11 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
-    // 【新增】处理外部 JSON 文件导入的 Launcher
     private final ActivityResultLauncher<String[]> importExternalJsonLauncher = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
             uri -> {
                 if (uri != null) {
                     try {
-                        // 1. 读取文件内容
                         InputStream inputStream = getContentResolver().openInputStream(uri);
                         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
                         StringBuilder sb = new StringBuilder();
@@ -116,14 +111,11 @@ public class SettingsActivity extends AppCompatActivity {
                         reader.close();
                         inputStream.close();
 
-                        // 2. 调用工具类解析
                         String jsonContent = sb.toString();
                         List<Transaction> externalTransactions = ExternalImportHelper.parseExternalData(jsonContent);
 
-                        // 3. 插入数据库
                         if (!externalTransactions.isEmpty()) {
                             for (Transaction t : externalTransactions) {
-                                // 直接调用 ViewModel 添加
                                 financeViewModel.addTransaction(t);
                             }
                             Toast.makeText(this, "成功导入 " + externalTransactions.size() + " 条外部数据", Toast.LENGTH_SHORT).show();
@@ -145,7 +137,6 @@ public class SettingsActivity extends AppCompatActivity {
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_settings);
 
-        // ... (onCreate 中的原有视图初始化代码保持不变) ...
         View rootView = findViewById(R.id.settings_root);
         final int originalPaddingLeft = rootView.getPaddingLeft();
         final int originalPaddingTop = rootView.getPaddingTop();
@@ -162,9 +153,10 @@ public class SettingsActivity extends AppCompatActivity {
         financeViewModel.getAllAssets().observe(this, list -> allAssets = list);
 
         findViewById(R.id.btn_category_setting).setOnClickListener(v -> startActivity(new Intent(this, CategorySettingsActivity.class)));
-        findViewById(R.id.btn_backup_restore).setOnClickListener(v -> showBackupOptions()); // 这里的点击事件处理函数被更新了
+        findViewById(R.id.btn_backup_restore).setOnClickListener(v -> showBackupOptions());
         findViewById(R.id.btn_auto_asset).setOnClickListener(v -> startActivity(new Intent(this, AutoAssetActivity.class)));
-        findViewById(R.id.btn_toggle_night_mode).setOnClickListener(v -> toggleNightMode());
+        // 修改点击事件，调用显示主题设置对话框
+        findViewById(R.id.btn_toggle_night_mode).setOnClickListener(v -> showThemeSettingDialog());
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
 
@@ -178,45 +170,64 @@ public class SettingsActivity extends AppCompatActivity {
         });
     }
 
-    // 【修改】更新菜单，增加第三个选项
     private void showBackupOptions() {
         String[] options = {"导出数据 (Zip)", "导入数据 (Zip)", "导入外部账单 (JSON)"};
         new AlertDialog.Builder(this)
                 .setTitle("数据备份与恢复")
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
-                        // 导出
                         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
                         String timeStr = sdf.format(new Date()).replace(":", "-");
                         String fileName = "Tally " + timeStr + ".zip";
                         exportLauncher.launch(fileName);
                     } else if (which == 1) {
-                        // 原有导入
                         importLauncher.launch(new String[]{"application/zip"});
                     } else if (which == 2) {
-                        // 【新增】外部 JSON 导入
-                        // 这里传入 "application/json" 或者 "*/*" 以防不同文件管理器识别MIME类型有误
                         importExternalJsonLauncher.launch(new String[]{"application/json", "text/plain", "*/*"});
                     }
                 })
                 .show();
     }
 
-    // ... (toggleNightMode 和 showSetOvertimeRateDialog 保持不变) ...
-    private void toggleNightMode() {
-        int currentMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-        AppCompatDelegate.setDefaultNightMode(
-                currentMode == Configuration.UI_MODE_NIGHT_YES ?
-                        AppCompatDelegate.MODE_NIGHT_NO : AppCompatDelegate.MODE_NIGHT_YES
-        );
+    // 新增：显示主题设置对话框
+    private void showThemeSettingDialog() {
+        String[] themes = {"跟随系统", "日间模式", "夜间模式"};
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        // 默认跟随系统 (MODE_NIGHT_FOLLOW_SYSTEM = -1)
+        int currentMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        
+        int checkedItem = 0;
+        if (currentMode == AppCompatDelegate.MODE_NIGHT_NO) {
+            checkedItem = 1;
+        } else if (currentMode == AppCompatDelegate.MODE_NIGHT_YES) {
+            checkedItem = 2;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("主题设置")
+                .setSingleChoiceItems(themes, checkedItem, (dialog, which) -> {
+                    int selectedMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
+                    if (which == 1) {
+                        selectedMode = AppCompatDelegate.MODE_NIGHT_NO;
+                    } else if (which == 2) {
+                        selectedMode = AppCompatDelegate.MODE_NIGHT_YES;
+                    }
+
+                    // 保存设置
+                    prefs.edit().putInt("theme_mode", selectedMode).apply();
+                    // 应用主题
+                    AppCompatDelegate.setDefaultNightMode(selectedMode);
+                    dialog.dismiss();
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private void showSetOvertimeRateDialog() {
-         // ... 代码保持不变 ...
          AlertDialog.Builder builder = new AlertDialog.Builder(this);
          View view = LayoutInflater.from(this).inflate(R.layout.dialog_set_overtime_rate, null);
          builder.setView(view);
-         // ... 原有逻辑 ...
+
          EditText etBaseSalary = view.findViewById(R.id.et_base_salary);
          EditText etWeekday = view.findViewById(R.id.et_weekday_rate);
          EditText etHoliday = view.findViewById(R.id.et_holiday_rate);

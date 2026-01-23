@@ -46,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private List<Transaction> allTransactions = new ArrayList<>();
     private List<AssetAccount> allAssets = new ArrayList<>();
 
-    // 导出功能保留在此处作为备份逻辑，但不再通过长按触发
+    // 导出功能保留在此处作为备份逻辑
     private final ActivityResultLauncher<String> exportLauncher = registerForActivityResult(
             new ActivityResultContracts.CreateDocument("application/zip"),
             uri -> {
@@ -109,6 +109,12 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // 【新增】在界面创建前应用主题设置
+        // 确保应用启动时能根据用户之前的选择（日间/夜间/跟随系统）正确显示
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        int themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        AppCompatDelegate.setDefaultNightMode(themeMode);
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -156,8 +162,6 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             });
 
-            // === 核心修改逻辑 ===
-            // 通过返回 true 来消费长按事件，从而阻止系统默认的 Toast 提示
             bottomNav.post(() -> {
                 // 1. 记账: 屏蔽默认长按提示
                 View recordTab = bottomNav.findViewById(R.id.nav_record);
@@ -169,14 +173,12 @@ public class MainActivity extends AppCompatActivity {
                 View statsTab = bottomNav.findViewById(R.id.nav_stats);
                 if (statsTab != null) {
                     statsTab.setOnLongClickListener(v -> {
-                        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                         boolean isMinimalist = prefs.getBoolean("minimalist_mode", false);
                         
                         if (isMinimalist) {
                             Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
                             startActivity(intent);
                         }
-                        // 无论是否极简模式，都返回 true，这样系统就不会弹出"统计"两个字的 Toast 了
                         return true; 
                     });
                 }
@@ -264,14 +266,8 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-    private void toggleNightMode() {
-        int currentMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-        AppCompatDelegate.setDefaultNightMode(
-                currentMode == Configuration.UI_MODE_NIGHT_YES ?
-                        AppCompatDelegate.MODE_NIGHT_NO : AppCompatDelegate.MODE_NIGHT_YES
-        );
-    }
-    
+    // 已移除旧的 toggleNightMode 方法，因为现在由 SettingsActivity 统一管理
+
     private void showBackupOptions() {
         String[] options = {"导出数据", "导入数据"};
         new AlertDialog.Builder(this)
