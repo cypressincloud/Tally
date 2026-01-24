@@ -127,7 +127,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="酷安 柏芸"
+        android:text="https://github.com/cypressincloud/Tally"
         android:textSize="12sp"
         android:textColor="#AAAAAA"
         android:layout_gravity="center_horizontal"
