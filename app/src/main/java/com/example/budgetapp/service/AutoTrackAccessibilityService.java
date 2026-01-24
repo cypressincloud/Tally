@@ -252,8 +252,8 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
             WindowManager.LayoutParams params = new WindowManager.LayoutParams();
 
-            params.type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ? 
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
+            params.type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
             params.format = PixelFormat.TRANSLUCENT;
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;

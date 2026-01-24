@@ -127,6 +127,7 @@
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:visibility="gone"
+                        app:rippleColor="@android:color/transparent"
                         style="@style/Widget.MaterialComponents.Button.UnelevatedButton"/>
                 </LinearLayout>
 
