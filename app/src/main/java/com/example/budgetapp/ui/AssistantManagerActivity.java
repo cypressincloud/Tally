@@ -268,30 +268,27 @@ public class AssistantManagerActivity extends AppCompatActivity {
 
     private void showEditDialog(KeywordItem oldItem) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("修改关键字");
-        LinearLayout container = new LinearLayout(this);
-        container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(60, 40, 60, 20);
+        // 加载更新后的布局
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_edit_keyword, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
 
-        LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        spinnerParams.topMargin = 30;
+        // 设置透明背景，显示圆角
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
 
-        TextView labelApp = new TextView(this);
-        labelApp.setText("所属应用:");
-        labelApp.setTextColor(Color.GRAY);
-        container.addView(labelApp);
+        // 获取控件
+        Spinner spApp = view.findViewById(R.id.sp_app);
+        RadioGroup rgType = view.findViewById(R.id.rg_type);
+        EditText etKeyword = view.findViewById(R.id.et_keyword);
+        Button btnCancel = view.findViewById(R.id.btn_cancel);
+        Button btnSave = view.findViewById(R.id.btn_save);
 
-        final Spinner spinnerApp = new Spinner(this);
-        spinnerApp.setBackground(null);
-        spinnerApp.setPopupBackgroundResource(R.drawable.bg_input_field);
-        spinnerApp.setPadding(0, 0, 0, 0);
-
+        // 设置 Spinner 数据
         List<AppSpinnerItem> spinnerItems = new ArrayList<>();
         Map<String, String> apps = KeywordManager.getSupportedApps();
-        
+
         int selectedIndex = 0;
         int i = 0;
         for (Map.Entry<String, String> entry : apps.entrySet()) {
@@ -303,68 +300,45 @@ public class AssistantManagerActivity extends AppCompatActivity {
         }
         ArrayAdapter<AppSpinnerItem> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, spinnerItems);
         spinnerAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
-        spinnerApp.setAdapter(spinnerAdapter);
-        spinnerApp.setSelection(selectedIndex);
-        container.addView(spinnerApp, spinnerParams);
+        spApp.setAdapter(spinnerAdapter);
+        spApp.setSelection(selectedIndex);
 
-        TextView labelType = new TextView(this);
-        labelType.setText("\n收支类型:");
-        labelType.setTextColor(Color.GRAY);
-        container.addView(labelType);
+        // 回显数据
+        if (oldItem.type == KeywordManager.TYPE_EXPENSE) {
+            rgType.check(R.id.rb_expense);
+        } else {
+            rgType.check(R.id.rb_income);
+        }
+        etKeyword.setText(oldItem.text);
 
-        final RadioGroup rgType = new RadioGroup(this);
-        rgType.setOrientation(LinearLayout.HORIZONTAL);
-        RadioButton rbExpense = new RadioButton(this);
-        rbExpense.setText("支出");
-        RadioButton rbIncome = new RadioButton(this);
-        rbIncome.setText("收入");
-        rgType.addView(rbExpense);
-        rgType.addView(rbIncome);
-        if (oldItem.type == KeywordManager.TYPE_EXPENSE) rbExpense.setChecked(true);
-        else rbIncome.setChecked(true);
-        container.addView(rgType);
+        // 按钮事件
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
 
-        TextView labelText = new TextView(this);
-        labelText.setText("\n识别关键词:");
-        labelText.setTextColor(Color.GRAY);
-        container.addView(labelText);
+        btnSave.setOnClickListener(v -> {
+            String newText = etKeyword.getText().toString().trim();
+            if (newText.isEmpty()) {
+                Toast.makeText(this, "请输入关键字", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            AppSpinnerItem selectedApp = (AppSpinnerItem) spApp.getSelectedItem();
+            int newType = (rgType.getCheckedRadioButtonId() == R.id.rb_expense)
+                    ? KeywordManager.TYPE_EXPENSE : KeywordManager.TYPE_INCOME;
 
-        final EditText etInput = new EditText(this);
-        etInput.setText(oldItem.text);
-        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        inputParams.topMargin = 20;
-        container.addView(etInput, inputParams);
-
-        builder.setView(container);
-        builder.setPositiveButton("保存", (dialogInterface, which) -> {
-            String newText = etInput.getText().toString().trim();
-            if (newText.isEmpty()) return;
-            AppSpinnerItem selectedApp = (AppSpinnerItem) spinnerApp.getSelectedItem();
-            int newType = rbExpense.isChecked() ? KeywordManager.TYPE_EXPENSE : KeywordManager.TYPE_INCOME;
-            
-            // 使用 KeywordManager 的新方法
+            // 先移除旧的
             if (oldItem.type == KeywordManager.TYPE_INCOME) {
                 KeywordManager.removeIncomeKeyword(this, oldItem.packageName, oldItem.text);
             } else {
                 KeywordManager.removeExpenseKeyword(this, oldItem.packageName, oldItem.text);
             }
-            
+
+            // 添加新的
             KeywordManager.addKeyword(this, selectedApp.packageName, newType, newText);
             loadData();
             Toast.makeText(this, "修改成功", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
         });
-        builder.setNegativeButton("取消", null);
-        AlertDialog dialog = builder.create();
+
         dialog.show();
-        
-        int primaryColor = ContextCompat.getColor(this, R.color.text_primary);
-        Button btnPos = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-        Button btnNeg = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
-        if (btnPos != null) btnPos.setTextColor(primaryColor);
-        if (btnNeg != null) btnNeg.setTextColor(primaryColor);
     }
 
     private void deleteItem(KeywordItem item) {

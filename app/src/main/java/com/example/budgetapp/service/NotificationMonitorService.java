@@ -203,12 +203,9 @@ public class NotificationMonitorService extends NotificationListenerService {
                 btnCurrency.setVisibility(View.VISIBLE);
                 btnCurrency.setText("¥"); // 默认值
                 btnCurrency.setOnClickListener(v -> {
-                    new AlertDialog.Builder(themeContext) // 注意：Service中使用的是 themeContext
-                            .setTitle("选择货币")
-                            .setItems(com.example.budgetapp.util.CurrencyUtils.CURRENCY_DISPLAY, (dialog, which) -> {
-                                btnCurrency.setText(com.example.budgetapp.util.CurrencyUtils.CURRENCY_SYMBOLS[which]);
-                            })
-                            .show();
+                    // 传入 true，因为这是在悬浮窗服务中
+                    // 注意：Context 应该使用 themeContext (在这些 service 代码中通常已经定义了 ContextThemeWrapper themeContext = ...)
+                    com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(themeContext, btnCurrency, true);
                 });
             } else {
                 btnCurrency.setVisibility(View.GONE);

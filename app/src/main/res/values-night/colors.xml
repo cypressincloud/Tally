@@ -43,4 +43,10 @@
     <color name="cat_unselected_text">#E0E0E0</color>
 
     <color name="cat_selected_text">#E0E0E0</color>
+    <color name="dialog_bg_floating">#2C2C2C</color>
+    <color name="currency_item_bg_normal">#424242</color>
+    <color name="currency_item_bg_selected">#1565C0</color>
+    <color name="currency_symbol_text_normal">#FFFFFF</color>
+    <color name="currency_symbol_text_selected">#FFFFFF</color>
+    <color name="currency_name_text">#AAAAAA</color>
 </resources>

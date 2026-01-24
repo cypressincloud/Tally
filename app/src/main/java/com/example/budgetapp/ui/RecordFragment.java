@@ -844,17 +844,10 @@ public class RecordFragment extends Fragment {
         dialog.show();
     }
 
-    // 在 RecordFragment 类中替换 showCurrencySelectDialog 方法
-
+    // 在 showCurrencySelectDialog 方法中，直接调用工具类：
     private void showCurrencySelectDialog(Button btn) {
-        // 使用 CurrencyUtils 中的定义，或者直接在这里定义 String[] 数组
-        new AlertDialog.Builder(getContext())
-                .setTitle("选择货币单位")
-                .setItems(com.example.budgetapp.util.CurrencyUtils.CURRENCY_DISPLAY, (dialog, which) -> {
-                    // 设置按钮文字为对应的符号
-                    btn.setText(com.example.budgetapp.util.CurrencyUtils.CURRENCY_SYMBOLS[which]);
-                })
-                .show();
+        // 传入 false，因为 Fragment 依附于 Activity，不是 Overlay
+        com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(getContext(), btn, false);
     }
 
     private void showRevokeDialog(Transaction transaction, AlertDialog parentDialog) {

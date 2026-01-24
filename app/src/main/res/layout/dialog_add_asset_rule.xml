@@ -8,9 +8,10 @@
     android:padding="24dp">
 
     <TextView
+        android:id="@+id/tv_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="设置加班薪资标准"
+        android:text="新增关联规则"
         android:textSize="20sp"
         android:textStyle="bold"
         android:textColor="?android:attr/textColorPrimary"
@@ -20,60 +21,54 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="每月底薪"
+        android:text="生效应用"
         android:textColor="?android:attr/textColorPrimary"
         android:textSize="14sp"
         android:layout_marginBottom="8dp"/>
 
-    <EditText
-        android:id="@+id/et_base_salary"
+    <Spinner
+        android:id="@+id/sp_app"
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:background="@drawable/bg_input_field"
-        android:hint="请输入每月底薪"
-        android:inputType="numberDecimal"
-        android:textColor="?android:attr/textColorPrimary"
-        android:textColorHint="?android:attr/textColorHint"
-        android:paddingHorizontal="16dp"
-        android:textSize="16sp" />
+        android:paddingHorizontal="12dp"
+        android:layout_marginBottom="16dp"
+        android:spinnerMode="dropdown"
+        android:popupBackground="@drawable/bg_input_field"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="工作日时薪"
+        android:text="关联资产"
         android:textColor="?android:attr/textColorPrimary"
         android:textSize="14sp"
         android:layout_marginBottom="8dp"/>
 
-    <EditText
-        android:id="@+id/et_weekday_rate"
+    <Spinner
+        android:id="@+id/sp_asset"
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:background="@drawable/bg_input_field"
-        android:hint="请输入工作日时薪"
-        android:inputType="numberDecimal"
-        android:textColor="?android:attr/textColorPrimary"
-        android:textColorHint="?android:attr/textColorHint"
-        android:paddingHorizontal="16dp"
-        android:textSize="16sp" />
+        android:paddingHorizontal="12dp"
+        android:layout_marginBottom="16dp"
+        android:spinnerMode="dropdown"
+        android:popupBackground="@drawable/bg_input_field"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="节假日(周末)时薪"
+        android:text="屏幕关键字 (包含即触发)"
         android:textColor="?android:attr/textColorPrimary"
         android:textSize="14sp"
         android:layout_marginBottom="8dp"/>
 
     <EditText
-        android:id="@+id/et_holiday_rate"
+        android:id="@+id/et_keyword"
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:background="@drawable/bg_input_field"
-        android:hint="请输入节假日时薪"
-        android:inputType="numberDecimal"
+        android:hint="例如: 招商银行"
+        android:inputType="text"
         android:textColor="?android:attr/textColorPrimary"
         android:textColorHint="?android:attr/textColorHint"
         android:paddingHorizontal="16dp"
@@ -86,7 +81,7 @@
         android:layout_marginTop="24dp">
 
         <Button
-            android:id="@+id/btn_cancel_overtime"
+            android:id="@+id/btn_cancel"
             android:layout_width="0dp"
             android:layout_height="56dp"
             android:layout_weight="1"
@@ -98,7 +93,7 @@
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton"/>
 
         <Button
-            android:id="@+id/btn_save_overtime"
+            android:id="@+id/btn_save"
             android:layout_width="0dp"
             android:layout_height="56dp"
             android:layout_weight="1"

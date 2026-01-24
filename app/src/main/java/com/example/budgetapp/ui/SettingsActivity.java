@@ -143,9 +143,9 @@ public class SettingsActivity extends AppCompatActivity {
         final int originalPaddingRight = rootView.getPaddingRight();
         final int originalPaddingBottom = rootView.getPaddingBottom();
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, windowInsets) -> {
-             androidx.core.graphics.Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-             v.setPadding(originalPaddingLeft + insets.left, originalPaddingTop + insets.top, originalPaddingRight + insets.right, originalPaddingBottom + insets.bottom);
-             return WindowInsetsCompat.CONSUMED;
+            androidx.core.graphics.Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(originalPaddingLeft + insets.left, originalPaddingTop + insets.top, originalPaddingRight + insets.right, originalPaddingBottom + insets.bottom);
+            return WindowInsetsCompat.CONSUMED;
         });
 
         financeViewModel = new ViewModelProvider(this).get(FinanceViewModel.class);
@@ -195,90 +195,124 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void showBackupOptions() {
-        String[] options = {"导出数据 (Zip)", "导入数据 (Zip)", "导入外部账单 (JSON)"};
-        new AlertDialog.Builder(this)
-                .setTitle("数据备份与恢复")
-                .setItems(options, (dialog, which) -> {
-                    if (which == 0) {
-                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-                        String timeStr = sdf.format(new Date()).replace(":", "-");
-                        String fileName = "Tally " + timeStr + ".zip";
-                        exportLauncher.launch(fileName);
-                    } else if (which == 1) {
-                        importLauncher.launch(new String[]{"application/zip"});
-                    } else if (which == 2) {
-                        importExternalJsonLauncher.launch(new String[]{"application/json", "text/plain", "*/*"});
-                    }
-                })
-                .show();
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_backup_options, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+
+        // 设置透明背景，使圆角生效
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        view.findViewById(R.id.tv_export).setOnClickListener(v -> {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            String timeStr = sdf.format(new Date()).replace(":", "-");
+            String fileName = "Tally " + timeStr + ".zip";
+            exportLauncher.launch(fileName);
+            dialog.dismiss();
+        });
+
+        view.findViewById(R.id.tv_import).setOnClickListener(v -> {
+            importLauncher.launch(new String[]{"application/zip"});
+            dialog.dismiss();
+        });
+
+        view.findViewById(R.id.tv_import_external).setOnClickListener(v -> {
+            importExternalJsonLauncher.launch(new String[]{"application/json", "text/plain", "*/*"});
+            dialog.dismiss();
+        });
+
+        view.findViewById(R.id.btn_cancel_backup).setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
     }
 
     private void showThemeSettingDialog() {
-        String[] themes = {"跟随系统", "日间模式", "夜间模式"};
-        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-        int currentMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        
-        int checkedItem = 0;
-        if (currentMode == AppCompatDelegate.MODE_NIGHT_NO) {
-            checkedItem = 1;
-        } else if (currentMode == AppCompatDelegate.MODE_NIGHT_YES) {
-            checkedItem = 2;
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_theme_settings, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
 
-        new AlertDialog.Builder(this)
-                .setTitle("主题设置")
-                .setSingleChoiceItems(themes, checkedItem, (dialog, which) -> {
-                    int selectedMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
-                    if (which == 1) {
-                        selectedMode = AppCompatDelegate.MODE_NIGHT_NO;
-                    } else if (which == 2) {
-                        selectedMode = AppCompatDelegate.MODE_NIGHT_YES;
-                    }
+        android.widget.RadioGroup rgTheme = view.findViewById(R.id.rg_theme);
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        int currentMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
 
-                    prefs.edit().putInt("theme_mode", selectedMode).apply();
-                    AppCompatDelegate.setDefaultNightMode(selectedMode);
-                    dialog.dismiss();
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        if (currentMode == AppCompatDelegate.MODE_NIGHT_NO) {
+            rgTheme.check(R.id.rb_day_mode);
+        } else if (currentMode == AppCompatDelegate.MODE_NIGHT_YES) {
+            rgTheme.check(R.id.rb_night_mode);
+        } else {
+            rgTheme.check(R.id.rb_follow_system);
+        }
+
+        // 监听选中事件，选中即生效并关闭
+        rgTheme.setOnCheckedChangeListener((group, checkedId) -> {
+            int selectedMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
+            if (checkedId == R.id.rb_day_mode) {
+                selectedMode = AppCompatDelegate.MODE_NIGHT_NO;
+            } else if (checkedId == R.id.rb_night_mode) {
+                selectedMode = AppCompatDelegate.MODE_NIGHT_YES;
+            }
+
+            prefs.edit().putInt("theme_mode", selectedMode).apply();
+            AppCompatDelegate.setDefaultNightMode(selectedMode);
+            // 稍作延迟关闭，让用户看到点击反馈
+            view.postDelayed(dialog::dismiss, 200);
+        });
+
+        view.findViewById(R.id.btn_cancel_theme).setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
     }
 
     private void showSetOvertimeRateDialog() {
-         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-         View view = LayoutInflater.from(this).inflate(R.layout.dialog_set_overtime_rate, null);
-         builder.setView(view);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_set_overtime_rate, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
 
-         EditText etBaseSalary = view.findViewById(R.id.et_base_salary);
-         EditText etWeekday = view.findViewById(R.id.et_weekday_rate);
-         EditText etHoliday = view.findViewById(R.id.et_holiday_rate);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
 
-         AssistantConfig config = new AssistantConfig(this);
-         float currentBase = config.getMonthlyBaseSalary();
-         float currentWeekday = config.getWeekdayOvertimeRate();
-         float currentHoliday = config.getHolidayOvertimeRate();
+        EditText etBaseSalary = view.findViewById(R.id.et_base_salary);
+        EditText etWeekday = view.findViewById(R.id.et_weekday_rate);
+        EditText etHoliday = view.findViewById(R.id.et_holiday_rate);
 
-         if (currentBase > 0) etBaseSalary.setText(String.valueOf(currentBase));
-         if (currentWeekday > 0) etWeekday.setText(String.valueOf(currentWeekday));
-         if (currentHoliday > 0) etHoliday.setText(String.valueOf(currentHoliday));
+        AssistantConfig config = new AssistantConfig(this);
+        float currentBase = config.getMonthlyBaseSalary();
+        float currentWeekday = config.getWeekdayOvertimeRate();
+        float currentHoliday = config.getHolidayOvertimeRate();
 
-         builder.setTitle("设置加班薪资标准")
-                 .setPositiveButton("保存", (dialog, which) -> {
-                     String bStr = etBaseSalary.getText().toString();
-                     String wStr = etWeekday.getText().toString();
-                     String hStr = etHoliday.getText().toString();
-                     try {
-                         float bRate = bStr.isEmpty() ? 0f : Float.parseFloat(bStr);
-                         float wRate = wStr.isEmpty() ? 0f : Float.parseFloat(wStr);
-                         float hRate = hStr.isEmpty() ? 0f : Float.parseFloat(hStr);
-                         config.setMonthlyBaseSalary(bRate);
-                         config.setWeekdayOvertimeRate(wRate);
-                         config.setHolidayOvertimeRate(hRate);
-                         Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show();
-                     } catch (NumberFormatException e) {
-                         Toast.makeText(this, "输入格式错误", Toast.LENGTH_SHORT).show();
-                     }
-                 })
-                 .setNegativeButton("取消", null)
-                 .show();
+        if (currentBase > 0) etBaseSalary.setText(String.valueOf(currentBase));
+        if (currentWeekday > 0) etWeekday.setText(String.valueOf(currentWeekday));
+        if (currentHoliday > 0) etHoliday.setText(String.valueOf(currentHoliday));
+
+        view.findViewById(R.id.btn_save_overtime).setOnClickListener(v -> {
+            String bStr = etBaseSalary.getText().toString();
+            String wStr = etWeekday.getText().toString();
+            String hStr = etHoliday.getText().toString();
+            try {
+                float bRate = bStr.isEmpty() ? 0f : Float.parseFloat(bStr);
+                float wRate = wStr.isEmpty() ? 0f : Float.parseFloat(wStr);
+                float hRate = hStr.isEmpty() ? 0f : Float.parseFloat(hStr);
+                config.setMonthlyBaseSalary(bRate);
+                config.setWeekdayOvertimeRate(wRate);
+                config.setHolidayOvertimeRate(hRate);
+                Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "输入格式错误", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        view.findViewById(R.id.btn_cancel_overtime).setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
     }
 }

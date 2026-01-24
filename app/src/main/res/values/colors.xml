@@ -47,4 +47,11 @@
     <color name="cat_unselected_bg">#F5F5F5</color>
     <color name="cat_unselected_text">#333333</color>
     <color name="cat_selected_text">#FFFFFF</color>
+
+    <color name="dialog_bg_floating">#FFFFFF</color>
+    <color name="currency_item_bg_normal">#F5F5F5</color>
+    <color name="currency_item_bg_selected">#E3F2FD</color>
+    <color name="currency_symbol_text_normal">#000000</color>
+    <color name="currency_symbol_text_selected">#2196F3</color>
+    <color name="currency_name_text">#888888</color>
 </resources>
