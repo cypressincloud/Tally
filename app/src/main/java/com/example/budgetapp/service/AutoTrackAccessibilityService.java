@@ -1,12 +1,14 @@
 package com.example.budgetapp.service;
 
 import android.accessibilityservice.AccessibilityService;
+import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
@@ -15,6 +17,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
+import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -45,7 +48,6 @@ import com.example.budgetapp.util.KeywordManager;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -70,9 +72,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private List<AssetAccount> loadedAssets = new ArrayList<>();
 
-    // 优化后的金额匹配正则：支持整数和小数，且前面可能有货币符号
     private final Pattern amountPattern = Pattern.compile("(\\d+(\\.\\d{1,2})?)");
-    // 匹配数量单位的正则：用于过滤 "1件"、"2个" 等非金额数字
     private final Pattern quantityPattern = Pattern.compile("\\[?\\d+\\s*[件个笔条单]\\s*\\]?");
 
     private final Runnable scanRunnable = new Runnable() {
@@ -117,11 +117,9 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         if (config == null) config = new AssistantConfig(this);
         if (!config.isEnabled()) return;
 
-        // 防抖动：移除之前的任务，延迟执行新的扫描
         handler.removeCallbacks(scanRunnable);
         if (isWindowShowing) return;
         
-        // 界面变动后延迟 300ms 再扫描，确保界面元素已加载完毕（如金额数字）
         handler.postDelayed(scanRunnable, 300);
     }
 
@@ -138,7 +136,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             for (String kw : expenseKeywords) {
                 if (text.contains(kw)) {
-                    // 发现关键字，开始全屏搜索金额
                     findAmountRecursive(getRootInActiveWindow(), 0, getAppNameReadable(currentPackageName), autoAssetId);
                     return;
                 }
@@ -175,10 +172,8 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         collectAllNumbers(root, candidates); 
 
         double bestAmount = -1;
-        // 策略：优先取带小数点的数字（更像金额），否则取第一个合理的数字
         for (Double amount : candidates) {
             String strAmt = String.valueOf(amount);
-            // 如果包含小数点且不以.0结尾（例如 12.50），优先级最高
             if (strAmt.contains(".") && !strAmt.endsWith(".0")) { 
                 bestAmount = amount;
                 break; 
@@ -198,11 +193,9 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         String text = getTextOrDescription(node);
 
         if (text != null && !text.isEmpty()) {
-            // 过滤掉纯时间格式 (如 12:30)，但保留 "金额: 20.00" 这种格式
             boolean isStrictTime = text.matches("^\\d{1,2}:\\d{2}(:\\d{2})?$");
             
             if (!isStrictTime) {
-                // 先移除数量单位（如 1件），避免误判
                 String cleanText = quantityPattern.matcher(text).replaceAll("");
                 
                 Matcher matcher = amountPattern.matcher(cleanText);
@@ -211,16 +204,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         String numStr = matcher.group(1).replace(",", "");
                         double val = Double.parseDouble(numStr);
                         
-                        // 过滤逻辑：
-                        // 1. 必须大于0
-                        // 2. 必须小于20万（避免提取到订单号等长数字）
-                        // 3. 过滤掉可能是年份的数字（2020-2035之间的整数）
-                        // 4. 过滤掉可能是手机号的（大于10000000000）
                         if (val > 0 && val < 200000 && !(val >= 2020 && val <= 2035 && val % 1 == 0)) {
                             list.add(val);
                         }
                     } catch (Exception e) {
-                        // ignore parsing errors
                     }
                 }
             }
@@ -240,7 +227,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private void triggerConfirmWindow(double amount, int type, String category, int assetId) {
         long now = System.currentTimeMillis();
-        // 防重复弹窗：5秒内金额和类型相同则忽略
         String signature = amount + "-" + type;
         if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return;
 
@@ -258,7 +244,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
         if (!Settings.canDrawOverlays(this)) {
             int finalAssetId = (matchedAssetId > 0) ? matchedAssetId : 0;
-            saveToDatabase(amount, type, category, note + " (后台)", "", finalAssetId);
+            saveToDatabase(amount, type, category, note + " (后台)", "", finalAssetId, "¥");
             return;
         }
 
@@ -276,9 +262,9 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             params.dimAmount = 0.5f;
             params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
             params.gravity = Gravity.CENTER;
-            params.y = -350; // 稍微向上偏移
+            params.y = -350;
 
-            android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
+            ContextThemeWrapper themeContext = new ContextThemeWrapper(this, R.style.Theme_BudgetApp);
             LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
 
@@ -288,13 +274,13 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             }
             View cardContent = floatView.findViewById(R.id.window_card_content);
             if (cardContent != null) {
-                cardContent.setOnClickListener(v -> {}); // 拦截点击
+                cardContent.setOnClickListener(v -> {});
             }
 
             isWindowShowing = true;
 
-            // 绑定控件
             EditText etAmount = floatView.findViewById(R.id.et_window_amount);
+            Button btnCurrency = floatView.findViewById(R.id.btn_window_currency);
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
             RecyclerView rvCategory = floatView.findViewById(R.id.rv_window_category); 
             EditText etCategory = floatView.findViewById(R.id.et_window_category);
@@ -308,7 +294,25 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
-            // 使用 CategoryManager 获取最新分类
+            // 【新增】处理货币单位
+            SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+            boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+
+            if (isCurrencyEnabled) {
+                btnCurrency.setVisibility(View.VISIBLE);
+                btnCurrency.setText("¥"); // 默认值
+                btnCurrency.setOnClickListener(v -> {
+                    new AlertDialog.Builder(themeContext) // 注意：Service中使用的是 themeContext
+                            .setTitle("选择货币")
+                            .setItems(com.example.budgetapp.util.CurrencyUtils.CURRENCY_DISPLAY, (dialog, which) -> {
+                                btnCurrency.setText(com.example.budgetapp.util.CurrencyUtils.CURRENCY_SYMBOLS[which]);
+                            })
+                            .show();
+                });
+            } else {
+                btnCurrency.setVisibility(View.GONE);
+            }
+
             List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
             List<String> incomeCategories = CategoryManager.getIncomeCategories(this);
 
@@ -317,7 +321,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             List<String> currentList = (type == 1) ? incomeCategories : expenseCategories;
             
-            // 检查分类是否在列表中
             if (!currentList.contains(category)) {
                  if (type == 0 && (category.equals("淘宝") || category.equals("京东") || category.equals("拼多多"))) {
                      selectedCategory[0] = "购物";
@@ -343,14 +346,12 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             });
             rvCategory.setAdapter(categoryAdapter);
 
-            // 初始化选中状态
             if (type == 1) {
                 rgType.check(R.id.rb_window_income);
             } else {
                 rgType.check(R.id.rb_window_expense);
             }
 
-            // 监听收支切换
             rgType.setOnCheckedChangeListener((group, checkedId) -> {
                 if (checkedId == R.id.rb_window_income) {
                     categoryAdapter.updateData(incomeCategories);
@@ -367,7 +368,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 }
             });
 
-            // 资产选择逻辑
             if (config == null) config = new AssistantConfig(this);
             boolean isAssetEnabled = config.isAssetsEnabled();
 
@@ -377,7 +377,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
                 spAsset.setAdapter(adapter);
 
-                // 异步加载资产数据
                 AppDatabase.databaseWriteExecutor.execute(() -> {
                     List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0);
                     loadedAssets.clear();
@@ -423,7 +422,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         if (!customInput.isEmpty()) {
                             finalCat = customInput;
                         } else {
-                            // 退款/其他 兜底
                             finalCat = (finalType == 1) ? "退款" : "其他"; 
                         }
                     }
@@ -435,7 +433,11 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                             assetId = loadedAssets.get(selectedPos).id;
                         }
                     }
-                    saveToDatabase(finalAmount, finalType, finalCat, finalNote, finalRemark, assetId);
+
+                    // 获取选择的货币符号
+                    String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
+
+                    saveToDatabase(finalAmount, finalType, finalCat, finalNote, finalRemark, assetId, symbol);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "已记账", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -497,7 +499,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         } catch (Exception e) { Log.e(TAG, "Foreground service failed", e); }
     }
 
-    private void saveToDatabase(double amount, int type, String category, String note, String remark, int assetId) {
+    private void saveToDatabase(double amount, int type, String category, String note, String remark, int assetId, String currencySymbol) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
             
@@ -509,6 +511,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             t.note = note;
             t.remark = remark;
             t.assetId = assetId;
+            t.currencySymbol = currencySymbol; // 保存货币单位
             dao.insert(t);
 
             if (assetId != 0) {

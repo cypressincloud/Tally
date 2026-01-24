@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -158,19 +159,39 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
 
-        // 修改：点击按钮直接跳转到 DonateActivity
+        // 【修改】货币单位开关逻辑
+        TextView btnCurrency = findViewById(R.id.btn_currency_setting);
+        // 定义 prefs 变量（仅此处定义一次）
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+        updateCurrencyButtonText(btnCurrency, isCurrencyEnabled);
+
+        btnCurrency.setOnClickListener(v -> {
+            boolean currentState = prefs.getBoolean("enable_currency", false);
+            boolean newState = !currentState;
+            prefs.edit().putBoolean("enable_currency", newState).apply();
+            updateCurrencyButtonText(btnCurrency, newState);
+            Toast.makeText(this, newState ? "已开启货币单位" : "已关闭货币单位", Toast.LENGTH_SHORT).show();
+        });
+
         findViewById(R.id.btn_donate).setOnClickListener(v -> {
             startActivity(new Intent(this, DonateActivity.class));
         });
 
+        // 【修改】极简模式逻辑 (直接复用上面的 prefs 变量，不再重复定义)
         switchMinimalist = findViewById(R.id.switch_minimalist);
-        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         boolean isMinimalist = prefs.getBoolean("minimalist_mode", false);
         switchMinimalist.setChecked(isMinimalist);
         switchMinimalist.setOnCheckedChangeListener((buttonView, isChecked) -> {
             prefs.edit().putBoolean("minimalist_mode", isChecked).apply();
             Toast.makeText(this, isChecked ? "极简模式已开启" : "极简模式已关闭", Toast.LENGTH_SHORT).show();
         });
+    }
+
+
+    // 更新按钮文本
+    private void updateCurrencyButtonText(TextView btn, boolean enabled) {
+        btn.setText(enabled ? "关闭货币单位" : "开启货币单位");
     }
 
     private void showBackupOptions() {

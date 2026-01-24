@@ -1,5 +1,6 @@
 package com.example.budgetapp.ui;
 
+import android.content.Context;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,9 +12,6 @@ import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -59,13 +57,24 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Transaction t = list.get(position);
 
+        // 【新增】检查设置是否开启
+        boolean showCurrency = holder.itemView.getContext()
+                .getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                .getBoolean("enable_currency", false);
+        
+        String symbol = (t.currencySymbol != null && !t.currencySymbol.isEmpty()) ? t.currencySymbol : "¥";
+        String amountStr = String.format("%.2f", t.amount);
+        
+        // 如果开启了货币单位，则拼接符号
+        String displayAmount = showCurrency ? (symbol + " " + amountStr) : amountStr;
+
         // 1. 金额
         if (t.type == 1) { // 收入
             holder.tvAmount.setTextColor(holder.itemView.getContext().getColor(R.color.income_red));
-            holder.tvAmount.setText("+" + String.format("%.2f", t.amount));
+            holder.tvAmount.setText("+" + displayAmount);
         } else { // 支出
             holder.tvAmount.setTextColor(holder.itemView.getContext().getColor(R.color.expense_green));
-            holder.tvAmount.setText("-" + String.format("%.2f", t.amount));
+            holder.tvAmount.setText("-" + displayAmount);
         }
 
         // 2. 分类
@@ -79,7 +88,7 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             holder.tvNote.setVisibility(View.GONE);
         }
 
-        // 4. 【核心逻辑修改】右下角状态
+        // 4. 右下角状态
         boolean hasRemark = !TextUtils.isEmpty(t.remark);
         int statusColor;
         if (hasRemark) {
@@ -103,7 +112,6 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             holder.tvAssetName.setTextColor(statusColor);
         } else {
             // --- 显示小色块 (兜底方案) ---
-            // (包括: 无关联资产、资产被删除、或资产数据尚未加载完成)
             holder.tvAssetName.setVisibility(View.GONE);
             holder.viewIndicator.setVisibility(View.VISIBLE);
             holder.viewIndicator.setBackgroundColor(statusColor);

@@ -1,7 +1,10 @@
 package com.example.budgetapp.service;
 
+import android.app.AlertDialog;
 import android.app.Notification;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,6 +14,7 @@ import android.provider.Settings;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.util.Log;
+import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -32,7 +36,7 @@ import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.database.TransactionDao;
 import com.example.budgetapp.ui.CategoryAdapter;
 import com.example.budgetapp.util.AssistantConfig;
-import com.example.budgetapp.util.CategoryManager; // 【新增引用】
+import com.example.budgetapp.util.CategoryManager;
 import com.example.budgetapp.util.KeywordManager;
 
 import java.text.SimpleDateFormat;
@@ -155,7 +159,7 @@ public class NotificationMonitorService extends NotificationListenerService {
         if (isWindowShowing) return;
 
         if (!Settings.canDrawOverlays(this)) {
-            saveToDatabase(amount, type, category, note + " (后台)", 0);
+            saveToDatabase(amount, type, category, note + " (后台)", 0, "¥");
             return;
         }
 
@@ -171,13 +175,14 @@ public class NotificationMonitorService extends NotificationListenerService {
             params.height = WindowManager.LayoutParams.WRAP_CONTENT;
             params.gravity = Gravity.CENTER;
 
-            android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
+            ContextThemeWrapper themeContext = new ContextThemeWrapper(this, R.style.Theme_BudgetApp);
             LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
 
             isWindowShowing = true;
 
             EditText etAmount = floatView.findViewById(R.id.et_window_amount);
+            Button btnCurrency = floatView.findViewById(R.id.btn_window_currency);
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
             RecyclerView rvCategory = floatView.findViewById(R.id.rv_window_category);
             EditText etCategory = floatView.findViewById(R.id.et_window_category);
@@ -190,7 +195,25 @@ public class NotificationMonitorService extends NotificationListenerService {
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
-            // 【修改点】使用 CategoryManager 获取分类
+            // 【新增】处理货币单位
+            SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+            boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+
+            if (isCurrencyEnabled) {
+                btnCurrency.setVisibility(View.VISIBLE);
+                btnCurrency.setText("¥"); // 默认值
+                btnCurrency.setOnClickListener(v -> {
+                    new AlertDialog.Builder(themeContext) // 注意：Service中使用的是 themeContext
+                            .setTitle("选择货币")
+                            .setItems(com.example.budgetapp.util.CurrencyUtils.CURRENCY_DISPLAY, (dialog, which) -> {
+                                btnCurrency.setText(com.example.budgetapp.util.CurrencyUtils.CURRENCY_SYMBOLS[which]);
+                            })
+                            .show();
+                });
+            } else {
+                btnCurrency.setVisibility(View.GONE);
+            }
+
             List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
             List<String> incomeCategories = CategoryManager.getIncomeCategories(this);
 
@@ -303,8 +326,11 @@ public class NotificationMonitorService extends NotificationListenerService {
                             assetId = loadedAssets.get(selectedPos).id;
                         }
                     }
+                    
+                    // 获取货币符号
+                    String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
-                    saveToDatabase(finalAmount, finalType, finalCat, finalNote, assetId);
+                    saveToDatabase(finalAmount, finalType, finalCat, finalNote, assetId, symbol);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "已记账", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -326,7 +352,7 @@ public class NotificationMonitorService extends NotificationListenerService {
         finally { isWindowShowing = false; }
     }
 
-    private void saveToDatabase(double amount, int type, String category, String note, int assetId) {
+    private void saveToDatabase(double amount, int type, String category, String note, int assetId, String currencySymbol) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
             Transaction t = new Transaction();
@@ -336,6 +362,7 @@ public class NotificationMonitorService extends NotificationListenerService {
             t.amount = amount;
             t.note = note;
             t.assetId = assetId;
+            t.currencySymbol = currencySymbol; // 保存
             dao.insert(t);
 
             if (assetId != 0) {

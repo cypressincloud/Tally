@@ -14,9 +14,10 @@ public class Transaction {
     public double amount;
     public String note;
     public String remark;
-    
-    // 【新增】关联资产ID，默认为0 (表示无关联)
     public int assetId;
+
+    // 【新增】货币符号
+    public String currencySymbol;
 
     public Transaction() {
     }
@@ -39,6 +40,7 @@ public class Transaction {
         this.amount = amount;
         this.note = note;
         this.remark = remark;
-        this.assetId = 0; // 默认不关联
+        this.assetId = 0;
+        this.currencySymbol = "¥"; // 默认人民币
     }
 }

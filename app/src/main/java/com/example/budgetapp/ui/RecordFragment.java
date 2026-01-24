@@ -41,7 +41,7 @@ import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
-import com.example.budgetapp.util.CategoryManager; // 【新增引用】
+import com.example.budgetapp.util.CategoryManager;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -57,7 +57,6 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -574,9 +573,11 @@ public class RecordFragment extends Fragment {
 
         TextView tvDate = dialogView.findViewById(R.id.tv_dialog_date);
         RadioGroup rgType = dialogView.findViewById(R.id.rg_type);
-        // 替换为 RecyclerView
-        RecyclerView rvCategory = dialogView.findViewById(R.id.rv_category); 
+        RecyclerView rvCategory = dialogView.findViewById(R.id.rv_category);
         EditText etAmount = dialogView.findViewById(R.id.et_amount);
+        // 【新增】获取货币按钮
+        Button btnCurrency = dialogView.findViewById(R.id.btn_currency);
+
         EditText etCustomCategory = dialogView.findViewById(R.id.et_custom_category);
         EditText etRemark = dialogView.findViewById(R.id.et_remark);
         EditText etNote = dialogView.findViewById(R.id.et_note);
@@ -588,17 +589,30 @@ public class RecordFragment extends Fragment {
 
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
 
-        // 【修改】从 CategoryManager 获取分类
+        // 【新增】处理货币单位逻辑
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+
+        if (isCurrencyEnabled) {
+            btnCurrency.setVisibility(View.VISIBLE);
+            if (existingTransaction != null && existingTransaction.currencySymbol != null && !existingTransaction.currencySymbol.isEmpty()) {
+                btnCurrency.setText(existingTransaction.currencySymbol);
+            } else {
+                btnCurrency.setText("¥"); // 默认
+            }
+            btnCurrency.setOnClickListener(v -> showCurrencySelectDialog(btnCurrency));
+        } else {
+            btnCurrency.setVisibility(View.GONE);
+        }
+
         List<String> expenseCategories = CategoryManager.getExpenseCategories(getContext());
         List<String> incomeCategories = CategoryManager.getIncomeCategories(getContext());
 
-        // 配置 RecyclerView (5列)
         rvCategory.setLayoutManager(new GridLayoutManager(getContext(), 5));
-        
+
         final boolean[] isExpense = {true}; // 默认支出
         final String[] selectedCategory = {expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0)};
 
-        // 创建 Adapter
         CategoryAdapter categoryAdapter = new CategoryAdapter(getContext(), expenseCategories, selectedCategory[0], category -> {
             selectedCategory[0] = category;
             if ("自定义".equals(category)) {
@@ -610,7 +624,7 @@ public class RecordFragment extends Fragment {
         });
         rvCategory.setAdapter(categoryAdapter);
 
-        // === 资产配置（保留原逻辑）===
+        // === 资产配置 ===
         AssistantConfig config = new AssistantConfig(requireContext());
         boolean isAssetEnabled = config.isAssetsEnabled();
 
@@ -702,23 +716,17 @@ public class RecordFragment extends Fragment {
             datePicker.show(getParentFragmentManager(), "date_picker");
         });
 
-        // 监听收入/支出切换
         rgType.setOnCheckedChangeListener((g, id) -> {
             boolean switchToExpense = (id == R.id.rb_expense);
             isExpense[0] = switchToExpense;
-            
-            // 切换数据源
+
             List<String> targetCategories = switchToExpense ? expenseCategories : incomeCategories;
-            
-            // 【修改】安全获取第一个元素
             String defaultCat = targetCategories.isEmpty() ? "自定义" : targetCategories.get(0);
-            
-            // 更新 Adapter
+
             categoryAdapter.updateData(targetCategories);
             categoryAdapter.setSelectedCategory(defaultCat);
             selectedCategory[0] = defaultCat;
 
-            // 重置输入框状态
             if ("自定义".equals(defaultCat)) {
                 etCustomCategory.setVisibility(View.VISIBLE);
             } else {
@@ -742,10 +750,9 @@ public class RecordFragment extends Fragment {
                 categoryAdapter.updateData(expenseCategories);
             }
 
-            // 回显分类
             String currentCat = existingTransaction.category;
             List<String> currentList = isExpense[0] ? expenseCategories : incomeCategories;
-            
+
             if (currentList.contains(currentCat)) {
                 categoryAdapter.setSelectedCategory(currentCat);
                 selectedCategory[0] = currentCat;
@@ -783,8 +790,7 @@ public class RecordFragment extends Fragment {
             if (!amountStr.isEmpty()) {
                 double amount = Double.parseDouble(amountStr);
                 int type = rgType.getCheckedRadioButtonId() == R.id.rb_income ? 1 : 0;
-                
-                // 获取分类
+
                 String category = selectedCategory[0];
                 if ("自定义".equals(category)) {
                     category = etCustomCategory.getText().toString().trim();
@@ -806,9 +812,13 @@ public class RecordFragment extends Fragment {
                     }
                 }
 
+                // 【新增】获取当前货币符号
+                String currencySymbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
+
                 if (existingTransaction == null) {
                     Transaction t = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     t.assetId = selectedAssetId;
+                    t.currencySymbol = currencySymbol; // 保存符号
                     viewModel.addTransaction(t);
 
                     if (selectedAssetId != 0) {
@@ -825,12 +835,26 @@ public class RecordFragment extends Fragment {
                     Transaction updateT = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     updateT.id = existingTransaction.id;
                     updateT.assetId = selectedAssetId;
+                    updateT.currencySymbol = currencySymbol; // 保存符号
                     viewModel.updateTransaction(updateT);
                 }
                 dialog.dismiss();
             }
         });
         dialog.show();
+    }
+
+    // 在 RecordFragment 类中替换 showCurrencySelectDialog 方法
+
+    private void showCurrencySelectDialog(Button btn) {
+        // 使用 CurrencyUtils 中的定义，或者直接在这里定义 String[] 数组
+        new AlertDialog.Builder(getContext())
+                .setTitle("选择货币单位")
+                .setItems(com.example.budgetapp.util.CurrencyUtils.CURRENCY_DISPLAY, (dialog, which) -> {
+                    // 设置按钮文字为对应的符号
+                    btn.setText(com.example.budgetapp.util.CurrencyUtils.CURRENCY_SYMBOLS[which]);
+                })
+                .show();
     }
 
     private void showRevokeDialog(Transaction transaction, AlertDialog parentDialog) {

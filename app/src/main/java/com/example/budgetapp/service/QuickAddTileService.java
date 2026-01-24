@@ -1,7 +1,10 @@
 package com.example.budgetapp.service;
 
+import android.app.AlertDialog;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
 import android.net.Uri;
 import android.os.Build;
@@ -10,6 +13,7 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
+import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -30,7 +34,7 @@ import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.ui.CategoryAdapter;
 import com.example.budgetapp.util.AssistantConfig;
-import com.example.budgetapp.util.CategoryManager; // 【新增引用】
+import com.example.budgetapp.util.CategoryManager;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -111,7 +115,7 @@ public class QuickAddTileService extends TileService {
             params.gravity = Gravity.CENTER;
             params.y = -350;
 
-            android.content.Context themeContext = new android.view.ContextThemeWrapper(this, R.style.Theme_BudgetApp);
+            ContextThemeWrapper themeContext = new ContextThemeWrapper(this, R.style.Theme_BudgetApp);
             LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
 
@@ -133,6 +137,7 @@ public class QuickAddTileService extends TileService {
             EditText etNote = floatView.findViewById(R.id.et_window_note);
             EditText etRemark = floatView.findViewById(R.id.et_window_remark);
             Spinner spAsset = floatView.findViewById(R.id.sp_asset);
+            Button btnCurrency = floatView.findViewById(R.id.btn_window_currency);
 
             Button btnSave = floatView.findViewById(R.id.btn_window_save);
             Button btnCancel = floatView.findViewById(R.id.btn_window_cancel);
@@ -140,8 +145,27 @@ public class QuickAddTileService extends TileService {
             etAmount.setText("");
             etAmount.requestFocus(); 
             rgType.check(R.id.rb_window_expense);
+
+            // 【新增】处理货币单位逻辑
+            SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+            boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+
+            if (isCurrencyEnabled) {
+                btnCurrency.setVisibility(View.VISIBLE);
+                btnCurrency.setText("¥"); // 默认值
+                btnCurrency.setOnClickListener(v -> {
+                    new AlertDialog.Builder(themeContext) // 注意：Service中使用的是 themeContext
+                            .setTitle("选择货币")
+                            .setItems(com.example.budgetapp.util.CurrencyUtils.CURRENCY_DISPLAY, (dialog, which) -> {
+                                btnCurrency.setText(com.example.budgetapp.util.CurrencyUtils.CURRENCY_SYMBOLS[which]);
+                            })
+                            .show();
+                });
+            } else {
+                btnCurrency.setVisibility(View.GONE);
+            }
             
-            // 【修改点】：使用 CategoryManager 获取分类
+            // 分类逻辑
             List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
             List<String> incomeCategories = CategoryManager.getIncomeCategories(this);
             
@@ -246,7 +270,11 @@ public class QuickAddTileService extends TileService {
                             assetId = loadedAssets.get(selectedPos).id;
                         }
                     }
-                    saveToDatabase(finalAmount, finalType, finalCat, finalNote, finalRemark, assetId);
+                    
+                    // 获取货币符号
+                    String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
+                    
+                    saveToDatabase(finalAmount, finalType, finalCat, finalNote, finalRemark, assetId, symbol);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "记账成功", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -272,7 +300,7 @@ public class QuickAddTileService extends TileService {
         }
     }
 
-    private void saveToDatabase(double amount, int type, String category, String note, String remark, int assetId) {
+    private void saveToDatabase(double amount, int type, String category, String note, String remark, int assetId, String currencySymbol) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
 
@@ -284,6 +312,7 @@ public class QuickAddTileService extends TileService {
             t.note = note;
             t.remark = remark;
             t.assetId = assetId; 
+            t.currencySymbol = currencySymbol; // 保存货币单位
             db.transactionDao().insert(t);
 
             if (assetId != 0) {
