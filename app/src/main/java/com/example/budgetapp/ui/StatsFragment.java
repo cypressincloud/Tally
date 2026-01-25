@@ -848,11 +848,11 @@ public class StatsFragment extends Fragment {
     }
 
     private void setupPieCharts() {
-        initPieChartStyle(expensePieChart);
-        initPieChartStyle(incomePieChart);
+        initPieChartStyle(expensePieChart, 0); // 0 代表支出
+        initPieChartStyle(incomePieChart, 1);  // 1 代表收入
     }
 
-    private void initPieChartStyle(PieChart chart) {
+    private void initPieChartStyle(PieChart chart, int type) {
         if (chart == null) return;
         int textColor = ContextCompat.getColor(requireContext(), R.color.text_primary);
         int holeColor = ContextCompat.getColor(requireContext(), R.color.bar_background);
@@ -873,19 +873,21 @@ public class StatsFragment extends Fragment {
             @Override
             public void onValueSelected(Entry e, Highlight h) {
                 String category = ((PieEntry) e).getLabel();
-                showCategoryDetailDialog(category);
+                showCategoryDetailDialog(category, type); // 传递类型
             }
             @Override
             public void onNothingSelected() { }
         });
     }
 
-    private void showCategoryDetailDialog(String category) {
+    private void showCategoryDetailDialog(String category, int type) {
         if (allTransactions == null) return;
         long startMillis;
         long endMillis;
         String dateRangeStr = "";
         ZoneId zone = ZoneId.systemDefault();
+
+        // 1. 确定时间范围
         if (currentMode == 0) {
             LocalDate start = LocalDate.of(selectedDate.getYear(), 1, 1);
             startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli();
@@ -904,31 +906,65 @@ public class StatsFragment extends Fragment {
             DateTimeFormatter fmt = DateTimeFormatter.ofPattern("M.d");
             dateRangeStr = startOfWeek.format(fmt) + " - " + endOfWeek.format(fmt);
         }
-        Map<String, Double> catTotals = new HashMap<>();
-        double totalAmount = 0;
+
+        // 2. 预计算该类型下的总金额和各分类金额，用于判断哪些属于"其他" (即 < 5%)
+        Map<String, Double> categorySums = new HashMap<>();
+        double totalScopeAmount = 0;
+
         for (Transaction t : allTransactions) {
-            if (t.date >= startMillis && t.date < endMillis && t.category.equals(category)) {
-                catTotals.put(t.category, catTotals.getOrDefault(t.category, 0.0) + t.amount);
-                totalAmount += t.amount;
+            // 必须在时间范围内且类型匹配
+            if (t.date >= startMillis && t.date < endMillis && t.type == type) {
+                // 如果是收入图表，需排除"加班"（与 aggregateData 逻辑保持一致）
+                if (type == 1 && "加班".equals(t.category)) continue;
+
+                categorySums.put(t.category, categorySums.getOrDefault(t.category, 0.0) + t.amount);
+                totalScopeAmount += t.amount;
             }
         }
-        
+
+        double threshold = totalScopeAmount * 0.05;
+
+        // 3. 筛选展示列表
         List<Transaction> filteredList = new ArrayList<>();
         for (Transaction t : allTransactions) {
-            if (t.date >= startMillis && t.date < endMillis) {
-                if (t.category.equals(category) || ("其他".equals(category) && "其他".equals(t.category))) {
+            if (t.date >= startMillis && t.date < endMillis && t.type == type) {
+                if (type == 1 && "加班".equals(t.category)) continue;
+
+                boolean isMatch = false;
+                if ("其他".equals(category)) {
+                    // 如果点击的是"其他"，则包含：
+                    // A. 该分类金额小于阈值（被聚合了）
+                    // B. 或者分类名本身就是"其他"（用户自定义的）
+                    Double catSum = categorySums.get(t.category);
+                    if (catSum != null && catSum < threshold) {
+                        isMatch = true;
+                    } else if ("其他".equals(t.category)) {
+                        isMatch = true;
+                    }
+                } else {
+                    // 点击的是普通分类，直接匹配名称
+                    if (t.category.equals(category)) {
+                        isMatch = true;
+                    }
+                }
+
+                if (isMatch) {
                     filteredList.add(t);
                 }
             }
         }
-        
+
+        // 4. 显示弹窗
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_transaction_list, null);
         builder.setView(dialogView);
         AlertDialog dialog = builder.create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
         TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
-        tvTitle.setText(dateRangeStr + " " + category + " - 消费清单");
+        String typeStr = (type == 1) ? "收入" : "消费";
+        tvTitle.setText(dateRangeStr + " " + category + " - " + typeStr + "清单");
+
         RecyclerView rv = dialogView.findViewById(R.id.rv_detail_list);
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
         TransactionListAdapter adapter = new TransactionListAdapter(t -> {
@@ -938,6 +974,7 @@ public class StatsFragment extends Fragment {
         adapter.setTransactions(filteredList);
         adapter.setAssets(assetList);
         rv.setAdapter(adapter);
+
         View btnOvertime = dialogView.findViewById(R.id.btn_add_overtime);
         View btnAdd = dialogView.findViewById(R.id.btn_add_transaction);
         if (btnOvertime != null) btnOvertime.setVisibility(View.GONE);

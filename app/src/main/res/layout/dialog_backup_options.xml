@@ -72,7 +72,7 @@
         android:id="@+id/tv_import_external"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="导入外部账单 (JSON)"
+        android:text="导入外部数据 (JSON)"
         android:textSize="16sp"
         android:textColor="?android:attr/textColorPrimary"
         android:padding="16dp"
