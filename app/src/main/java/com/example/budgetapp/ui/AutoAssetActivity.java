@@ -246,17 +246,33 @@ public class AutoAssetActivity extends AppCompatActivity {
 
             // 点击编辑 -> 调用统一弹窗
             holder.itemView.setOnClickListener(v -> showRuleDialog(rule));
-            
+
             holder.itemView.setOnLongClickListener(v -> {
-                new AlertDialog.Builder(AutoAssetActivity.this)
-                        .setTitle("删除规则")
-                        .setMessage("确定删除该条规则吗？")
-                        .setPositiveButton("删除", (d, w) -> {
-                            AutoAssetManager.removeRule(AutoAssetActivity.this, rule);
-                            loadData();
-                        })
-                        .setNegativeButton("取消", null)
-                        .show();
+                // --- 修改开始: 使用自定义弹窗 ---
+                AlertDialog.Builder builder = new AlertDialog.Builder(AutoAssetActivity.this);
+                View dialogView = LayoutInflater.from(AutoAssetActivity.this).inflate(R.layout.dialog_confirm_delete, null);
+                builder.setView(dialogView);
+                AlertDialog dialog = builder.create();
+
+                if (dialog.getWindow() != null) {
+                    dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+                }
+
+                TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
+                TextView tvMsg = dialogView.findViewById(R.id.tv_dialog_message);
+
+                tvTitle.setText("删除规则");
+                tvMsg.setText("确定删除对 [" + appName + "] 的这条关联规则吗？");
+
+                dialogView.findViewById(R.id.btn_dialog_cancel).setOnClickListener(dv -> dialog.dismiss());
+                dialogView.findViewById(R.id.btn_dialog_confirm).setOnClickListener(dv -> {
+                    AutoAssetManager.removeRule(AutoAssetActivity.this, rule);
+                    loadData();
+                    dialog.dismiss();
+                });
+
+                dialog.show();
+                // --- 修改结束 ---
                 return true;
             });
         }

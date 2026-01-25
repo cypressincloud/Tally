@@ -61,6 +61,22 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
+    // 【新增】导出 Excel 的 Launcher
+    private final ActivityResultLauncher<String> exportExcelLauncher = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("text/csv"),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        BackupManager.exportToExcel(this, uri, allTransactions, allAssets);
+                        Toast.makeText(this, "Excel 导出成功", Toast.LENGTH_SHORT).show();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
     private final ActivityResultLauncher<String[]> importLauncher = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
             uri -> {
@@ -159,9 +175,8 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
 
-        // 【修改】货币单位开关逻辑
+        // 货币单位开关逻辑
         TextView btnCurrency = findViewById(R.id.btn_currency_setting);
-        // 定义 prefs 变量（仅此处定义一次）
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
         updateCurrencyButtonText(btnCurrency, isCurrencyEnabled);
@@ -178,7 +193,7 @@ public class SettingsActivity extends AppCompatActivity {
             startActivity(new Intent(this, DonateActivity.class));
         });
 
-        // 【修改】极简模式逻辑 (直接复用上面的 prefs 变量，不再重复定义)
+        // 极简模式逻辑
         switchMinimalist = findViewById(R.id.switch_minimalist);
         boolean isMinimalist = prefs.getBoolean("minimalist_mode", false);
         switchMinimalist.setChecked(isMinimalist);
@@ -188,8 +203,6 @@ public class SettingsActivity extends AppCompatActivity {
         });
     }
 
-
-    // 更新按钮文本
     private void updateCurrencyButtonText(TextView btn, boolean enabled) {
         btn.setText(enabled ? "关闭货币单位" : "开启货币单位");
     }
@@ -200,7 +213,6 @@ public class SettingsActivity extends AppCompatActivity {
         builder.setView(view);
         AlertDialog dialog = builder.create();
 
-        // 设置透明背景，使圆角生效
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
@@ -210,6 +222,15 @@ public class SettingsActivity extends AppCompatActivity {
             String timeStr = sdf.format(new Date()).replace(":", "-");
             String fileName = "Tally " + timeStr + ".zip";
             exportLauncher.launch(fileName);
+            dialog.dismiss();
+        });
+
+        // 【新增】Excel 导出点击事件
+        view.findViewById(R.id.tv_export_excel).setOnClickListener(v -> {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            String timeStr = sdf.format(new Date());
+            String fileName = "Tally_账单_" + timeStr + ".csv";
+            exportExcelLauncher.launch(fileName);
             dialog.dismiss();
         });
 
@@ -250,7 +271,6 @@ public class SettingsActivity extends AppCompatActivity {
             rgTheme.check(R.id.rb_follow_system);
         }
 
-        // 监听选中事件，选中即生效并关闭
         rgTheme.setOnCheckedChangeListener((group, checkedId) -> {
             int selectedMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
             if (checkedId == R.id.rb_day_mode) {
@@ -261,7 +281,6 @@ public class SettingsActivity extends AppCompatActivity {
 
             prefs.edit().putInt("theme_mode", selectedMode).apply();
             AppCompatDelegate.setDefaultNightMode(selectedMode);
-            // 稍作延迟关闭，让用户看到点击反馈
             view.postDelayed(dialog::dismiss, 200);
         });
 

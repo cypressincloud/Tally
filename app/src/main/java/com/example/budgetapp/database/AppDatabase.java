@@ -10,8 +10,8 @@ import androidx.annotation.NonNull;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-// 【修改】版本号升级为 6
-@Database(entities = {Transaction.class, AssetAccount.class}, version = 6, exportSchema = false)
+// 【修改】版本号升级为 7
+@Database(entities = {Transaction.class, AssetAccount.class}, version = 7, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract TransactionDao transactionDao();
@@ -20,6 +20,8 @@ public abstract class AppDatabase extends RoomDatabase {
     private static volatile AppDatabase INSTANCE;
     private static final int NUMBER_OF_THREADS = 4;
     public static final ExecutorService databaseWriteExecutor = Executors.newFixedThreadPool(NUMBER_OF_THREADS);
+
+    // ... (保留之前的 MIGRATION_2_3 到 MIGRATION_5_6)
 
     static final Migration MIGRATION_2_3 = new Migration(2, 3) {
         @Override
@@ -47,11 +49,18 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
-    // 【新增】版本 5 -> 6 迁移：添加 currencySymbol
     static final Migration MIGRATION_5_6 = new Migration(5, 6) {
         @Override
         public void migrate(@NonNull SupportSQLiteDatabase database) {
             database.execSQL("ALTER TABLE transactions ADD COLUMN currencySymbol TEXT DEFAULT '¥'");
+        }
+    };
+
+    // 【新增】版本 6 -> 7 迁移：AssetAccount 添加 currencySymbol
+    static final Migration MIGRATION_6_7 = new Migration(6, 7) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE asset_accounts ADD COLUMN currencySymbol TEXT DEFAULT '¥'");
         }
     };
 
@@ -61,7 +70,7 @@ public abstract class AppDatabase extends RoomDatabase {
                 if (INSTANCE == null) {
                     INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
                                     AppDatabase.class, "budget_database")
-                            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                             .fallbackToDestructiveMigration()
                             .build();
                 }

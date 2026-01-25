@@ -439,6 +439,9 @@ public class RecordFragment extends Fragment {
         if (tvTitle != null) {
             DateTimeFormatter chFormatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.CHINA);
             tvTitle.setText(date.format(chFormatter));
+            // 【修改】显式禁用点击事件，确保点击无任何效果
+            tvTitle.setClickable(false);
+            tvTitle.setOnClickListener(null);
         }
 
         RecyclerView rvList = dialogView.findViewById(R.id.rv_detail_list);

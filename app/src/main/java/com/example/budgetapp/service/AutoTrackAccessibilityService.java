@@ -134,17 +134,21 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             int autoAssetId = AutoAssetManager.matchAsset(this, currentPackageName, text);
 
-            for (String kw : expenseKeywords) {
-                if (text.contains(kw)) {
-                    findAmountRecursive(getRootInActiveWindow(), 0, getAppNameReadable(currentPackageName), autoAssetId);
-                    return;
+            // 如果匹配到关键字，则重新从根节点查找可能的金额
+            AccessibilityNodeInfo root = getRootInActiveWindow();
+            if (root != null) {
+                for (String kw : expenseKeywords) {
+                    if (text.contains(kw)) {
+                        findAmountRecursive(root, 0, getAppNameReadable(currentPackageName), autoAssetId);
+                        return;
+                    }
                 }
-            }
 
-            for (String kw : incomeKeywords) {
-                if (text.contains(kw)) {
-                    findAmountRecursive(getRootInActiveWindow(), 1, getAppNameReadable(currentPackageName), autoAssetId);
-                    return;
+                for (String kw : incomeKeywords) {
+                    if (text.contains(kw)) {
+                        findAmountRecursive(root, 1, getAppNameReadable(currentPackageName), autoAssetId);
+                        return;
+                    }
                 }
             }
         }
@@ -174,10 +178,12 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         double bestAmount = -1;
         for (Double amount : candidates) {
             String strAmt = String.valueOf(amount);
+            // 优先选择带小数位的金额 (例如 12.50)
             if (strAmt.contains(".") && !strAmt.endsWith(".0")) { 
                 bestAmount = amount;
                 break; 
             }
+            // 其次选择任意正数
             if (bestAmount == -1 && amount > 0) {
                 bestAmount = amount; 
             }
@@ -193,9 +199,8 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         String text = getTextOrDescription(node);
 
         if (text != null && !text.isEmpty()) {
-            boolean isStrictTime = text.matches("^\\d{1,2}:\\d{2}(:\\d{2})?$");
-            
-            if (!isStrictTime) {
+            // 过滤掉包含冒号的文本，避免将时间（如 12:30）解析为数字
+            if (!text.contains(":")) {
                 String cleanText = quantityPattern.matcher(text).replaceAll("");
                 
                 Matcher matcher = amountPattern.matcher(cleanText);
@@ -204,10 +209,14 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         String numStr = matcher.group(1).replace(",", "");
                         double val = Double.parseDouble(numStr);
                         
+                        // 过滤规则：
+                        // 1. 金额必须 > 0 且 < 200000
+                        // 2. 过滤掉可能是年份的整数 (2020-2035)
                         if (val > 0 && val < 200000 && !(val >= 2020 && val <= 2035 && val % 1 == 0)) {
                             list.add(val);
                         }
                     } catch (Exception e) {
+                        // ignore parsing errors
                     }
                 }
             }
@@ -302,8 +311,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 btnCurrency.setVisibility(View.VISIBLE);
                 btnCurrency.setText("¥"); // 默认值
                 btnCurrency.setOnClickListener(v -> {
-                    // 传入 true，因为这是在悬浮窗服务中
-                    // 注意：Context 应该使用 themeContext (在这些 service 代码中通常已经定义了 ContextThemeWrapper themeContext = ...)
                     com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(themeContext, btnCurrency, true);
                 });
             } else {
@@ -431,7 +438,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         }
                     }
 
-                    // 获取选择的货币符号
                     String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
                     saveToDatabase(finalAmount, finalType, finalCat, finalNote, finalRemark, assetId, symbol);
@@ -508,7 +514,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             t.note = note;
             t.remark = remark;
             t.assetId = assetId;
-            t.currencySymbol = currencySymbol; // 保存货币单位
+            t.currencySymbol = currencySymbol; 
             dao.insert(t);
 
             if (assetId != 0) {

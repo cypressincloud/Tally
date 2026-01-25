@@ -2,6 +2,7 @@ package com.example.budgetapp.ui;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -25,10 +26,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.util.AssistantConfig;
+import com.example.budgetapp.util.CurrencyUtils;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class AssetsFragment extends Fragment {
 
@@ -112,21 +116,66 @@ public class AssetsFragment extends Fragment {
     private void updateUI() {
         if (allAccounts == null) return;
 
-        double totalAsset = 0;
-        double totalLiability = 0;
-        double totalLent = 0;
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
 
-        for (AssetAccount acc : allAccounts) {
-            if (acc.type == 0) totalAsset += acc.amount;
-            else if (acc.type == 1) totalLiability += acc.amount;
-            else if (acc.type == 2) totalLent += acc.amount;
+        if (!isCurrencyEnabled) {
+            // 单一币种逻辑
+            double totalAsset = 0;
+            double totalLiability = 0;
+            double totalLent = 0;
+
+            for (AssetAccount acc : allAccounts) {
+                if (acc.type == 0) totalAsset += acc.amount;
+                else if (acc.type == 1) totalLiability += acc.amount;
+                else if (acc.type == 2) totalLent += acc.amount;
+            }
+
+            // 恢复默认大字体
+            tvTotalAssets.setTextSize(32); 
+            tvTotalAssets.setText(String.format("%.2f", totalAsset));
+            tvTotalLiability.setText(String.format("%.2f", totalLiability));
+            tvTotalLent.setText(String.format("%.2f", totalLent));
+        } else {
+            // 多币种逻辑
+            Map<String, Double> assetMap = new TreeMap<>();
+            Map<String, Double> liabilityMap = new TreeMap<>();
+            Map<String, Double> lentMap = new TreeMap<>();
+
+            for (AssetAccount acc : allAccounts) {
+                String symbol = (acc.currencySymbol != null && !acc.currencySymbol.isEmpty()) ? acc.currencySymbol : "¥";
+                if (acc.type == 0) {
+                    assetMap.put(symbol, assetMap.getOrDefault(symbol, 0.0) + acc.amount);
+                } else if (acc.type == 1) {
+                    liabilityMap.put(symbol, liabilityMap.getOrDefault(symbol, 0.0) + acc.amount);
+                } else if (acc.type == 2) {
+                    lentMap.put(symbol, lentMap.getOrDefault(symbol, 0.0) + acc.amount);
+                }
+            }
+
+            // 【关键修改】如果包含多个币种，缩小字体
+            if (assetMap.size() > 1) {
+                tvTotalAssets.setTextSize(20); // 缩小字体以容纳更多内容
+            } else {
+                tvTotalAssets.setTextSize(32); // 恢复默认
+            }
+
+            tvTotalAssets.setText(formatMultiCurrency(assetMap));
+            tvTotalLiability.setText(formatMultiCurrency(liabilityMap));
+            tvTotalLent.setText(formatMultiCurrency(lentMap));
         }
 
-        tvTotalAssets.setText(String.format("%.2f", totalAsset));
-        tvTotalLiability.setText(String.format("%.2f", totalLiability));
-        tvTotalLent.setText(String.format("%.2f", totalLent));
-
         refreshList();
+    }
+
+    private String formatMultiCurrency(Map<String, Double> map) {
+        if (map.isEmpty()) return "0.00";
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, Double> entry : map.entrySet()) {
+            if (sb.length() > 0) sb.append("  "); // 使用两个空格分隔，增加可读性
+            sb.append(entry.getKey()).append(String.format("%.2f", entry.getValue()));
+        }
+        return sb.toString();
     }
 
     private void refreshList() {
@@ -160,9 +209,25 @@ public class AssetsFragment extends Fragment {
         RadioGroup rgType = view.findViewById(R.id.rg_asset_type);
         EditText etName = view.findViewById(R.id.et_asset_name);
         EditText etAmount = view.findViewById(R.id.et_asset_amount);
+        Button btnCurrency = view.findViewById(R.id.btn_currency);
         Button btnCancel = view.findViewById(R.id.btn_cancel);
         Button btnSave = view.findViewById(R.id.btn_save);
         Button btnDelete = view.findViewById(R.id.btn_delete);
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+
+        if (isCurrencyEnabled) {
+            btnCurrency.setVisibility(View.VISIBLE);
+            if (existing != null && existing.currencySymbol != null && !existing.currencySymbol.isEmpty()) {
+                btnCurrency.setText(existing.currencySymbol);
+            } else {
+                btnCurrency.setText("¥");
+            }
+            btnCurrency.setOnClickListener(v -> CurrencyUtils.showCurrencyDialog(getContext(), btnCurrency, false));
+        } else {
+            btnCurrency.setVisibility(View.GONE);
+        }
 
         if (existing != null) {
             etName.setText(existing.name);
@@ -207,15 +272,29 @@ public class AssetsFragment extends Fragment {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnDelete.setOnClickListener(v -> {
-            new AlertDialog.Builder(getContext())
-                    .setTitle("确认删除")
-                    .setMessage("确定要删除这项记录吗？")
-                    .setPositiveButton("删除", (d, w) -> {
-                        viewModel.deleteAsset(existing);
-                        dialog.dismiss();
-                    })
-                    .setNegativeButton("取消", null)
-                    .show();
+            // --- 修改开始: 使用自定义弹窗 ---
+            AlertDialog.Builder delBuilder = new AlertDialog.Builder(getContext());
+            View delView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_confirm_delete, null);
+            delBuilder.setView(delView);
+            AlertDialog delDialog = delBuilder.create();
+
+            // 设置背景透明
+            if (delDialog.getWindow() != null) {
+                delDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            }
+
+            TextView tvMsg = delView.findViewById(R.id.tv_dialog_message);
+            tvMsg.setText("确定要删除资产 “" + existing.name + "” 吗？\n相关记录可能无法正确显示。");
+
+            delView.findViewById(R.id.btn_dialog_cancel).setOnClickListener(dv -> delDialog.dismiss());
+            delView.findViewById(R.id.btn_dialog_confirm).setOnClickListener(dv -> {
+                viewModel.deleteAsset(existing);
+                delDialog.dismiss();
+                dialog.dismiss(); // 关闭外层编辑弹窗
+            });
+
+            delDialog.show();
+            // --- 修改结束 ---
         });
 
         btnSave.setOnClickListener(v -> {
@@ -233,13 +312,17 @@ public class AssetsFragment extends Fragment {
             if (selectedId == R.id.rb_liability) finalType = 1;
             else if (selectedId == R.id.rb_lent) finalType = 2;
 
+            String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
+
             if (existing == null) {
                 AssetAccount newAcc = new AssetAccount(name, amount, finalType);
+                newAcc.currencySymbol = symbol;
                 viewModel.addAsset(newAcc);
             } else {
                 existing.name = name;
                 existing.amount = amount;
                 existing.type = finalType;
+                existing.currencySymbol = symbol;
                 existing.updateTime = System.currentTimeMillis();
                 viewModel.updateAsset(existing);
             }
@@ -289,35 +372,39 @@ public class AssetsFragment extends Fragment {
         public void onBindViewHolder(@NonNull VH holder, int position) {
             AssetAccount item = data.get(position);
             holder.tvName.setText(item.name);
-            holder.tvAmount.setText(String.format("%.2f", item.amount));
+
+            Context context = holder.itemView.getContext();
+            SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+            boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+
+            String symbol = (item.currencySymbol != null && !item.currencySymbol.isEmpty()) ? item.currencySymbol : "¥";
+            String amountStr = String.format("%.2f", item.amount);
+            
+            if (isCurrencyEnabled) {
+                holder.tvAmount.setText(symbol + amountStr);
+            } else {
+                holder.tvAmount.setText(amountStr);
+            }
 
             boolean isDefault = (item.id == defaultAssetId);
-            Context context = holder.itemView.getContext();
 
             holder.itemView.setSelected(isDefault);
 
             if (isDefault) {
-                // 默认状态：白色文字
                 holder.tvName.setTextColor(Color.WHITE);
                 holder.tvAmount.setTextColor(Color.WHITE);
             } else {
-                // 普通状态：使用资源颜色以适配夜间模式
                 try {
-                    // 资产名称颜色
                     holder.tvName.setTextColor(context.getColor(R.color.text_primary));
                 } catch (Exception e) {
                     holder.tvName.setTextColor(Color.BLACK);
                 }
 
-                // *** 核心修改：使用 context.getColor 获取主题适配的颜色 ***
                 if (item.type == 0) {
-                    // 资产 -> app_yellow
                     holder.tvAmount.setTextColor(context.getColor(R.color.app_yellow));
                 } else if (item.type == 1) {
-                    // 负债 -> expense_green
                     holder.tvAmount.setTextColor(context.getColor(R.color.expense_green));
                 } else {
-                    // 借出 -> income_red
                     holder.tvAmount.setTextColor(context.getColor(R.color.income_red));
                 }
             }

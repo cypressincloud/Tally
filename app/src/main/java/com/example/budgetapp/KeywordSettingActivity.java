@@ -143,16 +143,33 @@ public class KeywordSettingActivity extends AppCompatActivity {
 
         listKeywords.setOnItemLongClickListener((parent, view, position, id) -> {
             KeywordDisplayItem item = displayList.get(position);
-            new AlertDialog.Builder(this)
-                    .setTitle("删除关键字")
-                    .setMessage("确定要删除 “" + item.keyword + "” 吗？")
-                    .setPositiveButton("删除", (dialog, which) -> {
-                        KeywordManager.removeKeyword(this, currentSelectedPackage, item.type, item.keyword);
-                        refreshKeywordList();
-                        Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
-                    })
-                    .setNegativeButton("取消", null)
-                    .show();
+
+            // --- 修改开始: 使用自定义弹窗 ---
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_confirm_delete, null);
+            builder.setView(dialogView);
+            AlertDialog dialog = builder.create();
+
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
+
+            TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
+            TextView tvMsg = dialogView.findViewById(R.id.tv_dialog_message);
+
+            tvTitle.setText("删除关键字");
+            tvMsg.setText("确定要删除关键字 “" + item.keyword + "” 吗？");
+
+            dialogView.findViewById(R.id.btn_dialog_cancel).setOnClickListener(dv -> dialog.dismiss());
+            dialogView.findViewById(R.id.btn_dialog_confirm).setOnClickListener(dv -> {
+                KeywordManager.removeKeyword(this, currentSelectedPackage, item.type, item.keyword);
+                refreshKeywordList();
+                Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            });
+
+            dialog.show();
+            // --- 修改结束 ---
             return true;
         });
     }
