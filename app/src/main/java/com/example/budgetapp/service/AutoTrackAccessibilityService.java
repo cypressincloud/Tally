@@ -69,6 +69,9 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
     private View keepAliveView;
     private long lastRecordTime = 0;
     private String lastContentSignature = "";
+    
+    // 【新增】记录窗口关闭的时间，用于防抖
+    private long lastWindowDismissTime = 0;
 
     private List<AssetAccount> loadedAssets = new ArrayList<>();
 
@@ -236,6 +239,12 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private void triggerConfirmWindow(double amount, int type, String category, int assetId) {
         long now = System.currentTimeMillis();
+
+        // 【修改】如果距离上次关闭窗口不足 2.5 秒，则忽略本次触发
+        if (now - lastWindowDismissTime < 2500) {
+            return;
+        }
+
         String signature = amount + "-" + type;
         if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return;
 
@@ -303,7 +312,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
-            // 【新增】处理货币单位
+            // 处理货币单位
             SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
             boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
 
@@ -459,7 +468,11 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
     
     private void closeWindow(WindowManager wm, View view) {
         try { wm.removeView(view); } catch (Exception e) {}
-        finally { isWindowShowing = false; }
+        finally { 
+            isWindowShowing = false;
+            // 【修改】记录关闭时间
+            lastWindowDismissTime = System.currentTimeMillis();
+        }
     }
 
     private void setupKeepAliveWindow() {

@@ -118,6 +118,22 @@
                 android:layout_marginHorizontal="20dp"/>
 
             <TextView
+                android:id="@+id/btn_default_record_display"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="20dp"
+                android:text="设置记账界面默认显示"
+                android:textSize="16sp"
+                android:background="?android:attr/selectableItemBackground"
+                android:textColor="?android:attr/textColorPrimary"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#1F888888"
+                android:layout_marginHorizontal="20dp"/>
+
+            <TextView
                 android:id="@+id/btn_overtime_setting"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

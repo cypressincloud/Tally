@@ -69,7 +69,8 @@
                     android:button="@null"
                     android:textColor="@color/selector_text_color"
                     android:background="@drawable/selector_tab_bg"
-                    android:checked="true"/> </RadioGroup>
+                    android:checked="true"/>
+            </RadioGroup>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -110,45 +111,59 @@
                     android:contentDescription="后一页"/>
             </LinearLayout>
 
-            <TextView
+            <LinearLayout
+                android:id="@+id/layout_trend_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="收支趋势"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:paddingStart="20dp"
-                android:paddingTop="16dp"
-                android:paddingBottom="12dp"/>
+                android:orientation="vertical">
 
-            <com.github.mikephil.charting.charts.LineChart
-                android:id="@+id/chart_line"
-                android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:layout_marginHorizontal="16dp"/>
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="收支趋势"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:paddingStart="20dp"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="12dp"/>
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#EEEEEE"
-                android:layout_marginVertical="24dp"
-                android:layout_marginHorizontal="20dp"/>
+                <com.github.mikephil.charting.charts.LineChart
+                    android:id="@+id/chart_line"
+                    android:layout_width="match_parent"
+                    android:layout_height="300dp"
+                    android:layout_marginHorizontal="16dp"/>
 
-            <TextView
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#EEEEEE"
+                    android:layout_marginVertical="24dp"
+                    android:layout_marginHorizontal="20dp"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/layout_expense_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="支出构成"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:paddingStart="20dp"
-                android:paddingBottom="12dp"/>
+                android:orientation="vertical">
 
-            <com.github.mikephil.charting.charts.PieChart
-                android:id="@+id/chart_pie"
-                android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:layout_marginHorizontal="16dp"/>
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="支出构成"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:paddingStart="20dp"
+                    android:paddingBottom="12dp"/>
+
+                <com.github.mikephil.charting.charts.PieChart
+                    android:id="@+id/chart_pie"
+                    android:layout_width="match_parent"
+                    android:layout_height="300dp"
+                    android:layout_marginHorizontal="16dp"/>
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tv_income_title"
@@ -170,78 +185,85 @@
                 android:layout_marginHorizontal="16dp"
                 android:visibility="gone"/>
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#EEEEEE"
-                android:layout_marginVertical="24dp"
-                android:layout_marginHorizontal="20dp"/>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="总结"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:paddingStart="20dp"
-                android:paddingBottom="12dp"/>
-
             <LinearLayout
+                android:id="@+id/layout_summary_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/assets_field"
-                android:layout_marginHorizontal="16dp"
-                android:layout_marginBottom="24dp"
-                android:padding="16dp">
-
-                <TextView
-                    android:id="@+id/tv_summary_title"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="本周消费"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="12dp"/>
-
-                <TextView
-                    android:id="@+id/tv_summary_content"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:lineSpacingExtra="6dp"/>
+                android:orientation="vertical">
 
                 <View
-                    android:id="@+id/divider_overtime"
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="#EEEEEE"
-                    android:layout_marginTop="12dp"
-                    android:layout_marginBottom="12dp"
-                    android:visibility="gone"/>
+                    android:layout_marginVertical="24dp"
+                    android:layout_marginHorizontal="20dp"/>
 
                 <TextView
-                    android:id="@+id/tv_overtime_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="本周加班"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:text="总结"
+                    android:textSize="18sp"
                     android:textStyle="bold"
-                    android:layout_marginBottom="12dp"
-                    android:visibility="gone"/>
+                    android:textColor="@color/text_primary"
+                    android:paddingStart="20dp"
+                    android:paddingBottom="12dp"/>
 
-                <TextView
-                    android:id="@+id/tv_overtime_content"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:lineSpacingExtra="6dp"
-                    android:visibility="gone"/>
+                    android:orientation="vertical"
+                    android:background="@drawable/assets_field"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginBottom="24dp"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/tv_summary_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="本周消费"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp"/>
+
+                    <TextView
+                        android:id="@+id/tv_summary_content"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:lineSpacingExtra="6dp"/>
+
+                    <View
+                        android:id="@+id/divider_overtime"
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#EEEEEE"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="12dp"
+                        android:visibility="gone"/>
+
+                    <TextView
+                        android:id="@+id/tv_overtime_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="本周加班"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp"
+                        android:visibility="gone"/>
+
+                    <TextView
+                        android:id="@+id/tv_overtime_content"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:lineSpacingExtra="6dp"
+                        android:visibility="gone"/>
+                </LinearLayout>
             </LinearLayout>
 
         </LinearLayout>

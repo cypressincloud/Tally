@@ -58,6 +58,9 @@ public class NotificationMonitorService extends NotificationListenerService {
 
     private long lastRecordTime = 0;
     private String lastContentSignature = "";
+    
+    // 【新增】记录窗口关闭的时间，用于防抖
+    private long lastWindowDismissTime = 0;
 
     private final Pattern amountPattern = Pattern.compile("(\\d+(\\.\\d{1,2})?)");
     
@@ -143,6 +146,12 @@ public class NotificationMonitorService extends NotificationListenerService {
 
     private void triggerConfirmWindow(double amount, int type, String category) {
         long now = System.currentTimeMillis();
+
+        // 【修改】如果距离上次关闭窗口不足 2.5 秒，则忽略本次触发
+        if (now - lastWindowDismissTime < 2500) {
+            return;
+        }
+
         String signature = amount + "-" + type + "-" + category;
         if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return;
 
@@ -195,7 +204,7 @@ public class NotificationMonitorService extends NotificationListenerService {
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
-            // 【新增】处理货币单位
+            // 处理货币单位
             SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
             boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
 
@@ -203,8 +212,6 @@ public class NotificationMonitorService extends NotificationListenerService {
                 btnCurrency.setVisibility(View.VISIBLE);
                 btnCurrency.setText("¥"); // 默认值
                 btnCurrency.setOnClickListener(v -> {
-                    // 传入 true，因为这是在悬浮窗服务中
-                    // 注意：Context 应该使用 themeContext (在这些 service 代码中通常已经定义了 ContextThemeWrapper themeContext = ...)
                     com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(themeContext, btnCurrency, true);
                 });
             } else {
@@ -346,7 +353,11 @@ public class NotificationMonitorService extends NotificationListenerService {
 
     private void closeWindow(WindowManager wm, View view) {
         try { wm.removeView(view); } catch (Exception e) {}
-        finally { isWindowShowing = false; }
+        finally { 
+            isWindowShowing = false;
+            // 【修改】记录关闭时间
+            lastWindowDismissTime = System.currentTimeMillis();
+        }
     }
 
     private void saveToDatabase(double amount, int type, String category, String note, int assetId, String currencySymbol) {

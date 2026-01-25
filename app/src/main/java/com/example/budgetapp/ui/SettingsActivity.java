@@ -61,7 +61,6 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
-    // 【新增】导出 Excel 的 Launcher
     private final ActivityResultLauncher<String> exportExcelLauncher = registerForActivityResult(
             new ActivityResultContracts.CreateDocument("text/csv"),
             uri -> {
@@ -174,6 +173,7 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_toggle_night_mode).setOnClickListener(v -> showThemeSettingDialog());
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
+        findViewById(R.id.btn_default_record_display).setOnClickListener(v -> showDefaultRecordDisplayDialog());
 
         // 货币单位开关逻辑
         TextView btnCurrency = findViewById(R.id.btn_currency_setting);
@@ -225,7 +225,6 @@ public class SettingsActivity extends AppCompatActivity {
             dialog.dismiss();
         });
 
-        // 【新增】Excel 导出点击事件
         view.findViewById(R.id.tv_export_excel).setOnClickListener(v -> {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
             String timeStr = sdf.format(new Date());
@@ -331,6 +330,59 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         view.findViewById(R.id.btn_cancel_overtime).setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
+    private void showDefaultRecordDisplayDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        // 加载自定义布局
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_default_display_settings, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+
+        // 设置背景透明，以便显示CardView的圆角
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        android.widget.RadioGroup rgDisplay = view.findViewById(R.id.rg_default_display);
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        int currentMode = prefs.getInt("default_record_mode", 0);
+
+        // 初始化选中状态
+        switch (currentMode) {
+            case 1: rgDisplay.check(R.id.rb_display_income); break;
+            case 2: rgDisplay.check(R.id.rb_display_expense); break;
+            case 3: rgDisplay.check(R.id.rb_display_overtime); break;
+            default: rgDisplay.check(R.id.rb_display_balance); break;
+        }
+
+        // 监听选择事件
+        rgDisplay.setOnCheckedChangeListener((group, checkedId) -> {
+            int selectedMode = 0;
+            String text = "结余";
+            if (checkedId == R.id.rb_display_income) {
+                selectedMode = 1;
+                text = "收入";
+            } else if (checkedId == R.id.rb_display_expense) {
+                selectedMode = 2;
+                text = "支出";
+            } else if (checkedId == R.id.rb_display_overtime) {
+                selectedMode = 3;
+                text = "加班";
+            }
+
+            // 保存设置
+            prefs.edit().putInt("default_record_mode", selectedMode).apply();
+            Toast.makeText(this, "已设置为默认显示: " + text, Toast.LENGTH_SHORT).show();
+
+            // 延迟一点关闭，优化视觉体验
+            view.postDelayed(dialog::dismiss, 200);
+        });
+
+        // 取消按钮
+        view.findViewById(R.id.btn_cancel_display).setOnClickListener(v -> dialog.dismiss());
 
         dialog.show();
     }

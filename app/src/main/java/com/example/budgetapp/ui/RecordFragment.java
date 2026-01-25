@@ -171,6 +171,11 @@ public class RecordFragment extends Fragment {
         });
         recyclerView.setAdapter(adapter);
 
+        // 加载默认显示设置 (0:结余, 1:收入, 2:支出, 3:加班)
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        int defaultMode = prefs.getInt("default_record_mode", 0);
+        switchFilterMode(defaultMode);
+
         recyclerView.setOnTouchListener((v, event) -> {
             gestureDetector.onTouchEvent(event);
             return false;
