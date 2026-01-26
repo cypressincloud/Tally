@@ -1126,27 +1126,30 @@ public class StatsFragment extends Fragment {
         };
         updateDateDisplay.run();
 
-        tvDate.setOnClickListener(v -> {
-            long currentMillis = calendar.getTimeInMillis();
-            long offset = TimeZone.getDefault().getOffset(currentMillis);
-            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker().setTitleText("选择日期").setSelection(currentMillis + offset).setPositiveButtonText("确认").setNegativeButtonText("取消").build();
-            datePicker.addOnPositiveButtonClickListener(selection -> {
-                java.util.Calendar selectedCal = java.util.Calendar.getInstance();
-                long correctMillis = selection - TimeZone.getDefault().getOffset(selection);
-                selectedCal.setTimeInMillis(correctMillis);
-                calendar.set(java.util.Calendar.YEAR, selectedCal.get(java.util.Calendar.YEAR));
-                calendar.set(java.util.Calendar.MONTH, selectedCal.get(java.util.Calendar.MONTH));
-                calendar.set(java.util.Calendar.DAY_OF_MONTH, selectedCal.get(java.util.Calendar.DAY_OF_MONTH));
-                MaterialTimePicker timePicker = new MaterialTimePicker.Builder().setTimeFormat(TimeFormat.CLOCK_24H).setHour(calendar.get(java.util.Calendar.HOUR_OF_DAY)).setMinute(calendar.get(java.util.Calendar.MINUTE)).setTitleText("选择时间").setPositiveButtonText("确认").setNegativeButtonText("取消").build();
-                timePicker.addOnPositiveButtonClickListener(pickerView -> {
-                    calendar.set(java.util.Calendar.HOUR_OF_DAY, timePicker.getHour());
-                    calendar.set(java.util.Calendar.MINUTE, timePicker.getMinute());
-                    updateDateDisplay.run();
-                });
-                timePicker.show(getParentFragmentManager(), "time_picker");
-            });
-            datePicker.show(getParentFragmentManager(), "date_picker");
-        });
+//        tvDate.setOnClickListener(v -> {
+//            long currentMillis = calendar.getTimeInMillis();
+//            long offset = TimeZone.getDefault().getOffset(currentMillis);
+//            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker().setTitleText("选择日期").setSelection(currentMillis + offset).setPositiveButtonText("确认").setNegativeButtonText("取消").build();
+//            datePicker.addOnPositiveButtonClickListener(selection -> {
+//                java.util.Calendar selectedCal = java.util.Calendar.getInstance();
+//                long correctMillis = selection - TimeZone.getDefault().getOffset(selection);
+//                selectedCal.setTimeInMillis(correctMillis);
+//                calendar.set(java.util.Calendar.YEAR, selectedCal.get(java.util.Calendar.YEAR));
+//                calendar.set(java.util.Calendar.MONTH, selectedCal.get(java.util.Calendar.MONTH));
+//                calendar.set(java.util.Calendar.DAY_OF_MONTH, selectedCal.get(java.util.Calendar.DAY_OF_MONTH));
+//                MaterialTimePicker timePicker = new MaterialTimePicker.Builder().setTimeFormat(TimeFormat.CLOCK_24H).setHour(calendar.get(java.util.Calendar.HOUR_OF_DAY)).setMinute(calendar.get(java.util.Calendar.MINUTE)).setTitleText("选择时间").setPositiveButtonText("确认").setNegativeButtonText("取消").build();
+//                timePicker.addOnPositiveButtonClickListener(pickerView -> {
+//                    calendar.set(java.util.Calendar.HOUR_OF_DAY, timePicker.getHour());
+//                    calendar.set(java.util.Calendar.MINUTE, timePicker.getMinute());
+//                    updateDateDisplay.run();
+//                });
+//                timePicker.show(getParentFragmentManager(), "time_picker");
+//            });
+//            datePicker.show(getParentFragmentManager(), "date_picker");
+//        });
+
+        tvDate.setClickable(false);
+        tvDate.setFocusable(false);
 
         rgType.setOnCheckedChangeListener((g, id) -> {
             boolean switchToExpense = (id == R.id.rb_expense);
