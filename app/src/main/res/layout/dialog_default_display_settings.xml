@@ -14,13 +14,15 @@
         android:padding="24dp">
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/tv_title"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="选择默认显示数据"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="?android:attr/textColorPrimary"
-            android:layout_marginBottom="20dp"/>
+            android:gravity="center"
+            android:layout_marginBottom="24dp"/>
 
         <RadioGroup
             android:id="@+id/rg_default_display"
@@ -34,8 +36,9 @@
                 android:layout_height="wrap_content"
                 android:text="结余"
                 android:textSize="16sp"
-                android:paddingStart="12dp"
-                android:layout_marginBottom="12dp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
+                android:layout_marginBottom="8dp"
                 android:buttonTint="?attr/colorPrimary"/>
 
             <RadioButton
@@ -44,8 +47,9 @@
                 android:layout_height="wrap_content"
                 android:text="收入"
                 android:textSize="16sp"
-                android:paddingStart="12dp"
-                android:layout_marginBottom="12dp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
+                android:layout_marginBottom="8dp"
                 android:buttonTint="?attr/colorPrimary"/>
 
             <RadioButton
@@ -54,8 +58,9 @@
                 android:layout_height="wrap_content"
                 android:text="支出"
                 android:textSize="16sp"
-                android:paddingStart="12dp"
-                android:layout_marginBottom="12dp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
+                android:layout_marginBottom="8dp"
                 android:buttonTint="?attr/colorPrimary"/>
 
             <RadioButton
@@ -64,24 +69,22 @@
                 android:layout_height="wrap_content"
                 android:text="加班"
                 android:textSize="16sp"
-                android:paddingStart="12dp"
-                android:layout_marginBottom="8dp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
                 android:buttonTint="?attr/colorPrimary"/>
         </RadioGroup>
 
-        <TextView
+        <Button
             android:id="@+id/btn_cancel_display"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="@color/input_bg"
             android:text="取消"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_gravity="end"
-            android:padding="8dp"
-            android:layout_marginTop="12dp"
-            android:background="?android:attr/selectableItemBackground"/>
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="14sp"
+            app:cornerRadius="16dp" />
 
     </LinearLayout>
-
 </androidx.cardview.widget.CardView>
