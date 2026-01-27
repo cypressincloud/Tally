@@ -69,6 +69,23 @@
         android:background="?android:attr/listDivider"/>
 
     <TextView
+        android:id="@+id/tv_import_excel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="导入账单 (Excel)"
+        android:textSize="16sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:padding="16dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:drawablePadding="12dp"
+        android:gravity="center_vertical"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?android:attr/listDivider"/>
+
+    <TextView
         android:id="@+id/tv_import_external"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -8,13 +8,16 @@ public class BackupData {
     public int version = 2; // 升级版本号
     public long createTime;
     public List<Transaction> records;
-    public List<AssetAccount> assets; // 【新增】资产列表
+    public List<AssetAccount> assets;
+    
+    // 【新增】用于接收导入的分类配置
+    public List<String> expenseCategories;
+    public List<String> incomeCategories;
 
     // 无参构造函数 (Gson 需要)
     public BackupData() {
     }
 
-    // 【修改】构造函数增加 assets 参数
     public BackupData(List<Transaction> records, List<AssetAccount> assets) {
         this.createTime = System.currentTimeMillis();
         this.records = records;

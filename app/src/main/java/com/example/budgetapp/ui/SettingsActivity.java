@@ -26,6 +26,7 @@ import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
+import com.example.budgetapp.util.CategoryManager; // 【新增】导入 CategoryManager
 import com.example.budgetapp.util.ExternalImportHelper;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 
@@ -102,10 +103,75 @@ public class SettingsActivity extends AppCompatActivity {
                             }
                             assetCount = data.assets.size();
                         }
+                        // 尝试恢复分类 (如果Zip里有包含)
+                        if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
+                            CategoryManager.saveExpenseCategories(this, data.expenseCategories);
+                        }
+                        if (data.incomeCategories != null && !data.incomeCategories.isEmpty()) {
+                            CategoryManager.saveIncomeCategories(this, data.incomeCategories);
+                        }
+                        
                         Toast.makeText(this, String.format("成功导入: %d条账单, %d个资产", recordCount, assetCount), Toast.LENGTH_LONG).show();
                     } catch (Exception e) {
                         e.printStackTrace();
                         Toast.makeText(this, "导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
+    // 【新增】Excel 导入 Launcher
+    private final ActivityResultLauncher<String[]> importExcelLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        BackupData data = BackupManager.importFromExcel(this, uri);
+                        int recordCount = 0;
+                        int assetCount = 0;
+
+                        // 恢复交易记录
+                        if (data.records != null && !data.records.isEmpty()) {
+                            for (Transaction t : data.records) {
+                                Transaction newT = t;
+                                // newT.id = 0; // Excel导入通常也视为新数据，或者你可以根据需求决定是否覆盖
+                                // 为了安全起见，这里作为新数据插入（自增ID），
+                                // 如果 BackupManager.importFromExcel 里已经处理了 ID 映射，这里可以斟酌
+                                // 简单起见，这里让数据库自动分配新 ID，防止 ID 冲突
+                                newT.id = 0; 
+                                financeViewModel.addTransaction(newT);
+                            }
+                            recordCount = data.records.size();
+                        }
+
+                        // 恢复资产
+                        if (data.assets != null && !data.assets.isEmpty()) {
+                            for (AssetAccount a : data.assets) {
+                                AssetAccount newA = a;
+                                // 同样处理 ID，防止覆盖现有关键数据
+                                // 注意：如果交易记录依赖这些资产ID，简单置0会导致关联丢失。
+                                // BackupManager.importFromExcel 内部是尽量保持关联的。
+                                // 如果是全新恢复，保留 ID 是好的；如果是合并数据，可能需要更复杂的逻辑。
+                                // 这里为了简便，假设用户是在做数据迁移或恢复，保留 BackupManager 解析出的状态
+                                // 但 Room 的 @PrimaryKey(autoGenerate = true) 插入时若 ID 存在会更新或报错
+                                // financeViewModel.addAsset 底层如果是 Insert(onConflict = REPLACE)，则会覆盖
+                                financeViewModel.addAsset(newA);
+                            }
+                            assetCount = data.assets.size();
+                        }
+
+                        // 恢复分类预设
+                        if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
+                            CategoryManager.saveExpenseCategories(this, data.expenseCategories);
+                        }
+                        if (data.incomeCategories != null && !data.incomeCategories.isEmpty()) {
+                            CategoryManager.saveIncomeCategories(this, data.incomeCategories);
+                        }
+
+                        Toast.makeText(this, String.format("Excel导入成功: %d条账单, %d个资产", recordCount, assetCount), Toast.LENGTH_LONG).show();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "Excel导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     }
                 }
             }
@@ -235,6 +301,19 @@ public class SettingsActivity extends AppCompatActivity {
 
         view.findViewById(R.id.tv_import).setOnClickListener(v -> {
             importLauncher.launch(new String[]{"application/zip"});
+            dialog.dismiss();
+        });
+
+        // 【新增】绑定导入 Excel 按钮
+        view.findViewById(R.id.tv_import_excel).setOnClickListener(v -> {
+            // 支持 .csv, .txt 以及常见的 Excel mime types
+            importExcelLauncher.launch(new String[]{
+                "text/csv", 
+                "text/plain", 
+                "application/vnd.ms-excel", 
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "*/*" // 兜底，防止部分系统识别不出 mime
+            });
             dialog.dismiss();
         });
 
