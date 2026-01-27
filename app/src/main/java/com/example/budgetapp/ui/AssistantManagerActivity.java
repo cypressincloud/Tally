@@ -341,12 +341,29 @@ public class AssistantManagerActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    // 替换原有的 deleteItem 方法
     private void deleteItem(KeywordItem item) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("删除");
-        builder.setMessage("确定删除 \"" + item.appName + "\" 的关键字 [" + item.text + "] 吗？");
-        builder.setPositiveButton("删除", (d, w) -> {
-            // 使用 KeywordManager 的新方法
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_confirm_delete, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+
+        // 设置背景透明，以便显示圆角
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        // 初始化控件
+        TextView tvTitle = view.findViewById(R.id.tv_dialog_title);
+        TextView tvMsg = view.findViewById(R.id.tv_dialog_message);
+
+        tvTitle.setText("删除关键字");
+        tvMsg.setText("确定删除 \"" + item.appName + "\" 的关键字 [" + item.text + "] 吗？");
+
+        // 绑定按钮事件
+        view.findViewById(R.id.btn_dialog_cancel).setOnClickListener(v -> dialog.dismiss());
+        view.findViewById(R.id.btn_dialog_confirm).setOnClickListener(v -> {
+            // 执行删除逻辑
             if (item.type == KeywordManager.TYPE_INCOME) {
                 KeywordManager.removeIncomeKeyword(this, item.packageName, item.text);
             } else {
@@ -354,9 +371,10 @@ public class AssistantManagerActivity extends AppCompatActivity {
             }
             loadData();
             Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
         });
-        builder.setNegativeButton("取消", null);
-        builder.show();
+
+        dialog.show();
     }
 
     class KeywordAdapter extends RecyclerView.Adapter<KeywordAdapter.VH> {

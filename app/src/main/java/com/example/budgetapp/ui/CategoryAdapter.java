@@ -1,7 +1,6 @@
 package com.example.budgetapp.ui;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -22,6 +21,8 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
     private List<String> categories;
     private String selectedCategory;
     private OnCategoryClickListener listener;
+    // 【新增】长按监听器
+    private OnCategoryLongClickListener longListener;
 
     private int selectedColor;
     private int unselectedColor;
@@ -31,6 +32,11 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
     public interface OnCategoryClickListener {
         void onCategoryClick(String category);
     }
+    
+    // 【新增】接口定义
+    public interface OnCategoryLongClickListener {
+        boolean onCategoryLongClick(String category);
+    }
 
     public CategoryAdapter(Context context, List<String> categories, String currentCategory, OnCategoryClickListener listener) {
         this.context = context;
@@ -38,14 +44,15 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
         this.selectedCategory = currentCategory;
         this.listener = listener;
         
-        // 选中时的背景色
         this.selectedColor = ContextCompat.getColor(context, R.color.app_yellow);
-        // 选中时的文字颜色 (从资源读取，支持日夜模式)
         this.selectedTextColor = ContextCompat.getColor(context, R.color.cat_selected_text);
-        
-        // 未选中时的颜色
         this.unselectedColor = ContextCompat.getColor(context, R.color.cat_unselected_bg);
         this.unselectedTextColor = ContextCompat.getColor(context, R.color.cat_unselected_text);
+    }
+
+    // 【新增】设置长按监听器
+    public void setOnCategoryLongClickListener(OnCategoryLongClickListener longListener) {
+        this.longListener = longListener;
     }
 
     public void updateData(List<String> newCategories) {
@@ -86,10 +93,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
         boolean isSelected = category.equals(selectedCategory);
         
         GradientDrawable background = new GradientDrawable();
-        // 【核心修改】将形状改为矩形
         background.setShape(GradientDrawable.RECTANGLE);
-        
-        // 【新增】设置圆角半径 (14dp 转像素)
         float radius = 16 * context.getResources().getDisplayMetrics().density;
         background.setCornerRadius(radius);
 
@@ -109,6 +113,14 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
             if (listener != null) {
                 listener.onCategoryClick(category);
             }
+        });
+
+        // 【新增】绑定长按事件
+        holder.itemView.setOnLongClickListener(v -> {
+            if (longListener != null) {
+                return longListener.onCategoryLongClick(category);
+            }
+            return false;
         });
     }
 

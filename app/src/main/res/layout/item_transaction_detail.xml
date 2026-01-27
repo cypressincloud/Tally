@@ -12,15 +12,32 @@
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/tv_detail_date"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="分类"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tv_detail_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="分类"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"/>
+
+            <TextView
+                android:id="@+id/tv_detail_sub_category"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="细分"
+                android:textSize="12sp"
+                android:textColor="#999999"
+                android:layout_marginStart="8dp"
+                android:visibility="gone"/>
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tv_detail_amount"
@@ -36,7 +53,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp">
-
         <FrameLayout
             android:id="@+id/fl_status_container"
             android:layout_width="wrap_content"

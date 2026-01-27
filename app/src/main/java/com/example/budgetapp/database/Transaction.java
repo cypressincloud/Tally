@@ -15,9 +15,10 @@ public class Transaction {
     public String note;
     public String remark;
     public int assetId;
-
-    // 【新增】货币符号
     public String currencySymbol;
+
+    // 【新增】二级分类
+    public String subCategory;
 
     public Transaction() {
     }
@@ -41,6 +42,7 @@ public class Transaction {
         this.note = note;
         this.remark = remark;
         this.assetId = 0;
-        this.currencySymbol = "¥"; // 默认人民币
+        this.currencySymbol = "¥";
+        this.subCategory = ""; // 默认为空
     }
 }

@@ -80,6 +80,14 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
         // 2. 分类
         holder.tvDate.setText(t.category);
 
+        // 【新增】显示二级分类
+        if (t.subCategory != null && !t.subCategory.isEmpty()) {
+            holder.tvSubCategory.setText(t.subCategory);
+            holder.tvSubCategory.setVisibility(View.VISIBLE);
+        } else {
+            holder.tvSubCategory.setVisibility(View.GONE);
+        }
+
         // 3. Note
         if (t.note != null && !t.note.isEmpty()) {
             holder.tvNote.setVisibility(View.VISIBLE);
@@ -130,11 +138,14 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView tvDate, tvAmount, tvNote;
         View viewIndicator;
+
+        TextView tvSubCategory;
         TextView tvAssetName;
 
         ViewHolder(View v) {
             super(v);
             tvDate = v.findViewById(R.id.tv_detail_date);
+            tvSubCategory = v.findViewById(R.id.tv_detail_sub_category); // 【新增】
             tvAmount = v.findViewById(R.id.tv_detail_amount);
             tvNote = v.findViewById(R.id.tv_detail_note);
             viewIndicator = v.findViewById(R.id.view_remark_indicator);

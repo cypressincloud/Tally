@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -22,15 +23,22 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.NumberPicker;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import android.view.ContextThemeWrapper; // 用于让代码创建的 Chip 应用正确的样式
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -65,7 +73,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class RecordFragment extends Fragment {
-
     private FinanceViewModel viewModel;
     private CalendarAdapter adapter;
     private YearMonth currentMonth;
@@ -620,9 +627,12 @@ public class RecordFragment extends Fragment {
 
         final boolean[] isExpense = {true}; // 默认支出
         final String[] selectedCategory = {expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0)};
+        final String[] selectedSubCategory = {""};
 
         CategoryAdapter categoryAdapter = new CategoryAdapter(getContext(), expenseCategories, selectedCategory[0], category -> {
             selectedCategory[0] = category;
+            // 切换一级分类时，重置二级分类
+            selectedSubCategory[0] = "";
             if ("自定义".equals(category)) {
                 etCustomCategory.setVisibility(View.VISIBLE);
                 etCustomCategory.requestFocus();
@@ -630,7 +640,117 @@ public class RecordFragment extends Fragment {
                 etCustomCategory.setVisibility(View.GONE);
             }
         });
+
+        // 【优化】长按显示二级分类选择 (使用 ChipGroup 胶囊形式呈现)
+        categoryAdapter.setOnCategoryLongClickListener(category -> {
+            if (CategoryManager.isSubCategoryEnabled(getContext()) && !"自定义".equals(category)) {
+                List<String> subCats = CategoryManager.getSubCategories(getContext(), category);
+
+                // 构建自定义 Dialog
+                AlertDialog.Builder subBuilder = new AlertDialog.Builder(getContext());
+                View subCatView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_select_sub_category, null);
+                subBuilder.setView(subCatView);
+                AlertDialog subCatDialog = subBuilder.create();
+
+                // 设置背景透明，适配圆角背景
+                if (subCatDialog.getWindow() != null) {
+                    subCatDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                }
+
+                // 绑定控件
+                TextView tvTitle = subCatView.findViewById(R.id.tv_title);
+                tvTitle.setText(category + " - 选择细分");
+
+                ChipGroup cgSubCategories = subCatView.findViewById(R.id.cg_sub_categories);
+                Button btnCancel = subCatView.findViewById(R.id.btn_cancel);
+                TextView tvEmpty = subCatView.findViewById(R.id.tv_empty);
+                View nsvContainer = subCatView.findViewById(R.id.nsv_container);
+
+                if (subCats.isEmpty()) {
+                    // ... (空状态逻辑保持不变) ...
+                    cgSubCategories.setVisibility(View.GONE);
+                    tvEmpty.setVisibility(View.VISIBLE);
+                    nsvContainer.setMinimumHeight(150);
+                } else {
+                    cgSubCategories.setVisibility(View.VISIBLE);
+                    tvEmpty.setVisibility(View.GONE);
+
+                    String currentSelectedSub = selectedSubCategory[0];
+
+                    // 准备颜色资源 (为了性能，提取到循环外)
+                    int bgDefault = ContextCompat.getColor(getContext(), R.color.cat_unselected_bg); // 设置页同款背景
+                    int bgChecked = ContextCompat.getColor(getContext(), R.color.app_yellow);        // 选中高亮色
+                    int textDefault = ContextCompat.getColor(getContext(), R.color.text_primary);    // 设置页同款文字
+                    int textChecked = ContextCompat.getColor(getContext(), R.color.cat_selected_text); // 选中后文字颜色
+
+                    // 定义状态列表: [选中状态, 默认状态]
+                    int[][] states = new int[][] {
+                            new int[] { android.R.attr.state_checked },
+                            new int[] { }
+                    };
+
+                    ColorStateList bgStateList = new ColorStateList(states, new int[] { bgChecked, bgDefault });
+                    ColorStateList textStateList = new ColorStateList(states, new int[] { textChecked, textDefault });
+
+                    // 动态添加胶囊 (Chips)
+                    for (String subCatName : subCats) {
+                        // ... (Chip 创建和样式设置保持不变)
+                        Chip chip = new Chip(getContext());
+                        chip.setText(subCatName);
+                        chip.setCheckable(true);
+                        chip.setClickable(true);
+                        chip.setChipBackgroundColor(bgStateList);
+                        chip.setTextColor(textStateList);
+                        chip.setChipStrokeWidth(0);
+                        chip.setCheckedIconVisible(false);
+
+                        // 如果该细分是当前已选中的，则高亮显示
+                        if (subCatName.equals(currentSelectedSub)) {
+                            chip.setChecked(true);
+                        }
+
+                        // 【修改】点击事件：支持取消选择
+                        chip.setOnClickListener(v -> {
+                            // 判断是否点击了当前已经选中的细分
+                            if (subCatName.equals(selectedSubCategory[0])) {
+                                // 如果是，则取消选择
+                                selectedSubCategory[0] = null;
+                                Toast.makeText(getContext(), "已取消细分", Toast.LENGTH_SHORT).show();
+                            } else {
+                                // 如果不是，则选中当前细分
+                                selectedSubCategory[0] = subCatName;
+                                Toast.makeText(getContext(), "已选择: " + subCatName, Toast.LENGTH_SHORT).show();
+                            }
+
+                            // 无论选中还是取消，都确保一级分类被选中，并关闭弹窗
+                            categoryAdapter.setSelectedCategory(category);
+                            selectedCategory[0] = category;
+                            etCustomCategory.setVisibility(View.GONE);
+                            subCatDialog.dismiss();
+                        });
+
+                        cgSubCategories.addView(chip);
+                    }
+                }
+
+                // 取消按钮事件
+                btnCancel.setOnClickListener(v -> subCatDialog.dismiss());
+
+                subCatDialog.show();
+                return true;
+            }
+            return false;
+        });
+
         rvCategory.setAdapter(categoryAdapter);
+
+        if (existingTransaction != null) {
+            // ... (保留回显逻辑)
+            // 【新增】回显二级分类
+            if (existingTransaction.subCategory != null) {
+                selectedSubCategory[0] = existingTransaction.subCategory;
+            }
+        }
 
         // === 资产配置 ===
         AssistantConfig config = new AssistantConfig(requireContext());
@@ -830,6 +950,7 @@ public class RecordFragment extends Fragment {
                     Transaction t = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     t.assetId = selectedAssetId;
                     t.currencySymbol = currencySymbol; // 保存符号
+                    t.subCategory = selectedSubCategory[0];
                     viewModel.addTransaction(t);
 
                     if (selectedAssetId != 0) {
@@ -847,6 +968,7 @@ public class RecordFragment extends Fragment {
                     updateT.id = existingTransaction.id;
                     updateT.assetId = selectedAssetId;
                     updateT.currencySymbol = currencySymbol; // 保存符号
+                    updateT.subCategory = selectedSubCategory[0];
                     viewModel.updateTransaction(updateT);
                 }
                 dialog.dismiss();

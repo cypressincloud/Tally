@@ -10,8 +10,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -29,8 +31,10 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -45,6 +49,8 @@ import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.util.AutoAssetManager;
 import com.example.budgetapp.util.CategoryManager;
 import com.example.budgetapp.util.KeywordManager;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -70,8 +76,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
     private long lastRecordTime = 0;
     private String lastContentSignature = "";
     
-    // 【新增】记录窗口关闭的时间，用于防抖
     private long lastWindowDismissTime = 0;
+
+    // 【新增】二级分类变量
+    private String selectedSubCategory = null;
 
     private List<AssetAccount> loadedAssets = new ArrayList<>();
 
@@ -137,7 +145,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             int autoAssetId = AutoAssetManager.matchAsset(this, currentPackageName, text);
 
-            // 如果匹配到关键字，则重新从根节点查找可能的金额
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null) {
                 for (String kw : expenseKeywords) {
@@ -181,12 +188,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         double bestAmount = -1;
         for (Double amount : candidates) {
             String strAmt = String.valueOf(amount);
-            // 优先选择带小数位的金额 (例如 12.50)
             if (strAmt.contains(".") && !strAmt.endsWith(".0")) { 
                 bestAmount = amount;
                 break; 
             }
-            // 其次选择任意正数
             if (bestAmount == -1 && amount > 0) {
                 bestAmount = amount; 
             }
@@ -202,7 +207,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         String text = getTextOrDescription(node);
 
         if (text != null && !text.isEmpty()) {
-            // 过滤掉包含冒号的文本，避免将时间（如 12:30）解析为数字
             if (!text.contains(":")) {
                 String cleanText = quantityPattern.matcher(text).replaceAll("");
                 
@@ -211,15 +215,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     try {
                         String numStr = matcher.group(1).replace(",", "");
                         double val = Double.parseDouble(numStr);
-                        
-                        // 过滤规则：
-                        // 1. 金额必须 > 0 且 < 200000
-                        // 2. 过滤掉可能是年份的整数 (2020-2035)
                         if (val > 0 && val < 200000 && !(val >= 2020 && val <= 2035 && val % 1 == 0)) {
                             list.add(val);
                         }
                     } catch (Exception e) {
-                        // ignore parsing errors
                     }
                 }
             }
@@ -240,7 +239,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
     private void triggerConfirmWindow(double amount, int type, String category, int assetId) {
         long now = System.currentTimeMillis();
 
-        // 【修改】如果距离上次关闭窗口不足 2.5 秒，则忽略本次触发
         if (now - lastWindowDismissTime < 2500) {
             return;
         }
@@ -259,10 +257,13 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private void showConfirmWindow(double amount, int type, String category, String note, int matchedAssetId) {
         if (isWindowShowing) return;
+        
+        // 重置二级分类
+        selectedSubCategory = null;
 
         if (!Settings.canDrawOverlays(this)) {
             int finalAssetId = (matchedAssetId > 0) ? matchedAssetId : 0;
-            saveToDatabase(amount, type, category, note + " (后台)", "", finalAssetId, "¥");
+            saveToDatabase(amount, type, category, null, note + " (后台)", "", finalAssetId, "¥");
             return;
         }
 
@@ -312,13 +313,12 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
-            // 处理货币单位
             SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
             boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
 
             if (isCurrencyEnabled) {
                 btnCurrency.setVisibility(View.VISIBLE);
-                btnCurrency.setText("¥"); // 默认值
+                btnCurrency.setText("¥"); 
                 btnCurrency.setOnClickListener(v -> {
                     com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(themeContext, btnCurrency, true);
                 });
@@ -350,6 +350,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             CategoryAdapter categoryAdapter = new CategoryAdapter(themeContext, currentList, selectedCategory[0], cat -> {
                 selectedCategory[0] = cat;
+                selectedSubCategory = null; // 重置
                 if ("自定义".equals(cat)) {
                     etCategory.setVisibility(View.VISIBLE);
                     etCategory.requestFocus();
@@ -357,6 +358,16 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     etCategory.setVisibility(View.GONE);
                 }
             });
+
+            // 【新增】长按监听
+            categoryAdapter.setOnCategoryLongClickListener(cat -> {
+                if (CategoryManager.isSubCategoryEnabled(this) && !"自定义".equals(cat)) {
+                    showSubCategoryDialog(themeContext, cat, categoryAdapter);
+                    return true;
+                }
+                return false;
+            });
+
             rvCategory.setAdapter(categoryAdapter);
 
             if (type == 1) {
@@ -371,12 +382,14 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     String first = incomeCategories.isEmpty() ? "自定义" : incomeCategories.get(0);
                     categoryAdapter.setSelectedCategory(first);
                     selectedCategory[0] = first;
+                    selectedSubCategory = null;
                     etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
                 } else {
                     categoryAdapter.updateData(expenseCategories);
                     String first = expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0);
                     categoryAdapter.setSelectedCategory(first);
                     selectedCategory[0] = first;
+                    selectedSubCategory = null;
                     etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
                 }
             });
@@ -449,7 +462,8 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
                     String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
-                    saveToDatabase(finalAmount, finalType, finalCat, finalNote, finalRemark, assetId, symbol);
+                    // 【修改】保存 selectedSubCategory
+                    saveToDatabase(finalAmount, finalType, finalCat, selectedSubCategory, finalNote, finalRemark, assetId, symbol);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "已记账", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -470,7 +484,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         try { wm.removeView(view); } catch (Exception e) {}
         finally { 
             isWindowShowing = false;
-            // 【修改】记录关闭时间
             lastWindowDismissTime = System.currentTimeMillis();
         }
     }
@@ -515,7 +528,98 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         } catch (Exception e) { Log.e(TAG, "Foreground service failed", e); }
     }
 
-    private void saveToDatabase(double amount, int type, String category, String note, String remark, int assetId, String currencySymbol) {
+    // 【修改】显示二级分类对话框 (逻辑与 RecordFragment 保持一致)
+    private void showSubCategoryDialog(Context context, String parentCategory, CategoryAdapter adapter) {
+        // ... (代码与上方 QuickAddTileService 中的完全一致) ...
+        // 为了方便您复制，这里再次提供完整代码块
+
+        List<String> subCats = CategoryManager.getSubCategories(this, parentCategory);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        View subCatView = LayoutInflater.from(context).inflate(R.layout.dialog_select_sub_category, null);
+        builder.setView(subCatView);
+
+        AlertDialog subCatDialog = builder.create();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            subCatDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+        } else {
+            subCatDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_PHONE);
+        }
+
+        subCatDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+        TextView tvTitle = subCatView.findViewById(R.id.tv_title);
+        tvTitle.setText(parentCategory + " - 选择细分");
+
+        ChipGroup cgSubCategories = subCatView.findViewById(R.id.cg_sub_categories);
+        TextView tvEmpty = subCatView.findViewById(R.id.tv_empty);
+        View nsvContainer = subCatView.findViewById(R.id.nsv_container);
+        Button btnCancel = subCatView.findViewById(R.id.btn_cancel);
+
+        if (subCats.isEmpty()) {
+            cgSubCategories.setVisibility(View.GONE);
+            tvEmpty.setVisibility(View.VISIBLE);
+            nsvContainer.setMinimumHeight(150);
+        } else {
+            cgSubCategories.setVisibility(View.VISIBLE);
+            tvEmpty.setVisibility(View.GONE);
+
+            int bgDefault = ContextCompat.getColor(context, R.color.cat_unselected_bg);
+            int bgChecked = ContextCompat.getColor(context, R.color.app_yellow);
+            int textDefault = ContextCompat.getColor(context, R.color.text_primary);
+            int textChecked = ContextCompat.getColor(context, R.color.cat_selected_text);
+
+            int[][] states = new int[][] {
+                    new int[] { android.R.attr.state_checked },
+                    new int[] { }
+            };
+            ColorStateList bgStateList = new ColorStateList(states, new int[] { bgChecked, bgDefault });
+            ColorStateList textStateList = new ColorStateList(states, new int[] { textChecked, textDefault });
+
+            for (String subCatName : subCats) {
+                // ... (Chip 创建和样式设置保持不变)
+                Chip chip = new Chip(context);
+                chip.setText(subCatName);
+                chip.setCheckable(true);
+                chip.setClickable(true);
+                chip.setChipBackgroundColor(bgStateList);
+                chip.setTextColor(textStateList);
+                chip.setChipStrokeWidth(0);
+                chip.setCheckedIconVisible(false);
+
+                if (subCatName.equals(selectedSubCategory)) {
+                    chip.setChecked(true);
+                }
+
+                // 【修改】点击事件：支持取消选择
+                chip.setOnClickListener(v -> {
+                    if (subCatName.equals(selectedSubCategory)) {
+                        // 取消选择
+                        selectedSubCategory = null;
+                        Toast.makeText(this, "已取消细分", Toast.LENGTH_SHORT).show();
+                    } else {
+                        // 选中
+                        selectedSubCategory = subCatName;
+                        Toast.makeText(this, "已选择: " + subCatName, Toast.LENGTH_SHORT).show();
+                    }
+
+                    if (adapter != null) {
+                        adapter.setSelectedCategory(parentCategory);
+                    }
+                    subCatDialog.dismiss();
+                });
+
+                cgSubCategories.addView(chip);
+            }
+        }
+
+        btnCancel.setOnClickListener(v -> subCatDialog.dismiss());
+        subCatDialog.show();
+    }
+
+    // 【修改】添加 subCategory 参数
+    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
             
@@ -523,6 +627,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             t.date = System.currentTimeMillis();
             t.type = type;
             t.category = category;
+            t.subCategory = subCategory; // 保存二级分类
             t.amount = amount;
             t.note = note;
             t.remark = remark;
