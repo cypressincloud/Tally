@@ -216,34 +216,57 @@ public class CategorySettingsActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    // 【修改】重写 showAddDialog 方法
     private void showAddDialog(boolean isExpense) {
-        // ... (保持原样，或者也可以统一优化，这里暂不改动以聚焦需求)
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        final EditText input = new EditText(this);
-        input.setHint("输入分类名称");
-        int padding = (int) (20 * getResources().getDisplayMetrics().density);
-        input.setPadding(padding, padding, padding, padding);
-        input.setBackground(null);
-        builder.setTitle(isExpense ? "添加支出分类" : "添加收入分类")
-                .setView(input)
-                .setPositiveButton("确定", (dialog, which) -> {
-                    String text = input.getText().toString().trim();
-                    if (!text.isEmpty()) {
-                        List<String> list = isExpense ? expenseList : incomeList;
-                        if (list.contains(text)) {
-                            Toast.makeText(this, "分类已存在", Toast.LENGTH_SHORT).show();
-                        } else {
-                            if (list.contains("自定义")) {
-                                list.add(list.indexOf("自定义"), text);
-                            } else {
-                                list.add(text);
-                            }
-                            saveAndRefresh(isExpense);
-                        }
+        // 1. 加载新布局
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_add_category, null);
+        builder.setView(view);
+
+        AlertDialog dialog = builder.create();
+
+        // 2. 设置背景透明，这一步对于圆角效果至关重要
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        // 3. 获取控件
+        TextView tvTitle = view.findViewById(R.id.tv_dialog_title);
+        EditText etInput = view.findViewById(R.id.et_category_name);
+        Button btnCancel = view.findViewById(R.id.btn_cancel);
+        Button btnConfirm = view.findViewById(R.id.btn_confirm);
+
+        // 4. 设置标题
+        tvTitle.setText(isExpense ? "添加支出分类" : "添加收入分类");
+
+        // 自动弹出键盘 (可选优化)
+        etInput.requestFocus();
+
+        // 5. 按钮事件
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnConfirm.setOnClickListener(v -> {
+            String text = etInput.getText().toString().trim();
+            if (!text.isEmpty()) {
+                List<String> list = isExpense ? expenseList : incomeList;
+                if (list.contains(text)) {
+                    Toast.makeText(this, "该分类已存在", Toast.LENGTH_SHORT).show();
+                } else {
+                    // 插入逻辑：如果有"自定义"，插在它前面，否则插在最后
+                    if (list.contains("自定义")) {
+                        list.add(list.indexOf("自定义"), text);
+                    } else {
+                        list.add(text);
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                    saveAndRefresh(isExpense);
+                    dialog.dismiss();
+                }
+            } else {
+                Toast.makeText(this, "请输入分类名称", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        dialog.show();
     }
 
     // 替换原有的 showDeleteDialog 方法

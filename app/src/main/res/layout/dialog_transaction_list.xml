@@ -76,7 +76,7 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_add_overtime"
                 android:layout_width="0dp"
-                android:layout_height="46dp"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:text="加班"
                 android:layout_marginEnd="8dp"
@@ -92,7 +92,7 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_add_transaction"
                 android:layout_width="0dp"
-                android:layout_height="46dp"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:text="记一笔"
                 android:backgroundTint="@color/app_yellow"
@@ -108,7 +108,7 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_close_dialog"
             android:layout_width="0dp"
-            android:layout_height="46dp"
+            android:layout_height="48dp"
             android:text="关  闭"
             android:textStyle="bold"
             android:backgroundTint="@color/app_yellow"
