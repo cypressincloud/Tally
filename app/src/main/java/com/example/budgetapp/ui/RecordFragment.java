@@ -655,6 +655,15 @@ public class RecordFragment extends Fragment {
                             String uri = resultData.getString(PhotoActionActivity.KEY_RESULT_URI);
                             currentPhotoPath[0] = uri;
                             updatePhotoButtons.run();
+
+                            // 【修改】选中/拍照后自动保存 (仅针对编辑模式)
+                            if (existingTransaction != null) {
+                                // 1. 更新对象中的 photoPath
+                                existingTransaction.photoPath = uri;
+                                // 2. 更新数据库
+                                viewModel.updateTransaction(existingTransaction);
+                                Toast.makeText(getContext(), "照片已添加并保存", Toast.LENGTH_SHORT).show();
+                            }
                         }
                     }
                 });
@@ -709,6 +718,13 @@ public class RecordFragment extends Fragment {
                     // 清除引用并更新 UI
                     currentPhotoPath[0] = "";
                     updatePhotoButtons.run();
+
+                    // 【新增】如果是编辑模式，删除后也自动保存清空状态
+                    if (existingTransaction != null) {
+                        existingTransaction.photoPath = "";
+                        viewModel.updateTransaction(existingTransaction);
+                    }
+
                     deleteDialog.dismiss();
                 });
 
