@@ -14,9 +14,12 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.ResultReceiver;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
@@ -45,6 +48,7 @@ import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.database.TransactionDao;
 import com.example.budgetapp.ui.CategoryAdapter;
+import com.example.budgetapp.ui.PhotoActionActivity;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.util.AutoAssetManager;
 import com.example.budgetapp.util.CategoryManager;
@@ -72,13 +76,13 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean isWindowShowing = false;
+    private View windowRootView; // 【新增】
     private View keepAliveView;
     private long lastRecordTime = 0;
     private String lastContentSignature = "";
-    
+
     private long lastWindowDismissTime = 0;
 
-    // 【新增】二级分类变量
     private String selectedSubCategory = null;
 
     private List<AssetAccount> loadedAssets = new ArrayList<>();
@@ -94,12 +98,12 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
                 AccessibilityNodeInfo rootNode = getRootInActiveWindow();
                 if (rootNode == null) return;
-                
+
                 String packageName = "unknown";
                 if (rootNode.getPackageName() != null) {
                     packageName = rootNode.getPackageName().toString();
                 }
-                
+
                 scanAndAnalyze(rootNode, packageName);
             } catch (Exception e) {
                 Log.e(TAG, "Scan error", e);
@@ -130,21 +134,21 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
         handler.removeCallbacks(scanRunnable);
         if (isWindowShowing) return;
-        
+
         handler.postDelayed(scanRunnable, 300);
     }
 
+    // ... (保留 scanAndAnalyze, getAppNameReadable, findAmountRecursive, collectAllNumbers, getTextOrDescription, triggerConfirmWindow 逻辑) ...
+    // 为了篇幅，中间这些分析逻辑代码省略，请保持原样 ...
+    // 此处只粘贴修改过的 showConfirmWindow 及辅助方法
+
     private void scanAndAnalyze(AccessibilityNodeInfo node, String currentPackageName) {
         if (node == null) return;
-
         String text = getTextOrDescription(node);
-        
         if (text != null && !text.isEmpty()) {
             Set<String> expenseKeywords = KeywordManager.getKeywords(this, currentPackageName, KeywordManager.TYPE_EXPENSE);
             Set<String> incomeKeywords = KeywordManager.getKeywords(this, currentPackageName, KeywordManager.TYPE_INCOME);
-
             int autoAssetId = AutoAssetManager.matchAsset(this, currentPackageName, text);
-
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null) {
                 for (String kw : expenseKeywords) {
@@ -153,7 +157,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         return;
                     }
                 }
-
                 for (String kw : incomeKeywords) {
                     if (text.contains(kw)) {
                         findAmountRecursive(root, 1, getAppNameReadable(currentPackageName), autoAssetId);
@@ -162,7 +165,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 }
             }
         }
-
         int count = node.getChildCount();
         for (int i = 0; i < count; i++) {
             scanAndAnalyze(node.getChild(i), currentPackageName);
@@ -183,20 +185,18 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
     private void findAmountRecursive(AccessibilityNodeInfo root, int type, String defaultCategory, int matchedAssetId) {
         if (root == null) return;
         List<Double> candidates = new ArrayList<>();
-        collectAllNumbers(root, candidates); 
-
+        collectAllNumbers(root, candidates);
         double bestAmount = -1;
         for (Double amount : candidates) {
             String strAmt = String.valueOf(amount);
-            if (strAmt.contains(".") && !strAmt.endsWith(".0")) { 
+            if (strAmt.contains(".") && !strAmt.endsWith(".0")) {
                 bestAmount = amount;
-                break; 
+                break;
             }
             if (bestAmount == -1 && amount > 0) {
-                bestAmount = amount; 
+                bestAmount = amount;
             }
         }
-
         if (bestAmount > 0) {
             triggerConfirmWindow(bestAmount, type, defaultCategory, matchedAssetId);
         }
@@ -205,11 +205,9 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
     private void collectAllNumbers(AccessibilityNodeInfo node, List<Double> list) {
         if (node == null) return;
         String text = getTextOrDescription(node);
-
         if (text != null && !text.isEmpty()) {
             if (!text.contains(":")) {
                 String cleanText = quantityPattern.matcher(text).replaceAll("");
-                
                 Matcher matcher = amountPattern.matcher(cleanText);
                 while (matcher.find()) {
                     try {
@@ -218,12 +216,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         if (val > 0 && val < 200000 && !(val >= 2020 && val <= 2035 && val % 1 == 0)) {
                             list.add(val);
                         }
-                    } catch (Exception e) {
-                    }
+                    } catch (Exception e) {}
                 }
             }
         }
-
         int count = node.getChildCount();
         for (int i = 0; i < count; i++) {
             collectAllNumbers(node.getChild(i), list);
@@ -238,32 +234,25 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private void triggerConfirmWindow(double amount, int type, String category, int assetId) {
         long now = System.currentTimeMillis();
-
         if (now - lastWindowDismissTime < 2500) {
             return;
         }
-
         String signature = amount + "-" + type;
         if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return;
-
         lastRecordTime = now;
         lastContentSignature = signature;
-
         SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
         String timeNote = sdf.format(new Date(now)) + " auto";
-
         handler.post(() -> showConfirmWindow(amount, type, category, timeNote, assetId));
     }
 
     private void showConfirmWindow(double amount, int type, String category, String note, int matchedAssetId) {
         if (isWindowShowing) return;
-        
-        // 重置二级分类
         selectedSubCategory = null;
 
         if (!Settings.canDrawOverlays(this)) {
             int finalAssetId = (matchedAssetId > 0) ? matchedAssetId : 0;
-            saveToDatabase(amount, type, category, null, note + " (后台)", "", finalAssetId, "¥");
+            saveToDatabase(amount, type, category, null, note + " (后台)", "", finalAssetId, "¥", "");
             return;
         }
 
@@ -276,8 +265,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             params.format = PixelFormat.TRANSLUCENT;
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;
-            params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
-                    WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+            params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_DIM_BEHIND;
             params.dimAmount = 0.5f;
             params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
             params.gravity = Gravity.CENTER;
@@ -286,6 +274,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             ContextThemeWrapper themeContext = new ContextThemeWrapper(this, R.style.Theme_BudgetApp);
             LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
+
+            // 【新增】
+            this.windowRootView = floatView;
+            android.widget.FrameLayout windowContentRoot = floatView.findViewById(R.id.window_root);
 
             View rootView = floatView.findViewById(R.id.window_root);
             if (rootView != null) {
@@ -301,7 +293,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             EditText etAmount = floatView.findViewById(R.id.et_window_amount);
             Button btnCurrency = floatView.findViewById(R.id.btn_window_currency);
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
-            RecyclerView rvCategory = floatView.findViewById(R.id.rv_window_category); 
+            RecyclerView rvCategory = floatView.findViewById(R.id.rv_window_category);
             EditText etCategory = floatView.findViewById(R.id.et_window_category);
             EditText etNote = floatView.findViewById(R.id.et_window_note);
             EditText etRemark = floatView.findViewById(R.id.et_window_remark);
@@ -310,15 +302,20 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             Button btnSave = floatView.findViewById(R.id.btn_window_save);
             Button btnCancel = floatView.findViewById(R.id.btn_window_cancel);
 
+            Button btnTakePhoto = floatView.findViewById(R.id.btn_window_take_photo);
+            Button btnViewPhoto = floatView.findViewById(R.id.btn_window_view_photo);
+
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
             SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
             boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+            boolean isPhotoBackupEnabled = prefs.getBoolean("enable_photo_backup", false);
+            final String[] currentPhotoPath = {null};
 
             if (isCurrencyEnabled) {
                 btnCurrency.setVisibility(View.VISIBLE);
-                btnCurrency.setText("¥"); 
+                btnCurrency.setText("¥");
                 btnCurrency.setOnClickListener(v -> {
                     com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(themeContext, btnCurrency, true);
                 });
@@ -326,31 +323,47 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 btnCurrency.setVisibility(View.GONE);
             }
 
+            // 【修改】
+            if (isPhotoBackupEnabled) {
+                btnTakePhoto.setVisibility(View.VISIBLE);
+                btnTakePhoto.setOnClickListener(v -> {
+                    showLocalPhotoDialog(themeContext, windowContentRoot, actionType -> {
+                        hideWindowAndStartPhotoActivity(actionType, null, currentPhotoPath);
+                    });
+                });
+
+                btnViewPhoto.setOnClickListener(v -> {
+                    if (currentPhotoPath[0] != null) {
+                        hideWindowAndStartPhotoActivity(PhotoActionActivity.ACTION_VIEW, currentPhotoPath[0], currentPhotoPath);
+                    }
+                });
+            }
+
             List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
             List<String> incomeCategories = CategoryManager.getIncomeCategories(this);
 
             rvCategory.setLayoutManager(new GridLayoutManager(themeContext, 5));
-            final String[] selectedCategory = {category}; 
+            final String[] selectedCategory = {category};
 
             List<String> currentList = (type == 1) ? incomeCategories : expenseCategories;
-            
+
             if (!currentList.contains(category)) {
-                 if (type == 0 && (category.equals("淘宝") || category.equals("京东") || category.equals("拼多多"))) {
-                     selectedCategory[0] = "购物";
-                 } else if (type == 0 && category.equals("美团")) {
-                     selectedCategory[0] = "餐饮"; 
-                 } else {
-                     selectedCategory[0] = "自定义";
-                     etCategory.setText(category);
-                     etCategory.setVisibility(View.VISIBLE);
-                 }
+                if (type == 0 && (category.equals("淘宝") || category.equals("京东") || category.equals("拼多多"))) {
+                    selectedCategory[0] = "购物";
+                } else if (type == 0 && category.equals("美团")) {
+                    selectedCategory[0] = "餐饮";
+                } else {
+                    selectedCategory[0] = "自定义";
+                    etCategory.setText(category);
+                    etCategory.setVisibility(View.VISIBLE);
+                }
             } else {
                 etCategory.setVisibility(View.GONE);
             }
 
             CategoryAdapter categoryAdapter = new CategoryAdapter(themeContext, currentList, selectedCategory[0], cat -> {
                 selectedCategory[0] = cat;
-                selectedSubCategory = null; // 重置
+                selectedSubCategory = null;
                 if ("自定义".equals(cat)) {
                     etCategory.setVisibility(View.VISIBLE);
                     etCategory.requestFocus();
@@ -359,7 +372,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 }
             });
 
-            // 【新增】长按监听
             categoryAdapter.setOnCategoryLongClickListener(cat -> {
                 if (CategoryManager.isSubCategoryEnabled(this) && !"自定义".equals(cat)) {
                     showSubCategoryDialog(themeContext, cat, categoryAdapter);
@@ -410,13 +422,12 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     noAsset.id = 0;
                     loadedAssets.add(noAsset);
                     if (assets != null) loadedAssets.addAll(assets);
-                    
-                    List<String> names = new ArrayList<>();
-                    for (AssetAccount a : loadedAssets) names.add(a.name);
-                    
+
                     int defaultAssetId = config.getDefaultAssetId();
                     int targetAssetId = (matchedAssetId > 0) ? matchedAssetId : defaultAssetId;
-                    
+                    List<String> names = new ArrayList<>();
+                    for (AssetAccount a : loadedAssets) names.add(a.name);
+
                     handler.post(() -> {
                         adapter.clear();
                         adapter.addAll(names);
@@ -441,14 +452,14 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     String finalNote = etNote.getText().toString();
                     String finalRemark = etRemark.getText().toString().trim();
                     int finalType = (rgType.getCheckedRadioButtonId() == R.id.rb_window_income) ? 1 : 0;
-                    
+
                     String finalCat = selectedCategory[0];
                     if ("自定义".equals(finalCat)) {
                         String customInput = etCategory.getText().toString().trim();
                         if (!customInput.isEmpty()) {
                             finalCat = customInput;
                         } else {
-                            finalCat = (finalType == 1) ? "退款" : "其他"; 
+                            finalCat = (finalType == 1) ? "退款" : "其他";
                         }
                     }
 
@@ -462,8 +473,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
                     String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
-                    // 【修改】保存 selectedSubCategory
-                    saveToDatabase(finalAmount, finalType, finalCat, selectedSubCategory, finalNote, finalRemark, assetId, symbol);
+                    saveToDatabase(finalAmount, finalType, finalCat, selectedSubCategory, finalNote, finalRemark, assetId, symbol, currentPhotoPath[0]);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "已记账", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -479,14 +489,79 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             isWindowShowing = false;
         }
     }
-    
+
     private void closeWindow(WindowManager wm, View view) {
         try { wm.removeView(view); } catch (Exception e) {}
-        finally { 
+        finally {
             isWindowShowing = false;
             lastWindowDismissTime = System.currentTimeMillis();
+            windowRootView = null; // 【新增】
         }
     }
+
+    // --- 新增辅助方法 START ---
+    interface PhotoActionResult {
+        void onAction(int type);
+    }
+
+    private void showLocalPhotoDialog(Context context, android.widget.FrameLayout root, PhotoActionResult listener) {
+        View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_photo_action, root, false);
+        View mask = new View(context);
+        mask.setBackgroundColor(Color.parseColor("#80000000"));
+        mask.setOnClickListener(v -> {
+            root.removeView(mask);
+            root.removeView(dialogView);
+        });
+        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
+        root.addView(mask, params);
+        android.view.ViewGroup.LayoutParams lp = dialogView.getLayoutParams();
+        android.widget.FrameLayout.LayoutParams dialogParams = new android.widget.FrameLayout.LayoutParams(
+                lp.width,
+                lp.height);
+        dialogParams.gravity = Gravity.CENTER;
+        root.addView(dialogView, dialogParams);
+
+        dialogView.findViewById(R.id.btn_action_camera).setOnClickListener(v -> {
+            root.removeView(mask);
+            root.removeView(dialogView);
+            listener.onAction(PhotoActionActivity.ACTION_CAMERA);
+        });
+        dialogView.findViewById(R.id.btn_action_gallery).setOnClickListener(v -> {
+            root.removeView(mask);
+            root.removeView(dialogView);
+            listener.onAction(PhotoActionActivity.ACTION_GALLERY);
+        });
+        dialogView.findViewById(R.id.btn_action_cancel).setOnClickListener(v -> {
+            root.removeView(mask);
+            root.removeView(dialogView);
+        });
+    }
+
+    private void hideWindowAndStartPhotoActivity(int actionType, String uri, String[] currentPhotoPathRef) {
+        if (windowRootView != null) windowRootView.setVisibility(View.GONE);
+        Intent intent = new Intent(this, PhotoActionActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.putExtra(PhotoActionActivity.EXTRA_ACTION_TYPE, actionType);
+        if (uri != null) intent.putExtra(PhotoActionActivity.EXTRA_IMAGE_URI, uri);
+        intent.putExtra(PhotoActionActivity.EXTRA_RECEIVER, new ResultReceiver(new Handler(Looper.getMainLooper())) {
+            @Override
+            protected void onReceiveResult(int resultCode, Bundle resultData) {
+                if (windowRootView != null) windowRootView.setVisibility(View.VISIBLE);
+                if (resultCode == 1 && resultData != null) {
+                    String resultUri = resultData.getString(PhotoActionActivity.KEY_RESULT_URI);
+                    if (currentPhotoPathRef != null) currentPhotoPathRef[0] = resultUri;
+                    if (resultUri != null && windowRootView != null) {
+                        Button btnView = windowRootView.findViewById(R.id.btn_window_view_photo);
+                        if (btnView != null) btnView.setVisibility(View.VISIBLE);
+                    }
+                }
+            }
+        });
+        startActivity(intent);
+    }
+    // --- 新增辅助方法 END ---
 
     private void setupKeepAliveWindow() {
         if (!Settings.canDrawOverlays(this) || keepAliveView != null) return;
@@ -495,11 +570,11 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         keepAliveView.setBackgroundColor(Color.TRANSPARENT);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams();
         params.width = 1; params.height = 1;
-        params.type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ? 
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
-        params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | 
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | 
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
+        params.type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
+        params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
         params.format = PixelFormat.TRANSLUCENT;
         params.gravity = Gravity.TOP | Gravity.START;
         try { wm.addView(keepAliveView, params); } catch (Exception e) {}
@@ -516,7 +591,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             Intent intent = new Intent(this, MainActivity.class);
             PendingIntent pendingIntent = PendingIntent.getActivity(
                     this, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-            Notification.Builder builder = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ? 
+            Notification.Builder builder = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
                     new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
             Notification notification = builder.setSmallIcon(R.drawable.ic_app_logo)
                     .setContentTitle("Tally").setContentText("招财进宝 财源广进").setContentIntent(pendingIntent).setOngoing(true).build();
@@ -528,35 +603,24 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         } catch (Exception e) { Log.e(TAG, "Foreground service failed", e); }
     }
 
-    // 【修改】显示二级分类对话框 (逻辑与 RecordFragment 保持一致)
     private void showSubCategoryDialog(Context context, String parentCategory, CategoryAdapter adapter) {
-        // ... (代码与上方 QuickAddTileService 中的完全一致) ...
-        // 为了方便您复制，这里再次提供完整代码块
-
         List<String> subCats = CategoryManager.getSubCategories(this, parentCategory);
-
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         View subCatView = LayoutInflater.from(context).inflate(R.layout.dialog_select_sub_category, null);
         builder.setView(subCatView);
-
         AlertDialog subCatDialog = builder.create();
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             subCatDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
         } else {
             subCatDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_PHONE);
         }
-
         subCatDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-
         TextView tvTitle = subCatView.findViewById(R.id.tv_title);
         tvTitle.setText(parentCategory + " - 选择细分");
-
         ChipGroup cgSubCategories = subCatView.findViewById(R.id.cg_sub_categories);
         TextView tvEmpty = subCatView.findViewById(R.id.tv_empty);
         View nsvContainer = subCatView.findViewById(R.id.nsv_container);
         Button btnCancel = subCatView.findViewById(R.id.btn_cancel);
-
         if (subCats.isEmpty()) {
             cgSubCategories.setVisibility(View.GONE);
             tvEmpty.setVisibility(View.VISIBLE);
@@ -564,21 +628,14 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         } else {
             cgSubCategories.setVisibility(View.VISIBLE);
             tvEmpty.setVisibility(View.GONE);
-
             int bgDefault = ContextCompat.getColor(context, R.color.cat_unselected_bg);
             int bgChecked = ContextCompat.getColor(context, R.color.app_yellow);
             int textDefault = ContextCompat.getColor(context, R.color.text_primary);
             int textChecked = ContextCompat.getColor(context, R.color.cat_selected_text);
-
-            int[][] states = new int[][] {
-                    new int[] { android.R.attr.state_checked },
-                    new int[] { }
-            };
+            int[][] states = new int[][] { new int[] { android.R.attr.state_checked }, new int[] { } };
             ColorStateList bgStateList = new ColorStateList(states, new int[] { bgChecked, bgDefault });
             ColorStateList textStateList = new ColorStateList(states, new int[] { textChecked, textDefault });
-
             for (String subCatName : subCats) {
-                // ... (Chip 创建和样式设置保持不变)
                 Chip chip = new Chip(context);
                 chip.setText(subCatName);
                 chip.setCheckable(true);
@@ -587,52 +644,42 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 chip.setTextColor(textStateList);
                 chip.setChipStrokeWidth(0);
                 chip.setCheckedIconVisible(false);
-
                 if (subCatName.equals(selectedSubCategory)) {
                     chip.setChecked(true);
                 }
-
-                // 【修改】点击事件：支持取消选择
                 chip.setOnClickListener(v -> {
                     if (subCatName.equals(selectedSubCategory)) {
-                        // 取消选择
                         selectedSubCategory = null;
                         Toast.makeText(this, "已取消细分", Toast.LENGTH_SHORT).show();
                     } else {
-                        // 选中
                         selectedSubCategory = subCatName;
                         Toast.makeText(this, "已选择: " + subCatName, Toast.LENGTH_SHORT).show();
                     }
-
-                    if (adapter != null) {
-                        adapter.setSelectedCategory(parentCategory);
-                    }
+                    if (adapter != null) adapter.setSelectedCategory(parentCategory);
                     subCatDialog.dismiss();
                 });
-
                 cgSubCategories.addView(chip);
             }
         }
-
         btnCancel.setOnClickListener(v -> subCatDialog.dismiss());
         subCatDialog.show();
     }
 
-    // 【修改】添加 subCategory 参数
-    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol) {
+    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
-            
+
             Transaction t = new Transaction();
             t.date = System.currentTimeMillis();
             t.type = type;
             t.category = category;
-            t.subCategory = subCategory; // 保存二级分类
+            t.subCategory = subCategory;
             t.amount = amount;
             t.note = note;
             t.remark = remark;
             t.assetId = assetId;
-            t.currencySymbol = currencySymbol; 
+            t.currencySymbol = currencySymbol;
+            t.photoPath = photoPath;
             dao.insert(t);
 
             if (assetId != 0) {

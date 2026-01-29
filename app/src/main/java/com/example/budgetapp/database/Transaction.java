@@ -16,7 +16,7 @@ public class Transaction {
     public String remark;
     public int assetId;
     public String currencySymbol;
-
+    public String photoPath;
     // 【新增】二级分类
     public String subCategory;
 
@@ -44,5 +44,6 @@ public class Transaction {
         this.assetId = 0;
         this.currencySymbol = "¥";
         this.subCategory = ""; // 默认为空
+        this.photoPath = "";
     }
 }

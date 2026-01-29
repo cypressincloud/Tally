@@ -8,6 +8,7 @@ import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputFilter;
@@ -32,13 +33,14 @@ import android.widget.Toast;
 
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import android.view.ContextThemeWrapper; // 用于让代码创建的 Chip 应用正确的样式
+import android.view.ContextThemeWrapper;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -451,7 +453,6 @@ public class RecordFragment extends Fragment {
         if (tvTitle != null) {
             DateTimeFormatter chFormatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.CHINA);
             tvTitle.setText(date.format(chFormatter));
-            // 【修改】显式禁用点击事件，确保点击无任何效果
             tvTitle.setClickable(false);
             tvTitle.setOnClickListener(null);
         }
@@ -577,9 +578,11 @@ public class RecordFragment extends Fragment {
         }
     }
 
+    // 覆写 showAddOrEditDialog 方法
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
         if (getContext() == null) return;
 
+        // 外部 Builder
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_transaction, null);
         builder.setView(dialogView);
@@ -590,7 +593,6 @@ public class RecordFragment extends Fragment {
         RadioGroup rgType = dialogView.findViewById(R.id.rg_type);
         RecyclerView rvCategory = dialogView.findViewById(R.id.rv_category);
         EditText etAmount = dialogView.findViewById(R.id.et_amount);
-        // 【新增】获取货币按钮
         Button btnCurrency = dialogView.findViewById(R.id.btn_currency);
 
         EditText etCustomCategory = dialogView.findViewById(R.id.et_custom_category);
@@ -602,22 +604,121 @@ public class RecordFragment extends Fragment {
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
 
+        // 【新增】 获取照片相关按钮
+        com.google.android.material.button.MaterialButton btnTakePhoto = dialogView.findViewById(R.id.btn_take_photo);
+        com.google.android.material.button.MaterialButton btnViewPhoto = dialogView.findViewById(R.id.btn_view_photo);
+
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
 
-        // 【新增】处理货币单位逻辑
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+
+        // 【新增】 检查是否开启照片备份
+        boolean isPhotoBackupEnabled = prefs.getBoolean("enable_photo_backup", false);
 
         if (isCurrencyEnabled) {
             btnCurrency.setVisibility(View.VISIBLE);
             if (existingTransaction != null && existingTransaction.currencySymbol != null && !existingTransaction.currencySymbol.isEmpty()) {
                 btnCurrency.setText(existingTransaction.currencySymbol);
             } else {
-                btnCurrency.setText("¥"); // 默认
+                btnCurrency.setText("¥");
             }
             btnCurrency.setOnClickListener(v -> showCurrencySelectDialog(btnCurrency));
         } else {
             btnCurrency.setVisibility(View.GONE);
+        }
+
+        // 【新增】 照片逻辑变量
+        final String[] currentPhotoPath = { existingTransaction != null ? existingTransaction.photoPath : "" };
+
+        // 【新增】 初始化照片按钮状态
+        Runnable updatePhotoButtons = () -> {
+            if (currentPhotoPath[0] != null && !currentPhotoPath[0].isEmpty()) {
+                btnViewPhoto.setVisibility(View.VISIBLE);
+            } else {
+                btnViewPhoto.setVisibility(View.GONE);
+            }
+        };
+
+        if (isPhotoBackupEnabled) {
+            btnTakePhoto.setVisibility(View.VISIBLE);
+            updatePhotoButtons.run();
+
+            // 点击拍照/选图
+            btnTakePhoto.setOnClickListener(v -> {
+                Intent intent = new Intent(requireContext(), PhotoActionActivity.class);
+                // 使用 ResultReceiver 获取结果
+                intent.putExtra(PhotoActionActivity.EXTRA_RECEIVER, new android.os.ResultReceiver(new android.os.Handler(android.os.Looper.getMainLooper())) {
+                    @Override
+                    protected void onReceiveResult(int resultCode, Bundle resultData) {
+                        if (resultCode == 1 && resultData != null) {
+                            String uri = resultData.getString(PhotoActionActivity.KEY_RESULT_URI);
+                            currentPhotoPath[0] = uri;
+                            updatePhotoButtons.run();
+                        }
+                    }
+                });
+                startActivity(intent);
+            });
+
+            // 点击查看照片
+            btnViewPhoto.setOnClickListener(v -> {
+                if (currentPhotoPath[0] != null && !currentPhotoPath[0].isEmpty()) {
+                    showPhotoDialog(currentPhotoPath[0]);
+                }
+            });
+
+            // 【修改】 长按删除照片逻辑 (使用自定义弹窗)
+            btnViewPhoto.setOnLongClickListener(v -> {
+                // 1. 构建自定义 View，注意变量名改为 deleteBuilder 以免冲突
+                android.app.AlertDialog.Builder deleteBuilder = new android.app.AlertDialog.Builder(getContext());
+                View deleteView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_delete_photo, null);
+                deleteBuilder.setView(deleteView);
+
+                android.app.AlertDialog deleteDialog = deleteBuilder.create();
+
+                // 设置背景透明，适配圆角
+                if (deleteDialog.getWindow() != null) {
+                    deleteDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                }
+
+                // 2. 绑定事件
+                deleteView.findViewById(R.id.btn_cancel_delete).setOnClickListener(view -> {
+                    deleteDialog.dismiss();
+                });
+
+                deleteView.findViewById(R.id.btn_confirm_delete).setOnClickListener(view -> {
+                    // 执行删除逻辑
+                    if (currentPhotoPath[0] != null && !currentPhotoPath[0].isEmpty()) {
+                        try {
+                            Uri uri = Uri.parse(currentPhotoPath[0]);
+                            DocumentFile file = DocumentFile.fromSingleUri(requireContext(), uri);
+                            if (file != null && file.exists()) {
+                                if (file.delete()) {
+                                    Toast.makeText(getContext(), "照片已彻底删除", Toast.LENGTH_SHORT).show();
+                                } else {
+                                    Toast.makeText(getContext(), "文件删除失败，仅移除引用", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            Toast.makeText(getContext(), "删除出错: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    // 清除引用并更新 UI
+                    currentPhotoPath[0] = "";
+                    updatePhotoButtons.run();
+                    deleteDialog.dismiss();
+                });
+
+                deleteDialog.show();
+                return true; // 消费长按事件
+            });
+
+        } else {
+            btnTakePhoto.setVisibility(View.GONE);
+            btnViewPhoto.setVisibility(View.GONE);
         }
 
         List<String> expenseCategories = CategoryManager.getExpenseCategories(getContext());
@@ -625,13 +726,12 @@ public class RecordFragment extends Fragment {
 
         rvCategory.setLayoutManager(new GridLayoutManager(getContext(), 5));
 
-        final boolean[] isExpense = {true}; // 默认支出
+        final boolean[] isExpense = {true};
         final String[] selectedCategory = {expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0)};
         final String[] selectedSubCategory = {""};
 
         CategoryAdapter categoryAdapter = new CategoryAdapter(getContext(), expenseCategories, selectedCategory[0], category -> {
             selectedCategory[0] = category;
-            // 切换一级分类时，重置二级分类
             selectedSubCategory[0] = "";
             if ("自定义".equals(category)) {
                 etCustomCategory.setVisibility(View.VISIBLE);
@@ -641,60 +741,41 @@ public class RecordFragment extends Fragment {
             }
         });
 
-        // 【优化】长按显示二级分类选择 (使用 ChipGroup 胶囊形式呈现)
+        // 长按显示二级分类 (保持原有逻辑)
         categoryAdapter.setOnCategoryLongClickListener(category -> {
             if (CategoryManager.isSubCategoryEnabled(getContext()) && !"自定义".equals(category)) {
                 List<String> subCats = CategoryManager.getSubCategories(getContext(), category);
-
-                // 构建自定义 Dialog
                 AlertDialog.Builder subBuilder = new AlertDialog.Builder(getContext());
                 View subCatView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_select_sub_category, null);
                 subBuilder.setView(subCatView);
                 AlertDialog subCatDialog = subBuilder.create();
-
-                // 设置背景透明，适配圆角背景
                 if (subCatDialog.getWindow() != null) {
                     subCatDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                 }
-
-                // 绑定控件
                 TextView tvTitle = subCatView.findViewById(R.id.tv_title);
                 tvTitle.setText(category + " - 选择细分");
-
                 ChipGroup cgSubCategories = subCatView.findViewById(R.id.cg_sub_categories);
                 Button btnCancel = subCatView.findViewById(R.id.btn_cancel);
                 TextView tvEmpty = subCatView.findViewById(R.id.tv_empty);
                 View nsvContainer = subCatView.findViewById(R.id.nsv_container);
 
                 if (subCats.isEmpty()) {
-                    // ... (空状态逻辑保持不变) ...
                     cgSubCategories.setVisibility(View.GONE);
                     tvEmpty.setVisibility(View.VISIBLE);
                     nsvContainer.setMinimumHeight(150);
                 } else {
                     cgSubCategories.setVisibility(View.VISIBLE);
                     tvEmpty.setVisibility(View.GONE);
-
                     String currentSelectedSub = selectedSubCategory[0];
-
-                    // 准备颜色资源 (为了性能，提取到循环外)
-                    int bgDefault = ContextCompat.getColor(getContext(), R.color.cat_unselected_bg); // 设置页同款背景
-                    int bgChecked = ContextCompat.getColor(getContext(), R.color.app_yellow);        // 选中高亮色
-                    int textDefault = ContextCompat.getColor(getContext(), R.color.text_primary);    // 设置页同款文字
-                    int textChecked = ContextCompat.getColor(getContext(), R.color.cat_selected_text); // 选中后文字颜色
-
-                    // 定义状态列表: [选中状态, 默认状态]
-                    int[][] states = new int[][] {
-                            new int[] { android.R.attr.state_checked },
-                            new int[] { }
-                    };
-
+                    int bgDefault = ContextCompat.getColor(getContext(), R.color.cat_unselected_bg);
+                    int bgChecked = ContextCompat.getColor(getContext(), R.color.app_yellow);
+                    int textDefault = ContextCompat.getColor(getContext(), R.color.text_primary);
+                    int textChecked = ContextCompat.getColor(getContext(), R.color.cat_selected_text);
+                    int[][] states = new int[][] { new int[] { android.R.attr.state_checked }, new int[] { } };
                     ColorStateList bgStateList = new ColorStateList(states, new int[] { bgChecked, bgDefault });
                     ColorStateList textStateList = new ColorStateList(states, new int[] { textChecked, textDefault });
 
-                    // 动态添加胶囊 (Chips)
                     for (String subCatName : subCats) {
-                        // ... (Chip 创建和样式设置保持不变)
                         Chip chip = new Chip(getContext());
                         chip.setText(subCatName);
                         chip.setCheckable(true);
@@ -703,39 +784,26 @@ public class RecordFragment extends Fragment {
                         chip.setTextColor(textStateList);
                         chip.setChipStrokeWidth(0);
                         chip.setCheckedIconVisible(false);
-
-                        // 如果该细分是当前已选中的，则高亮显示
                         if (subCatName.equals(currentSelectedSub)) {
                             chip.setChecked(true);
                         }
-
-                        // 【修改】点击事件：支持取消选择
                         chip.setOnClickListener(v -> {
-                            // 判断是否点击了当前已经选中的细分
                             if (subCatName.equals(selectedSubCategory[0])) {
-                                // 如果是，则取消选择
                                 selectedSubCategory[0] = null;
                                 Toast.makeText(getContext(), "已取消细分", Toast.LENGTH_SHORT).show();
                             } else {
-                                // 如果不是，则选中当前细分
                                 selectedSubCategory[0] = subCatName;
                                 Toast.makeText(getContext(), "已选择: " + subCatName, Toast.LENGTH_SHORT).show();
                             }
-
-                            // 无论选中还是取消，都确保一级分类被选中，并关闭弹窗
                             categoryAdapter.setSelectedCategory(category);
                             selectedCategory[0] = category;
                             etCustomCategory.setVisibility(View.GONE);
                             subCatDialog.dismiss();
                         });
-
                         cgSubCategories.addView(chip);
                     }
                 }
-
-                // 取消按钮事件
                 btnCancel.setOnClickListener(v -> subCatDialog.dismiss());
-
                 subCatDialog.show();
                 return true;
             }
@@ -745,14 +813,11 @@ public class RecordFragment extends Fragment {
         rvCategory.setAdapter(categoryAdapter);
 
         if (existingTransaction != null) {
-            // ... (保留回显逻辑)
-            // 【新增】回显二级分类
             if (existingTransaction.subCategory != null) {
                 selectedSubCategory[0] = existingTransaction.subCategory;
             }
         }
 
-        // === 资产配置 ===
         AssistantConfig config = new AssistantConfig(requireContext());
         boolean isAssetEnabled = config.isAssetsEnabled();
 
@@ -822,42 +887,17 @@ public class RecordFragment extends Fragment {
         };
         updateDateDisplay.run();
 
-//        tvDate.setOnClickListener(v -> {
-//            long currentMillis = calendar.getTimeInMillis();
-//            long offset = TimeZone.getDefault().getOffset(currentMillis);
-//            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker().setTitleText("选择日期").setSelection(currentMillis + offset).setPositiveButtonText("确认").setNegativeButtonText("取消").build();
-//            datePicker.addOnPositiveButtonClickListener(selection -> {
-//                java.util.Calendar selectedCal = java.util.Calendar.getInstance();
-//                long correctMillis = selection - TimeZone.getDefault().getOffset(selection);
-//                selectedCal.setTimeInMillis(correctMillis);
-//                calendar.set(java.util.Calendar.YEAR, selectedCal.get(java.util.Calendar.YEAR));
-//                calendar.set(java.util.Calendar.MONTH, selectedCal.get(java.util.Calendar.MONTH));
-//                calendar.set(java.util.Calendar.DAY_OF_MONTH, selectedCal.get(java.util.Calendar.DAY_OF_MONTH));
-//                MaterialTimePicker timePicker = new MaterialTimePicker.Builder().setTimeFormat(TimeFormat.CLOCK_24H).setHour(calendar.get(java.util.Calendar.HOUR_OF_DAY)).setMinute(calendar.get(java.util.Calendar.MINUTE)).setTitleText("选择时间").setPositiveButtonText("确认").setNegativeButtonText("取消").build();
-//                timePicker.addOnPositiveButtonClickListener(pickerView -> {
-//                    calendar.set(java.util.Calendar.HOUR_OF_DAY, timePicker.getHour());
-//                    calendar.set(java.util.Calendar.MINUTE, timePicker.getMinute());
-//                    updateDateDisplay.run();
-//                });
-//                timePicker.show(getParentFragmentManager(), "time_picker");
-//            });
-//            datePicker.show(getParentFragmentManager(), "date_picker");
-//        });
-
         tvDate.setClickable(false);
         tvDate.setFocusable(false);
 
         rgType.setOnCheckedChangeListener((g, id) -> {
             boolean switchToExpense = (id == R.id.rb_expense);
             isExpense[0] = switchToExpense;
-
             List<String> targetCategories = switchToExpense ? expenseCategories : incomeCategories;
             String defaultCat = targetCategories.isEmpty() ? "自定义" : targetCategories.get(0);
-
             categoryAdapter.updateData(targetCategories);
             categoryAdapter.setSelectedCategory(defaultCat);
             selectedCategory[0] = defaultCat;
-
             if ("自定义".equals(defaultCat)) {
                 etCustomCategory.setVisibility(View.VISIBLE);
             } else {
@@ -943,14 +983,15 @@ public class RecordFragment extends Fragment {
                     }
                 }
 
-                // 【新增】获取当前货币符号
                 String currencySymbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
+                // 【修改】 保存时带入 photoPath
                 if (existingTransaction == null) {
                     Transaction t = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     t.assetId = selectedAssetId;
-                    t.currencySymbol = currencySymbol; // 保存符号
+                    t.currencySymbol = currencySymbol;
                     t.subCategory = selectedSubCategory[0];
+                    t.photoPath = currentPhotoPath[0]; // 保存照片路径
                     viewModel.addTransaction(t);
 
                     if (selectedAssetId != 0) {
@@ -967,8 +1008,9 @@ public class RecordFragment extends Fragment {
                     Transaction updateT = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     updateT.id = existingTransaction.id;
                     updateT.assetId = selectedAssetId;
-                    updateT.currencySymbol = currencySymbol; // 保存符号
+                    updateT.currencySymbol = currencySymbol;
                     updateT.subCategory = selectedSubCategory[0];
+                    updateT.photoPath = currentPhotoPath[0]; // 更新照片路径
                     viewModel.updateTransaction(updateT);
                 }
                 dialog.dismiss();
@@ -977,6 +1019,21 @@ public class RecordFragment extends Fragment {
         dialog.show();
     }
 
+    // 新增：显示大图的 Dialog
+    private void showPhotoDialog(String uriStr) {
+        if (getContext() == null || uriStr == null) return;
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        android.widget.ImageView iv = new android.widget.ImageView(getContext());
+        try {
+            iv.setImageURI(android.net.Uri.parse(uriStr));
+            iv.setAdjustViewBounds(true);
+            iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            builder.setView(iv);
+            builder.show();
+        } catch (Exception e) {
+            Toast.makeText(getContext(), "无法加载图片", Toast.LENGTH_SHORT).show();
+        }
+    }
     // 在 showCurrencySelectDialog 方法中，直接调用工具类：
     private void showCurrencySelectDialog(Button btn) {
         // 传入 false，因为 Fragment 依附于 Activity，不是 Overlay
@@ -1035,7 +1092,26 @@ public class RecordFragment extends Fragment {
             int selectedPos = spRevokeAsset.getSelectedItemPosition();
             if (selectedPos >= 0 && selectedPos < assetList.size()) {
                 AssetAccount selectedAsset = assetList.get(selectedPos);
+
+                // 1. 执行数据库撤回操作
                 viewModel.revokeTransaction(transaction, selectedAsset.id);
+
+                // 2. 【新增】 如果有照片，删除物理文件
+                if (transaction.photoPath != null && !transaction.photoPath.isEmpty()) {
+                    try {
+                        Uri uri = Uri.parse(transaction.photoPath);
+                        DocumentFile file = DocumentFile.fromSingleUri(requireContext(), uri);
+                        if (file != null && file.exists()) {
+                            boolean deleted = file.delete();
+                            if (!deleted) {
+                                // 如果删除失败，可以打日志
+                            }
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
                 String msg = selectedAsset.id == 0 ? "已撤回记录（无资产变动）" : "已撤回并退款至 " + selectedAsset.name;
                 Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
                 revokeDialog.dismiss();

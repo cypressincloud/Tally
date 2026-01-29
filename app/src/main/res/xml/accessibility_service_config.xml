@@ -5,5 +5,4 @@
     android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
     android:canRetrieveWindowContent="true"
     android:description="@string/app_name"
-    android:notificationTimeout="100"
-    android:packageNames="com.tencent.mm,com.eg.android.AlipayGphone,com.xunmeng.pinduoduo,com.ss.android.ugc.aweme,com.jingdong.app.mall,com.taobao.taobao,com.sankuai.meituan" />
+    android:notificationTimeout="100" />

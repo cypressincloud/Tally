@@ -26,6 +26,25 @@
             </intent-filter>
         </activity>
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.example.budgetapp.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <activity android:name=".ui.PhotoBackupSettingsActivity"
+            android:label="照片备份设置"
+            android:theme="@style/Theme.BudgetApp"/>
+
+        <activity android:name=".ui.PhotoActionActivity"
+            android:theme="@style/Theme.BudgetApp.Transparent"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"/>
+
         <activity
             android:name=".ui.SettingsActivity"
             android:label="设置"

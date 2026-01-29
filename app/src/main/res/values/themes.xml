@@ -44,4 +44,13 @@
         <item name="android:colorControlNormal">@android:color/transparent</item>
     </style>
 
+    <style name="Theme.BudgetApp.Transparent" parent="Theme.BudgetApp">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
+
 </resources>

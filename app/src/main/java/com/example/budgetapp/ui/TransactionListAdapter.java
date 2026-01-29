@@ -19,7 +19,7 @@ import java.util.Map;
 
 public class TransactionListAdapter extends RecyclerView.Adapter<TransactionListAdapter.ViewHolder> {
     private List<Transaction> list = new ArrayList<>();
-    private Map<Integer, String> assetMap = new HashMap<>(); 
+    private Map<Integer, String> assetMap = new HashMap<>();
     private OnItemClickListener listener;
 
     public interface OnItemClickListener {
@@ -57,14 +57,14 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Transaction t = list.get(position);
 
-        // 【新增】检查设置是否开启
+        // 检查设置是否开启
         boolean showCurrency = holder.itemView.getContext()
                 .getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
                 .getBoolean("enable_currency", false);
-        
+
         String symbol = (t.currencySymbol != null && !t.currencySymbol.isEmpty()) ? t.currencySymbol : "¥";
         String amountStr = String.format("%.2f", t.amount);
-        
+
         // 如果开启了货币单位，则拼接符号
         String displayAmount = showCurrency ? (symbol + " " + amountStr) : amountStr;
 
@@ -80,7 +80,7 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
         // 2. 分类
         holder.tvDate.setText(t.category);
 
-        // 【新增】显示二级分类
+        // 显示二级分类
         if (t.subCategory != null && !t.subCategory.isEmpty()) {
             holder.tvSubCategory.setText(t.subCategory);
             holder.tvSubCategory.setVisibility(View.VISIBLE);
@@ -96,10 +96,13 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             holder.tvNote.setVisibility(View.GONE);
         }
 
-        // 4. 右下角状态
+        // 4. 右下角状态 (文字颜色/小色块)
+        // 【修改】: 如果有 文字备注 OR 有照片备注(photoPath不为空)，则显示绿色，否则红色
         boolean hasRemark = !TextUtils.isEmpty(t.remark);
+        boolean hasPhoto = !TextUtils.isEmpty(t.photoPath);
+
         int statusColor;
-        if (hasRemark) {
+        if (hasRemark || hasPhoto) {
             statusColor = holder.itemView.getContext().getColor(R.color.expense_green);
         } else {
             statusColor = holder.itemView.getContext().getColor(R.color.income_red);
@@ -117,12 +120,12 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             holder.viewIndicator.setVisibility(View.GONE);
             holder.tvAssetName.setVisibility(View.VISIBLE);
             holder.tvAssetName.setText(assetName);
-            holder.tvAssetName.setTextColor(statusColor);
+            holder.tvAssetName.setTextColor(statusColor); // 设置颜色
         } else {
             // --- 显示小色块 (兜底方案) ---
             holder.tvAssetName.setVisibility(View.GONE);
             holder.viewIndicator.setVisibility(View.VISIBLE);
-            holder.viewIndicator.setBackgroundColor(statusColor);
+            holder.viewIndicator.setBackgroundColor(statusColor); // 设置颜色
         }
 
         holder.itemView.setOnClickListener(v -> {
@@ -145,7 +148,7 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
         ViewHolder(View v) {
             super(v);
             tvDate = v.findViewById(R.id.tv_detail_date);
-            tvSubCategory = v.findViewById(R.id.tv_detail_sub_category); // 【新增】
+            tvSubCategory = v.findViewById(R.id.tv_detail_sub_category);
             tvAmount = v.findViewById(R.id.tv_detail_amount);
             tvNote = v.findViewById(R.id.tv_detail_note);
             viewIndicator = v.findViewById(R.id.view_remark_indicator);

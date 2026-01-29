@@ -241,6 +241,13 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
         findViewById(R.id.btn_default_record_display).setOnClickListener(v -> showDefaultRecordDisplayDialog());
 
+        // 【新增】照片备份设置跳转逻辑
+        // 请确保在 activity_settings.xml 中已添加 id 为 btn_photo_backup_setting 的 TextView
+        View btnPhotoBackup = findViewById(R.id.btn_photo_backup_setting);
+        if (btnPhotoBackup != null) {
+            btnPhotoBackup.setOnClickListener(v -> startActivity(new Intent(this, PhotoBackupSettingsActivity.class)));
+        }
+
         // 货币单位开关逻辑
         TextView btnCurrency = findViewById(R.id.btn_currency_setting);
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
@@ -268,7 +275,6 @@ public class SettingsActivity extends AppCompatActivity {
             Toast.makeText(this, isChecked ? "极简模式已开启" : "极简模式已关闭", Toast.LENGTH_SHORT).show();
         });
     }
-
     private void updateCurrencyButtonText(TextView btn, boolean enabled) {
         btn.setText(enabled ? "关闭货币单位" : "开启货币单位");
     }

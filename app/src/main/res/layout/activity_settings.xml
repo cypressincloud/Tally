@@ -168,6 +168,22 @@
                 android:layout_marginHorizontal="20dp"/>
 
             <TextView
+                android:id="@+id/btn_photo_backup_setting"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="20dp"
+                android:text="照片备份设置"
+                android:textSize="16sp"
+                android:background="?android:attr/selectableItemBackground"
+                android:textColor="?android:attr/textColorPrimary"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#1F888888"
+                android:layout_marginHorizontal="20dp"/>
+
+            <TextView
                 android:id="@+id/btn_donate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
