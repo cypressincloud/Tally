@@ -75,44 +75,44 @@
 
             <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1F888888" android:layout_marginHorizontal="20dp"/>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="20dp">
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="开启退款消息监听"
-                        android:textSize="16sp"
-                        android:textColor="?android:attr/textColorPrimary"/>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="需授予通知使用权，监听通知栏"
-                        android:textSize="12sp"
-                        android:textColor="#888888"
-                        android:layout_marginTop="4dp"/>
-                </LinearLayout>
-                <androidx.appcompat.widget.SwitchCompat
-                    android:id="@+id/switchRefundMonitor"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:thumb="@drawable/switch_thumb_custom"
-                    app:track="@drawable/switch_track_custom"
-                    app:showText="false"
-                    app:thumbTint="@null"
-                    app:trackTint="@null"
-                    android:background="@null"/>
-            </LinearLayout>
+<!--            <LinearLayout-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:orientation="horizontal"-->
+<!--                android:gravity="center_vertical"-->
+<!--                android:padding="20dp">-->
+<!--                <LinearLayout-->
+<!--                    android:layout_width="0dp"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:layout_weight="1"-->
+<!--                    android:orientation="vertical">-->
+<!--                    <TextView-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:text="开启退款消息监听"-->
+<!--                        android:textSize="16sp"-->
+<!--                        android:textColor="?android:attr/textColorPrimary"/>-->
+<!--                    <TextView-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:text="需授予通知使用权，监听通知栏"-->
+<!--                        android:textSize="12sp"-->
+<!--                        android:textColor="#888888"-->
+<!--                        android:layout_marginTop="4dp"/>-->
+<!--                </LinearLayout>-->
+<!--                <androidx.appcompat.widget.SwitchCompat-->
+<!--                    android:id="@+id/switchRefundMonitor"-->
+<!--                    android:layout_width="wrap_content"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:thumb="@drawable/switch_thumb_custom"-->
+<!--                    app:track="@drawable/switch_track_custom"-->
+<!--                    app:showText="false"-->
+<!--                    app:thumbTint="@null"-->
+<!--                    app:trackTint="@null"-->
+<!--                    android:background="@null"/>-->
+<!--            </LinearLayout>-->
 
-            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1F888888" android:layout_marginHorizontal="20dp"/>
+<!--            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1F888888" android:layout_marginHorizontal="20dp"/>-->
 
             <LinearLayout
                 android:layout_width="match_parent"

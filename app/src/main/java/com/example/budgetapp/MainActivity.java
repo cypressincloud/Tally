@@ -202,11 +202,11 @@ public class MainActivity extends AppCompatActivity {
                     "为了提取屏幕上的支付金额，请开启‘记账屏幕同步助手’。",
                     Settings.ACTION_ACCESSIBILITY_SETTINGS);
         }
-        else if (config.isRefundEnabled() && !isNotificationListenerEnabled()) {
-            showPermissionDialog("开启退款监听",
-                    "为了监听微信/支付宝的退款通知，请授予‘通知使用权’。",
-                    Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
-        }
+//        else if (config.isRefundEnabled() && !isNotificationListenerEnabled()) {
+//            showPermissionDialog("开启退款监听",
+//                    "为了监听微信/支付宝的退款通知，请授予‘通知使用权’。",
+//                    Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+//        }
         else if (config.isEnabled() && !Settings.canDrawOverlays(this)) {
             showPermissionDialog("开启悬浮窗权限",
                     "为了在记账时显示确认弹窗，请授予‘显示在其他应用上层’权限。",

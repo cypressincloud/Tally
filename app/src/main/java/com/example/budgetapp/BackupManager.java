@@ -70,7 +70,7 @@ public class BackupManager {
         AssistantConfig config = new AssistantConfig(context);
         BackupData.AssistantConfigData configData = new BackupData.AssistantConfigData();
         configData.enableAutoTrack = config.isEnabled();
-        configData.enableRefund = config.isRefundEnabled();
+//        configData.enableRefund = config.isRefundEnabled();
         configData.enableAssets = config.isAssetsEnabled();
         configData.defaultAssetId = config.getDefaultAssetId();
         configData.expenseKeywords = config.getExpenseKeywords();
@@ -210,7 +210,7 @@ public class BackupManager {
         csvBuilder.append("配置项,值\n");
         AssistantConfig config = new AssistantConfig(context);
         csvBuilder.append("自动记账开关,").append(config.isEnabled()).append("\n");
-        csvBuilder.append("退款监听,").append(config.isRefundEnabled()).append("\n");
+//        csvBuilder.append("退款监听,").append(config.isRefundEnabled()).append("\n");
         csvBuilder.append("资产模块,").append(config.isAssetsEnabled()).append("\n");
         csvBuilder.append("默认资产ID,").append(config.getDefaultAssetId()).append("\n");
         csvBuilder.append("工作日加班倍率,").append(config.getWeekdayOvertimeRate()).append("\n");
@@ -412,7 +412,7 @@ public class BackupManager {
         AssistantConfig currentConfig = new AssistantConfig(context);
         // 初始化为当前值，防止文件缺少配置
         restoredConfig.enableAutoTrack = currentConfig.isEnabled();
-        restoredConfig.enableRefund = currentConfig.isRefundEnabled();
+//        restoredConfig.enableRefund = currentConfig.isRefundEnabled();
         restoredConfig.enableAssets = currentConfig.isAssetsEnabled();
         restoredConfig.defaultAssetId = currentConfig.getDefaultAssetId();
         
@@ -468,7 +468,7 @@ public class BackupManager {
         if (cd == null) return;
         AssistantConfig config = new AssistantConfig(context);
         config.setEnabled(cd.enableAutoTrack);
-        config.setRefundEnabled(cd.enableRefund);
+//        config.setRefundEnabled(cd.enableRefund);
         config.setAssetsEnabled(cd.enableAssets);
         config.setDefaultAssetId(cd.defaultAssetId);
         config.setWeekdayOvertimeRate(cd.weekdayRate);

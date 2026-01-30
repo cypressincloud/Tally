@@ -9,7 +9,7 @@ public class AssistantConfig {
     private static final String PREF_NAME = "budget_assistant_prefs";
     
     private static final String KEY_ENABLE = "key_enable_auto_track";
-    private static final String KEY_ENABLE_REFUND = "key_enable_refund_monitor";
+//    private static final String KEY_ENABLE_REFUND = "key_enable_refund_monitor";
     private static final String KEY_ENABLE_ASSETS = "key_enable_assets_module";
     private static final String KEY_DEFAULT_ASSET_ID = "key_default_asset_id"; 
 
@@ -36,14 +36,14 @@ public class AssistantConfig {
         prefs.edit().putBoolean(KEY_ENABLE, enabled).apply();
     }
 
-    // --- 退款监听开关 ---
-    public boolean isRefundEnabled() {
-        return prefs.getBoolean(KEY_ENABLE_REFUND, false); 
-    }
-
-    public void setRefundEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_ENABLE_REFUND, enabled).apply();
-    }
+//    // --- 退款监听开关 ---
+//    public boolean isRefundEnabled() {
+//        return prefs.getBoolean(KEY_ENABLE_REFUND, false);
+//    }
+//
+//    public void setRefundEnabled(boolean enabled) {
+//        prefs.edit().putBoolean(KEY_ENABLE_REFUND, enabled).apply();
+//    }
 
     // --- 资产模块开关 ---
     public boolean isAssetsEnabled() {

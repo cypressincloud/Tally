@@ -48,7 +48,8 @@ public class AssistantManagerActivity extends AppCompatActivity {
     
     // 使用 SwitchCompat
     private SwitchCompat switchAutoTrack;
-    private SwitchCompat switchRefundMonitor;
+
+//    private SwitchCompat switchRefundMonitor;
     private SwitchCompat switchAssets;
     
     private RecyclerView rvKeywords;
@@ -124,20 +125,20 @@ public class AssistantManagerActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         loadData(); 
-        if (switchRefundMonitor != null) {
-            if (config.isRefundEnabled() && !isNotificationListenerEnabled()) {
-                // 可选：提醒用户权限缺失
-            }
-        }
+//        if (switchRefundMonitor != null) {
+//            if (config.isRefundEnabled() && !isNotificationListenerEnabled()) {
+//                // 可选：提醒用户权限缺失
+//            }
+//        }
     }
 
     private void initViews() {
         switchAutoTrack = findViewById(R.id.switchAutoTrack);
-        switchRefundMonitor = findViewById(R.id.switchRefundMonitor);
+//        switchRefundMonitor = findViewById(R.id.switchRefundMonitor);
         switchAssets = findViewById(R.id.switchAssets);
 
         switchAutoTrack.setChecked(config.isEnabled());
-        switchRefundMonitor.setChecked(config.isRefundEnabled());
+//        switchRefundMonitor.setChecked(config.isRefundEnabled());
         switchAssets.setChecked(config.isAssetsEnabled());
 
         switchAutoTrack.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -148,15 +149,15 @@ public class AssistantManagerActivity extends AppCompatActivity {
             }
         });
 
-        switchRefundMonitor.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            config.setRefundEnabled(isChecked);
-            if (isChecked) {
-                checkNotificationPermission(); 
-                Toast.makeText(this, "已开启退款监听", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "已关闭退款监听", Toast.LENGTH_SHORT).show();
-            }
-        });
+//        switchRefundMonitor.setOnCheckedChangeListener((buttonView, isChecked) -> {
+//            config.setRefundEnabled(isChecked);
+//            if (isChecked) {
+//                checkNotificationPermission();
+//                Toast.makeText(this, "已开启退款监听", Toast.LENGTH_SHORT).show();
+//            } else {
+//                Toast.makeText(this, "已关闭退款监听", Toast.LENGTH_SHORT).show();
+//            }
+//        });
 
         switchAssets.setOnCheckedChangeListener((buttonView, isChecked) -> {
             config.setAssetsEnabled(isChecked);
@@ -207,37 +208,37 @@ public class AssistantManagerActivity extends AppCompatActivity {
         return false;
     }
 
-    private void checkNotificationPermission() {
-        if (!isNotificationListenerEnabled()) {
-            new AlertDialog.Builder(this)
-                .setTitle("需要权限")
-                .setMessage("为了监听微信/支付宝的退款通知，请授予“通知使用权”。")
-                .setPositiveButton("去设置", (dialog, which) -> {
-                    try {
-                        startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
-                    } catch (Exception e) {
-                        Toast.makeText(this, "无法打开设置页，请手动前往设置", Toast.LENGTH_LONG).show();
-                    }
-                })
-                .setNegativeButton("取消", (d, w) -> switchRefundMonitor.setChecked(false))
-                .show();
-        }
-    }
+//    private void checkNotificationPermission() {
+//        if (!isNotificationListenerEnabled()) {
+//            new AlertDialog.Builder(this)
+//                .setTitle("需要权限")
+//                .setMessage("为了监听微信/支付宝的退款通知，请授予“通知使用权”。")
+//                .setPositiveButton("去设置", (dialog, which) -> {
+//                    try {
+//                        startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+//                    } catch (Exception e) {
+//                        Toast.makeText(this, "无法打开设置页，请手动前往设置", Toast.LENGTH_LONG).show();
+//                    }
+//                })
+//                .setNegativeButton("取消", (d, w) -> switchRefundMonitor.setChecked(false))
+//                .show();
+//        }
+//    }
 
-    private boolean isNotificationListenerEnabled() {
-        String pkgName = getPackageName();
-        final String flat = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
-        if (!TextUtils.isEmpty(flat)) {
-            final String[] names = flat.split(":");
-            for (String name : names) {
-                final ComponentName cn = ComponentName.unflattenFromString(name);
-                if (cn != null && TextUtils.equals(pkgName, cn.getPackageName())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
+//    private boolean isNotificationListenerEnabled() {
+//        String pkgName = getPackageName();
+//        final String flat = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+//        if (!TextUtils.isEmpty(flat)) {
+//            final String[] names = flat.split(":");
+//            for (String name : names) {
+//                final ComponentName cn = ComponentName.unflattenFromString(name);
+//                if (cn != null && TextUtils.equals(pkgName, cn.getPackageName())) {
+//                    return true;
+//                }
+//            }
+//        }
+//        return false;
+//    }
 
     private void loadData() {
         dataList.clear();
