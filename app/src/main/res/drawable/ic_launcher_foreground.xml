@@ -7,7 +7,11 @@
 
     <group
         android:translateX="20"
-        android:translateY="20">
+        android:translateY="20"
+        android:pivotX="12.5"
+        android:pivotY="12"
+        android:scaleX="1.25"
+        android:scaleY="1.25">
 
         <path
             android:fillColor="@android:color/white"
