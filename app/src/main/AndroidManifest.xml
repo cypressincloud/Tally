@@ -81,6 +81,10 @@
             android:theme="@style/Theme.BudgetApp"
             android:exported="false"/>
 
+        <activity
+            android:name=".ui.CurrencySettingsActivity"
+            android:exported="false" />
+
         <service
             android:name=".service.QuickAddTileService"
             android:icon="@drawable/ic_qs_record"
