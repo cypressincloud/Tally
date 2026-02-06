@@ -76,7 +76,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean isWindowShowing = false;
-    private View windowRootView; // 【新增】
+    private View windowRootView;
     private View keepAliveView;
     private long lastRecordTime = 0;
     private String lastContentSignature = "";
@@ -137,10 +137,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
         handler.postDelayed(scanRunnable, 300);
     }
-
-    // ... (保留 scanAndAnalyze, getAppNameReadable, findAmountRecursive, collectAllNumbers, getTextOrDescription, triggerConfirmWindow 逻辑) ...
-    // 为了篇幅，中间这些分析逻辑代码省略，请保持原样 ...
-    // 此处只粘贴修改过的 showConfirmWindow 及辅助方法
 
     private void scanAndAnalyze(AccessibilityNodeInfo node, String currentPackageName) {
         if (node == null) return;
@@ -250,9 +246,14 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         if (isWindowShowing) return;
         selectedSubCategory = null;
 
+        // 【修正点】在这里定义 prefs，后续代码复用它
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        String defaultSymbol = prefs.getString("default_currency_symbol", "¥");
+
         if (!Settings.canDrawOverlays(this)) {
             int finalAssetId = (matchedAssetId > 0) ? matchedAssetId : 0;
-            saveToDatabase(amount, type, category, null, note + " (后台)", "", finalAssetId, "¥", "");
+            // 使用 defaultSymbol
+            saveToDatabase(amount, type, category, null, note + " (后台)", "", finalAssetId, defaultSymbol, "");
             return;
         }
 
@@ -275,7 +276,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
 
-            // 【新增】
             this.windowRootView = floatView;
             android.widget.FrameLayout windowContentRoot = floatView.findViewById(R.id.window_root);
 
@@ -308,14 +308,14 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
-            SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+            // 【修正点】直接使用上面已经定义的 prefs 变量，不再重新声明 SharedPreferences prefs = ...
             boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
             boolean isPhotoBackupEnabled = prefs.getBoolean("enable_photo_backup", false);
             final String[] currentPhotoPath = {null};
 
             if (isCurrencyEnabled) {
                 btnCurrency.setVisibility(View.VISIBLE);
-                btnCurrency.setText("¥");
+                btnCurrency.setText(defaultSymbol); // 使用默认符号
                 btnCurrency.setOnClickListener(v -> {
                     com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(themeContext, btnCurrency, true);
                 });
@@ -323,7 +323,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 btnCurrency.setVisibility(View.GONE);
             }
 
-            // 【修改】
             if (isPhotoBackupEnabled) {
                 btnTakePhoto.setVisibility(View.VISIBLE);
                 btnTakePhoto.setOnClickListener(v -> {
@@ -495,11 +494,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         finally {
             isWindowShowing = false;
             lastWindowDismissTime = System.currentTimeMillis();
-            windowRootView = null; // 【新增】
+            windowRootView = null;
         }
     }
 
-    // --- 新增辅助方法 START ---
     interface PhotoActionResult {
         void onAction(int type);
     }
@@ -561,7 +559,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         });
         startActivity(intent);
     }
-    // --- 新增辅助方法 END ---
 
     private void setupKeepAliveWindow() {
         if (!Settings.canDrawOverlays(this) || keepAliveView != null) return;

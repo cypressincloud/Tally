@@ -621,7 +621,9 @@ public class RecordFragment extends Fragment {
             if (existingTransaction != null && existingTransaction.currencySymbol != null && !existingTransaction.currencySymbol.isEmpty()) {
                 btnCurrency.setText(existingTransaction.currencySymbol);
             } else {
-                btnCurrency.setText("¥");
+                // 读取用户设置的默认货币符号
+                String defaultSymbol = prefs.getString("default_currency_symbol", "¥");
+                btnCurrency.setText(defaultSymbol);
             }
             btnCurrency.setOnClickListener(v -> showCurrencySelectDialog(btnCurrency));
         } else {

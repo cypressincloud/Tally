@@ -22,7 +22,7 @@
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:scrollbars="vertical"
+                android:scrollbars="none"
                 android:fadeScrollbars="false"
                 app:layout_constraintHeight_default="wrap"
                 app:layout_constraintHeight_max="680dp"

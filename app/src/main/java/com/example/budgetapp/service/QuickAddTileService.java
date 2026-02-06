@@ -173,7 +173,8 @@ public class QuickAddTileService extends TileService {
 
             if (isCurrencyEnabled) {
                 btnCurrency.setVisibility(View.VISIBLE);
-                btnCurrency.setText("¥");
+                String defaultSymbol = prefs.getString("default_currency_symbol", "¥");
+                btnCurrency.setText(defaultSymbol);
                 btnCurrency.setOnClickListener(v -> {
                     com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(themeContext, btnCurrency, true);
                 });
