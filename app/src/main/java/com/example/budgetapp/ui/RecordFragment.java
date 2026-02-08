@@ -31,6 +31,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.budgetapp.database.RenewalItem;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import android.view.ContextThemeWrapper;
@@ -75,6 +76,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class RecordFragment extends Fragment {
+    private AssistantConfig assistantConfig;
     private FinanceViewModel viewModel;
     private CalendarAdapter adapter;
     private YearMonth currentMonth;
@@ -118,6 +120,7 @@ public class RecordFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_record, container, false);
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
+        assistantConfig = new AssistantConfig(requireContext()); // 初始化配置类
 
         if (currentMonth == null) {
             currentMonth = YearMonth.now();
@@ -125,14 +128,13 @@ public class RecordFragment extends Fragment {
 
         initGestureDetector();
 
-        // === 1. 初始化设置菜单按钮 ===
+        // 初始化设置菜单按钮
         ImageButton btnSettings = view.findViewById(R.id.btn_settings_menu);
         if (btnSettings != null) {
             btnSettings.setOnClickListener(v -> {
                 Intent intent = new Intent(requireContext(), SettingsActivity.class);
                 startActivity(intent);
             });
-            // 初始可见性检查
             SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
             boolean isMinimalist = prefs.getBoolean("minimalist_mode", false);
             btnSettings.setVisibility(isMinimalist ? View.GONE : View.VISIBLE);
@@ -140,7 +142,6 @@ public class RecordFragment extends Fragment {
 
         tvMonthTitle = view.findViewById(R.id.tv_month_title);
         tvMonthLabel = view.findViewById(R.id.tv_month_label);
-
         tvIncome = view.findViewById(R.id.tv_month_income);
         tvExpense = view.findViewById(R.id.tv_month_expense);
         tvBalance = view.findViewById(R.id.tv_month_balance);
@@ -151,21 +152,15 @@ public class RecordFragment extends Fragment {
         layoutBalance = view.findViewById(R.id.layout_stat_balance);
         layoutOvertime = view.findViewById(R.id.layout_stat_overtime);
 
-        // 快速记账按钮逻辑
         FloatingActionButton btnQuickRecord = view.findViewById(R.id.btn_quick_record);
         if (btnQuickRecord != null) {
-            btnQuickRecord.setOnClickListener(v -> {
-                showDateDetailDialog(LocalDate.now());
-            });
+            btnQuickRecord.setOnClickListener(v -> showDateDetailDialog(LocalDate.now()));
         }
 
         RecyclerView recyclerView = view.findViewById(R.id.calendar_recycler);
-
         GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 7) {
             @Override
-            public boolean canScrollVertically() {
-                return false; // 禁止垂直滑动
-            }
+            public boolean canScrollVertically() { return false; }
         };
         recyclerView.setLayoutManager(layoutManager);
         recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
@@ -180,7 +175,6 @@ public class RecordFragment extends Fragment {
         });
         recyclerView.setAdapter(adapter);
 
-        // 加载默认显示设置 (0:结余, 1:收入, 2:支出, 3:加班)
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         int defaultMode = prefs.getInt("default_record_mode", 0);
         switchFilterMode(defaultMode);
@@ -218,16 +212,19 @@ public class RecordFragment extends Fragment {
             updateCalendar();
         });
 
+        // 确保实时观察所有交易记录，包含自动生成的账单
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
+            // 强制刷新日历统计，确保“自动续费”或“关键字记账”产生的记录立即显示
             updateCalendar();
 
+            // 如果当前打开了详情对话框，需要实时刷新对话框内部的列表适配器
             if (currentDetailAdapter != null && selectedDate != null) {
                 long start = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 long end = selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 List<Transaction> dayList = list.stream()
                         .filter(t -> t.date >= start && t.date < end)
                         .collect(Collectors.toList());
-                currentDetailAdapter.setTransactions(dayList);
+                currentDetailAdapter.setTransactions(dayList); // 关键：更新详情列表
             }
         });
 
@@ -256,6 +253,69 @@ public class RecordFragment extends Fragment {
                 btnSettings.setVisibility(isMinimalist ? View.GONE : View.VISIBLE);
             }
         }
+        // 检查并执行自动扣费
+        checkAutoRenewalDeduction();
+    }
+
+    private void checkAutoRenewalDeduction() {
+        List<RenewalItem> renewalList = assistantConfig.getRenewalList(); // 获取多项续费列表
+        if (renewalList.isEmpty()) return;
+
+        LocalDate today = LocalDate.now();
+        String todayStr = today.toString();
+        String lastCheckDate = assistantConfig.getLastRenewalDate();
+
+        // 防止当日重复执行
+        if (todayStr.equals(lastCheckDate)) return;
+
+        int defaultAssetId = assistantConfig.getDefaultAssetId();
+        boolean hasExecuted = false;
+
+        for (RenewalItem item : renewalList) {
+            boolean shouldDeduct = false;
+            if ("Month".equals(item.period)) {
+                shouldDeduct = (today.getDayOfMonth() == item.day);
+            } else if ("Year".equals(item.period)) {
+                shouldDeduct = (today.getMonthValue() == item.month && today.getDayOfMonth() == item.day);
+            }
+
+            if (shouldDeduct) {
+                executeAutoDeduction(item, defaultAssetId, todayStr);
+                hasExecuted = true;
+            }
+        }
+
+        // 标记今日已完成扣费检查
+        assistantConfig.setLastRenewalDate(todayStr);
+    }
+
+    private void executeAutoDeduction(RenewalItem item, int assetId, String todayStr) {
+        double amount = item.amount;
+        String object = item.object;
+        long timestamp = System.currentTimeMillis();
+
+        // 核心修改：分类设为“自动续费”，记录标识 (note) 替换为续费对象名称
+        Transaction t = new Transaction(timestamp, 0, "自动续费", amount, object, "系统自动扣费");
+        t.assetId = assetId != -1 ? assetId : 0;
+
+        viewModel.addTransaction(t);
+
+        // 如果关联了资产，更新资产余额
+        if (t.assetId != 0) {
+            viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
+                if (assets != null) {
+                    for (AssetAccount a : assets) {
+                        if (a.id == t.assetId) {
+                            a.amount -= amount;
+                            viewModel.updateAsset(a);
+                            break;
+                        }
+                    }
+                }
+            });
+        }
+
+        Toast.makeText(getContext(), "已自动扣除: " + object, Toast.LENGTH_SHORT).show();
     }
 
     private void showCustomDatePicker() {
@@ -404,6 +464,9 @@ public class RecordFragment extends Fragment {
         List<Transaction> allList = viewModel.getAllTransactions().getValue();
         List<Transaction> currentList = allList != null ? allList : new ArrayList<>();
 
+        // 核心修改：将续费项目列表同步给日历适配器，用于渲染红框标识
+        adapter.setRenewalItems(assistantConfig.getRenewalList());
+
         adapter.setCurrentMonth(currentMonth);
         adapter.updateData(days, currentList);
 
@@ -451,16 +514,18 @@ public class RecordFragment extends Fragment {
 
         TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
         if (tvTitle != null) {
-            DateTimeFormatter chFormatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.CHINA);
-            tvTitle.setText(date.format(chFormatter));
-            tvTitle.setClickable(false);
-            tvTitle.setOnClickListener(null);
+            tvTitle.setText(date.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.CHINA)));
         }
 
         RecyclerView rvList = dialogView.findViewById(R.id.rv_detail_list);
         rvList.setLayoutManager(new LinearLayoutManager(getContext()));
 
         TransactionListAdapter listAdapter = new TransactionListAdapter(transaction -> {
+            // 如果是预览账单，点击提示不可编辑
+            if ("PREVIEW_BILL".equals(transaction.remark)) {
+                Toast.makeText(getContext(), "待扣费账单：到达日期后将自动执行", Toast.LENGTH_SHORT).show();
+                return;
+            }
             LocalDate transDate = Instant.ofEpochMilli(transaction.date).atZone(ZoneId.systemDefault()).toLocalDate();
             showAddOrEditDialog(transaction, transDate);
         });
@@ -469,34 +534,53 @@ public class RecordFragment extends Fragment {
         currentDetailAdapter = listAdapter;
         rvList.setAdapter(listAdapter);
 
+        // 1. 获取数据库中当天的真实记录
         List<Transaction> all = viewModel.getAllTransactions().getValue();
+        List<Transaction> dayList = new ArrayList<>();
         if (all != null) {
             long start = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
             long end = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-            List<Transaction> dayList = all.stream()
+            dayList = all.stream()
                     .filter(t -> t.date >= start && t.date < end)
                     .collect(Collectors.toList());
-            listAdapter.setTransactions(dayList);
         }
 
-        Button btnAddNormal = dialogView.findViewById(R.id.btn_add_transaction);
-        if (btnAddNormal != null) {
-            btnAddNormal.setOnClickListener(v -> {
-                showAddOrEditDialog(null, date);
-            });
-        }
-        Button btnAddOvertime = dialogView.findViewById(R.id.btn_add_overtime);
-        if (btnAddOvertime != null) {
-            btnAddOvertime.setOnClickListener(v -> {
-                dialog.dismiss();
-                showOvertimeDialog(date);
-            });
-        }
-        Button btnClose = dialogView.findViewById(R.id.btn_close_dialog);
-        if (btnClose != null) btnClose.setOnClickListener(v -> dialog.dismiss());
+        // 2. 核心逻辑：匹配续费项并生成预览账单
+        List<RenewalItem> renewals = assistantConfig.getRenewalList();
+        for (RenewalItem item : renewals) {
+            boolean matchesDate = false;
+            if ("Month".equals(item.period)) {
+                matchesDate = (date.getDayOfMonth() == item.day);
+            } else if ("Year".equals(item.period)) {
+                matchesDate = (date.getMonthValue() == item.month && date.getDayOfMonth() == item.day);
+            }
 
+            if (matchesDate) {
+                // 检查数据库中是否已存在该笔自动续费的正式记录
+                String objectName = item.object;
+                boolean alreadyExecuted = dayList.stream().anyMatch(t ->
+                        "自动续费".equals(t.category) && objectName.equals(t.note));
+
+                if (!alreadyExecuted) {
+                    // 创建虚拟预览账单
+                    Transaction preview = new Transaction();
+                    preview.amount = item.amount;
+                    preview.type = 0; // 支出
+                    preview.category = "自动续费";
+                    preview.note = objectName;
+                    preview.remark = "PREVIEW_BILL"; // 预览标识
+                    preview.date = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                    dayList.add(preview);
+                }
+            }
+        }
+
+        listAdapter.setTransactions(dayList);
+
+        dialogView.findViewById(R.id.btn_add_transaction).setOnClickListener(v -> showAddOrEditDialog(null, date));
+        dialogView.findViewById(R.id.btn_add_overtime).setOnClickListener(v -> { dialog.dismiss(); showOvertimeDialog(date); });
+        dialogView.findViewById(R.id.btn_close_dialog).setOnClickListener(v -> dialog.dismiss());
         dialog.setOnDismissListener(d -> currentDetailAdapter = null);
-
         dialog.show();
     }
 

@@ -24,191 +24,200 @@
             android:textColor="?android:attr/textColorPrimary"/>
     </LinearLayout>
 
-    <ScrollView
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:scrollbars="none"
-        android:overScrollMode="ifContentScrolls">
+        app:cardCornerRadius="20dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white">
 
-        <LinearLayout
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingBottom="8dp">
+            android:layout_height="match_parent"
+            android:scrollbars="none"
+            android:overScrollMode="ifContentScrolls">
 
-            <androidx.cardview.widget.CardView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="0dp"
-                app:cardBackgroundColor="@color/white">
+                android:orientation="vertical">
 
-                <LinearLayout
+                <TextView
+                    android:id="@+id/btn_category_setting"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:padding="20dp"
+                    android:text="分类预设设置"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_category_setting"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="分类预设设置"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F888888"
-                        android:layout_marginHorizontal="20dp"/>
+                <TextView
+                    android:id="@+id/btn_backup_restore"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="数据备份与恢复"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_backup_restore"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="数据备份与恢复"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F888888"
-                        android:layout_marginHorizontal="20dp"/>
+                <TextView
+                    android:id="@+id/btn_auto_asset"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="自动资产设置"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_auto_asset"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="自动资产设置"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F888888"
-                        android:layout_marginHorizontal="20dp"/>
+                <TextView
+                    android:id="@+id/btn_toggle_night_mode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="主题设置"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_toggle_night_mode"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="主题设置"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F888888"
-                        android:layout_marginHorizontal="20dp"/>
+                <TextView
+                    android:id="@+id/btn_assistant_setting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="记账助手设置"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_assistant_setting"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="记账助手设置"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F888888"
-                        android:layout_marginHorizontal="20dp"/>
+                <TextView
+                    android:id="@+id/btn_default_record_display"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="设置记账界面默认显示"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_default_record_display"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="设置记账界面默认显示"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F888888"
-                        android:layout_marginHorizontal="20dp"/>
+                <TextView
+                    android:id="@+id/btn_overtime_setting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="设置加班薪资标准"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_overtime_setting"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="设置加班薪资标准"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:id="@+id/divider_currency"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                    <View
-                        android:id="@+id/divider_currency"
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F888888"
-                        android:layout_marginHorizontal="20dp"/>
+                <TextView
+                    android:id="@+id/btn_currency_setting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="货币单位设置"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_currency_setting"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="货币单位设置"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:id="@+id/divider_donate"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                    <View
-                        android:id="@+id/divider_donate"
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F888888"
-                        android:layout_marginHorizontal="20dp"/>
+                <TextView
+                    android:id="@+id/btn_photo_backup_setting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="照片备份设置"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_photo_backup_setting"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="照片备份设置"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F888888"
-                        android:layout_marginHorizontal="20dp"/>
+                <TextView
+                    android:id="@+id/btn_auto_renewal_setting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="自动续费设置"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
 
-                    <TextView
-                        android:id="@+id/btn_donate"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="20dp"
-                        android:text="捐赠支持"
-                        android:textSize="16sp"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:textColor="?android:attr/textColorPrimary"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
 
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-        </LinearLayout>
-    </ScrollView>
+                <TextView
+                    android:id="@+id/btn_donate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="捐赠支持"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+            </LinearLayout>
+        </ScrollView>
+    </androidx.cardview.widget.CardView>
 
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"

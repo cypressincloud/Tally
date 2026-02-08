@@ -242,6 +242,15 @@ public class SettingsActivity extends AppCompatActivity {
             startActivity(new Intent(this, DonateActivity.class));
         });
 
+        findViewById(R.id.btn_auto_renewal_setting).setOnClickListener(v -> {
+            // 跳转到新创建的自动续费设置页面
+            startActivity(new Intent(this, AutoRenewalActivity.class));
+        });
+
+        findViewById(R.id.btn_donate).setOnClickListener(v -> {
+            startActivity(new Intent(this, DonateActivity.class));
+        });
+
         // 极简模式逻辑
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         switchMinimalist = findViewById(R.id.switch_minimalist);

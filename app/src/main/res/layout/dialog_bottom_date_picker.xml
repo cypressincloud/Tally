@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
- <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -24,6 +24,7 @@
             android:textColor="@color/text_primary"
             android:textSize="20sp"
             android:textStyle="bold" />
+
         <TextView
             android:id="@+id/tv_date_preview"
             android:layout_width="match_parent"
@@ -41,16 +42,16 @@
         android:orientation="horizontal"
         android:layout_marginBottom="24dp"
         android:baselineAligned="false">
+
         <FrameLayout
+            android:id="@+id/container_year"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1.2">
-
             <NumberPicker
                 android:id="@+id/np_year"
                 android:layout_width="match_parent"
                 android:layout_height="160dp"
-                android:background="@null"
                 android:theme="@style/ThemeOverlay.App.NumberPicker"
                 android:descendantFocusability="blocksDescendants" />
             <TextView
@@ -61,23 +62,20 @@
                 android:textColor="@color/text_primary"
                 android:textStyle="bold"
                 android:layout_gravity="center_vertical|end"
-                android:layout_marginEnd="24dp"
-                tools:ignore="HardcodedText"/>
+                android:layout_marginEnd="24dp"/>
         </FrameLayout>
 
         <FrameLayout
+            android:id="@+id/container_month"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1">
-
             <NumberPicker
                 android:id="@+id/np_month"
                 android:layout_width="match_parent"
                 android:layout_height="160dp"
-                android:background="@null"
                 android:theme="@style/ThemeOverlay.App.NumberPicker"
                 android:descendantFocusability="blocksDescendants" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -86,23 +84,20 @@
                 android:textColor="@color/text_primary"
                 android:textStyle="bold"
                 android:layout_gravity="center_vertical|end"
-                android:layout_marginEnd="20dp"
-                tools:ignore="HardcodedText"/>
+                android:layout_marginEnd="20dp"/>
         </FrameLayout>
 
         <FrameLayout
+            android:id="@+id/container_day"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1">
-
             <NumberPicker
                 android:id="@+id/np_day"
                 android:layout_width="match_parent"
                 android:layout_height="160dp"
-                android:background="@null"
                 android:theme="@style/ThemeOverlay.App.NumberPicker"
                 android:descendantFocusability="blocksDescendants" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -111,17 +106,14 @@
                 android:textColor="@color/text_primary"
                 android:textStyle="bold"
                 android:layout_gravity="center_vertical|end"
-                android:layout_marginEnd="20dp"
-                tools:ignore="HardcodedText"/>
+                android:layout_marginEnd="20dp"/>
         </FrameLayout>
-
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
-
         <Button
             android:id="@+id/btn_cancel"
             android:layout_width="0dp"
@@ -131,10 +123,7 @@
             android:backgroundTint="@color/input_bg"
             android:text="取消"
             android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold"
             app:cornerRadius="16dp" />
-
         <Button
             android:id="@+id/btn_confirm"
             android:layout_width="0dp"
@@ -143,10 +132,7 @@
             android:layout_marginStart="8dp"
             android:backgroundTint="?attr/colorPrimary"
             android:text="确定"
-            android:textColor="@color/selector_text"
-            android:textSize="16sp"
-            android:textStyle="bold"
+            android:textColor="@color/white"
             app:cornerRadius="16dp" />
     </LinearLayout>
-
 </LinearLayout>

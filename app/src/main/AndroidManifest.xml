@@ -85,6 +85,12 @@
             android:name=".ui.CurrencySettingsActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.AutoRenewalActivity"
+            android:label="自动续费提醒设置"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
         <service
             android:name=".service.QuickAddTileService"
             android:icon="@drawable/ic_qs_record"

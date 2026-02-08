@@ -1,3 +1,4 @@
+// src/main/java/com/example/budgetapp/ui/CalendarAdapter.java
 package com.example.budgetapp.ui;
 
 import android.content.Context;
@@ -11,7 +12,10 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.budgetapp.R;
+import com.example.budgetapp.database.RenewalItem;
 import com.example.budgetapp.database.Transaction;
+import com.example.budgetapp.util.AssistantConfig;
+
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -20,9 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHolder> {
-    
+
     private List<LocalDate> days = new ArrayList<>();
     private List<Transaction> transactions = new ArrayList<>();
+    private List<RenewalItem> renewalItems = new ArrayList<>(); // 支持多项续费项目
     private LocalDate selectedDate;
     private final OnDateClickListener listener;
     private int filterMode = 0;
@@ -36,11 +41,19 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         this.listener = listener;
     }
 
+    /**
+     * 更新续费项目列表
+     */
+    public void setRenewalItems(List<RenewalItem> items) {
+        this.renewalItems = items != null ? items : new ArrayList<>();
+        notifyDataSetChanged();
+    }
+
     public void setFilterMode(int mode) {
         this.filterMode = mode;
         notifyDataSetChanged();
     }
-    
+
     public void setCurrentMonth(YearMonth month) {
         this.currentMonth = month;
     }
@@ -93,13 +106,11 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         int colorSecondaryText = getThemeColor(context, android.R.attr.textColorSecondary);
         int themeColor = context.getColor(R.color.app_yellow);
 
-        boolean isCurrentMonth = true;
-        if (currentMonth != null) {
-            isCurrentMonth = date.getYear() == currentMonth.getYear() &&
-                             date.getMonth() == currentMonth.getMonth();
-        }
+        boolean isCurrentMonth = currentMonth != null &&
+                date.getYear() == currentMonth.getYear() &&
+                date.getMonth() == currentMonth.getMonth();
 
-        // --- 1. 计算默认字体颜色 ---
+        // 1. 计算默认字体颜色
         int defaultDayColor;
         if (isCurrentMonth) {
             holder.tvDay.setAlpha(1.0f);
@@ -111,7 +122,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             defaultDayColor = colorSecondaryText;
         }
 
-        // --- 2. 统计金额及默认颜色 ---
+        // 2. 统计金额及颜色处理
         double dailySum = 0;
         long start = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
         long end = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
@@ -143,8 +154,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         String netText = "";
         if (Math.abs(dailySum) > 0.001) {
             netText = String.format("%.2f", dailySum);
-            // 金额颜色逻辑保持不变...
-             if (filterMode == 2) {
+            if (filterMode == 2) {
                 defaultNetColor = Color.parseColor("#4CAF50");
             } else if (filterMode == 3) {
                 defaultNetColor = Color.parseColor("#FF9800");
@@ -153,61 +163,75 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             }
         }
 
-        // --- 3. 样式应用核心逻辑 ---
+        // 3. 样式应用逻辑核心
         boolean isToday = date.equals(LocalDate.now());
         boolean isSelected = date.equals(selectedDate);
 
-        if (isToday) {
-            // [今天]：实心主题色背景 + 白色文字 (优先级最高，或者与选中效果叠加)
-            // 这里假设"今天"的样式优先展示，即使被选中也保持实心
-            holder.itemView.setBackgroundResource(R.drawable.bg_calendar_today);
-            Drawable bg = holder.itemView.getBackground();
-            if (bg != null) bg.setTint(themeColor);
-            
-            // 强制白色文字
-            holder.tvDay.setTextColor(Color.WHITE);
-            holder.tvDay.setAlpha(1.0f);
-            
-            holder.tvNet.setText(netText);
-            if (!netText.isEmpty()) {
-                holder.tvNet.setTextColor(Color.WHITE); // 金额也由白色显示
-                holder.tvNet.setAlpha(1.0f);
-            } else {
-                 holder.tvNet.setText("");
+        // --- 核心优化：检测多项自动续费日期 ---
+        boolean isRenewalDay = false;
+        for (RenewalItem item : renewalItems) {
+            if ("Month".equals(item.period)) {
+                if (date.getDayOfMonth() == item.day) {
+                    isRenewalDay = true;
+                    break;
+                }
+            } else if ("Year".equals(item.period)) {
+                if (date.getMonthValue() == item.month && date.getDayOfMonth() == item.day) {
+                    isRenewalDay = true;
+                    break;
+                }
             }
-            holder.itemView.setSelected(isSelected); // 保持选中状态标记（如有需要）
+        }
 
-        } else if (isSelected) {
-            // [被选中 (非今天)]：空心边框 + 默认文字颜色
+        // --- 样式优先级：选中 > 今天 > 续费日期 > 普通 ---
+        if (isSelected) {
+            // [被选中状态]：显示黄色边框
             holder.itemView.setBackgroundResource(R.drawable.bg_selected_date);
             Drawable bg = holder.itemView.getBackground();
             if (bg != null) bg.setTint(themeColor);
-            
-            // 字体不用变色，使用 defaultDayColor
+
             holder.tvDay.setTextColor(defaultDayColor);
             holder.tvDay.setAlpha(1.0f);
-
-            holder.tvNet.setText(netText);
-            if (!netText.isEmpty()) {
-                holder.tvNet.setTextColor(defaultNetColor);
-                holder.tvNet.setAlpha(isCurrentMonth ? 1.0f : 0.3f);
-            } else {
-                 holder.tvNet.setText("");
-            }
             holder.itemView.setSelected(true);
+
+        } else if (isToday) {
+            // [今天状态]：黄色实心背景 + 白色文字
+            holder.itemView.setBackgroundResource(R.drawable.bg_calendar_today);
+            Drawable bg = holder.itemView.getBackground();
+            if (bg != null) bg.setTint(themeColor);
+
+            holder.tvDay.setTextColor(Color.WHITE);
+            holder.tvDay.setAlpha(1.0f);
+            holder.itemView.setSelected(false);
+
+        } else if (isRenewalDay) {
+            // [自动续费状态]：显示红色边框
+            holder.itemView.setBackgroundResource(R.drawable.bg_selected_date);
+            Drawable bg = holder.itemView.getBackground();
+            if (bg != null) bg.setTint(Color.RED); // 设置为红色边框适配“自动续费”标识
+
+            holder.tvDay.setTextColor(defaultDayColor);
+            holder.itemView.setSelected(false);
 
         } else {
             // [普通状态]
             holder.itemView.setBackgroundResource(0);
-            holder.itemView.setSelected(false);
-            
             holder.tvDay.setTextColor(defaultDayColor);
-            
-            holder.tvNet.setText(netText);
-            if (!netText.isEmpty()) {
+            holder.itemView.setSelected(false);
+        }
+
+        // 设置下方金额文字
+        holder.tvNet.setText(netText);
+        if (!netText.isEmpty()) {
+            // 如果是今天且未被选中，金额显示白色以适配黄色背景
+            if (isToday && !isSelected) {
+                holder.tvNet.setTextColor(Color.WHITE);
+            } else {
                 holder.tvNet.setTextColor(defaultNetColor);
-                holder.tvNet.setAlpha(isCurrentMonth ? 1.0f : 0.3f);
             }
+            holder.tvNet.setAlpha(isCurrentMonth ? 1.0f : 0.3f);
+        } else {
+            holder.tvNet.setText("");
         }
 
         holder.itemView.setOnClickListener(v -> listener.onDateClick(date));
