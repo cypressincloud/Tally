@@ -183,6 +183,8 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             }
         }
 
+        int incomeRed = context.getColor(R.color.income_red);
+
         // --- 样式优先级：选中 > 今天 > 续费日期 > 普通 ---
         if (isSelected) {
             // [被选中状态]：显示黄色边框
@@ -208,7 +210,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             // [自动续费状态]：显示红色边框
             holder.itemView.setBackgroundResource(R.drawable.bg_selected_date);
             Drawable bg = holder.itemView.getBackground();
-            if (bg != null) bg.setTint(Color.RED); // 设置为红色边框适配“自动续费”标识
+            if (bg != null) bg.setTint(incomeRed); // 设置为红色边框适配“自动续费”标识
 
             holder.tvDay.setTextColor(defaultDayColor);
             holder.itemView.setSelected(false);
