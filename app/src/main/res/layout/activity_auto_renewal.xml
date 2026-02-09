@@ -66,7 +66,7 @@
                 android:layout_marginBottom="32dp"
                 android:text="+ 添加续费提醒"
                 android:backgroundTint="@color/app_yellow"
-                android:textColor="@color/white"
+                android:textColor="@color/real_white"
                 android:textStyle="bold"
                 app:cornerRadius="16dp"
                 android:elevation="0dp"
