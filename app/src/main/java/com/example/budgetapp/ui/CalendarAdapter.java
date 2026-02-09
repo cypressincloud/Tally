@@ -106,6 +106,9 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         int colorSecondaryText = getThemeColor(context, android.R.attr.textColorSecondary);
         int themeColor = context.getColor(R.color.app_yellow);
 
+        int incomeRed = context.getColor(R.color.income_red);
+        int expenseGreen = context.getColor(R.color.expense_green);
+
         boolean isCurrentMonth = currentMonth != null &&
                 date.getYear() == currentMonth.getYear() &&
                 date.getMonth() == currentMonth.getMonth();
@@ -155,11 +158,11 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         if (Math.abs(dailySum) > 0.001) {
             netText = String.format("%.2f", dailySum);
             if (filterMode == 2) {
-                defaultNetColor = Color.parseColor("#4CAF50");
+                defaultNetColor = expenseGreen;
             } else if (filterMode == 3) {
                 defaultNetColor = Color.parseColor("#FF9800");
             } else {
-                defaultNetColor = dailySum > 0 ? Color.parseColor("#FF5252") : Color.parseColor("#4CAF50");
+                defaultNetColor = dailySum > 0 ? incomeRed : expenseGreen;
             }
         }
 
@@ -182,8 +185,6 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                 }
             }
         }
-
-        int incomeRed = context.getColor(R.color.income_red);
 
         // --- 样式优先级：选中 > 今天 > 续费日期 > 普通 ---
         if (isSelected) {

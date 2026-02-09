@@ -132,7 +132,7 @@
             android:layout_marginStart="8dp"
             android:backgroundTint="?attr/colorPrimary"
             android:text="确定"
-            android:textColor="@color/white"
+            android:textColor="@color/real_white"
             app:cornerRadius="16dp" />
     </LinearLayout>
 </LinearLayout>
