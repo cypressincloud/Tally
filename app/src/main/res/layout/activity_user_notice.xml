@@ -138,7 +138,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="https://github.com/cypressincloud/Tally"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textAllCaps="false"
                     android:textColor="#888888"
                     android:layout_gravity="center"

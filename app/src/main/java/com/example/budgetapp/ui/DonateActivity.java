@@ -63,16 +63,30 @@ public class DonateActivity extends AppCompatActivity {
     }
 
     private void showSaveQrConfirmDialog(Bitmap bitmap, String fileNamePrefix) {
-        new AlertDialog.Builder(this)
-                .setTitle("保存收款码")
-                .setMessage("将收款码保存到系统相册？")
-                .setPositiveButton("保存", (dialog, which) -> {
-                    saveBitmapToGallery(bitmap, fileNamePrefix);
-                })
-                .setNegativeButton("取消", null)
-                .show();
-    }
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_save_qr, null);
 
+        // 使用应用定义的透明浮动主题
+        AlertDialog dialog = new AlertDialog.Builder(this, R.style.Theme_BudgetApp_Transparent)
+                .setView(dialogView)
+                .create();
+
+        dialogView.findViewById(R.id.btn_cancel).setOnClickListener(v -> dialog.dismiss());
+
+        dialogView.findViewById(R.id.btn_save).setOnClickListener(v -> {
+            saveBitmapToGallery(bitmap, fileNamePrefix);
+            dialog.dismiss();
+        });
+
+        dialog.show();
+
+        // 调整弹窗宽度
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.85),
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+        }
+    }
     private Bitmap getBitmapFromDrawable(Drawable drawable) {
         if (drawable == null) return null;
         if (drawable instanceof BitmapDrawable) {
