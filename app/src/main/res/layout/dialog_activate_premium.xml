@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@drawable/bg_bottom_sheet_rounded"
+    android:gravity="center_horizontal">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="激活高级设置"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="?android:attr/textColorPrimary"
+        android:layout_marginBottom="16dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <ImageView
+            android:id="@+id/iv_pay_alipay"
+            android:layout_width="0dp"
+            android:layout_height="140dp"
+            android:layout_weight="1"
+            android:src="@drawable/pay"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter"
+            android:layout_marginEnd="8dp"/>
+
+        <ImageView
+            android:id="@+id/iv_pay_wechat"
+            android:layout_width="0dp"
+            android:layout_height="140dp"
+            android:layout_weight="1"
+            android:src="@drawable/wechat"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter"
+            android:layout_marginStart="8dp"/>
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="点击二维码可保存到系统相册"
+        android:textSize="12sp"
+        android:textColor="#999999"
+        android:layout_marginTop="8dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tally 采取诚信付款方式，打赏 ￥12 即可激活高级设置。您也可以先体验，若觉得软件不错，后续可在设置页面的“捐赠支持”中补票。Tally 是纯本地项目，不设检测逻辑，不绑定账号系统，详情请查看用户须知。"
+        android:textSize="13sp"
+        android:textColor="#666666"
+        android:layout_marginTop="16dp"
+        android:lineSpacingExtra="5dp"
+        android:gravity="start"/>
+
+    <Button
+        android:id="@+id/btn_user_notice"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="用户须知"
+        android:layout_marginTop="12dp"
+        app:rippleColor="@android:color/transparent"/>
+
+    <Button
+        android:id="@+id/btn_already_paid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="我已诚信付款"
+        android:backgroundTint="?android:attr/colorPrimary"
+        android:textColor="@color/real_white"
+        android:layout_marginTop="4dp"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"/>
+
+</LinearLayout>

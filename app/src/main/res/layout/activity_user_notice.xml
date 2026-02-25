@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/notice_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bar_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="用户须知"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"/>
+    </LinearLayout>
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="16dp"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="none"
+            android:overScrollMode="never">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="项目简介"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Tally 是一个纯本地的记账项目，拥有自动记账、照片记账、自动续费提醒、多币种、关联资产等核心功能。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="项目权限清单"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="• 自启动：用于自动记账进程的后台保活。\n• 无障碍：实现屏幕读取与自动记账的核心权限。\n• 悬浮窗：用于 1 像素保活机制及记账时的即时弹窗交互。\n• 通知栏：提供实时状态反馈，功能稳定后可手动关闭。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="10dp"
+                    android:layout_marginTop="12dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="隐私安全承诺"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="由于权限较为敏感，Tally 承诺完全不具备联网功能，未来也不会添加。如有云同步需求，建议参考开源代码自行扩展。关注酷安 “Tally” 项目，不定时发布版本更新。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <Button
+                    android:id="@+id/btn_copy_github"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="https://github.com/cypressincloud/Tally"
+                    android:textSize="13sp"
+                    android:textAllCaps="false"
+                    android:textColor="#888888"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="40dp"
+                    app:rippleColor="@android:color/transparent"/> <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="点击后复制到剪切板"
+                android:textSize="11sp"
+                android:textColor="#999999"
+                android:layout_gravity="center"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="20dp"/>
+
+            </LinearLayout>
+        </ScrollView>
+    </androidx.cardview.widget.CardView>
+</LinearLayout>

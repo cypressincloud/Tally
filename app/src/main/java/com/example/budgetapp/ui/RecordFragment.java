@@ -1116,12 +1116,40 @@ public class RecordFragment extends Fragment {
                 etCustomCategory.setText(currentCat);
             }
 
+            // 在 RecordFragment.java 的 showAddOrEditDialog 方法内找到 btnDelete 的逻辑
             btnDelete.setVisibility(View.VISIBLE);
             btnDelete.setOnClickListener(v -> {
-                new AlertDialog.Builder(getContext()).setTitle("确认删除").setMessage("确定要删除这条记录吗？").setPositiveButton("删除", (d, w) -> {
-                    viewModel.deleteTransaction(existingTransaction);
-                    dialog.dismiss();
-                }).setNegativeButton("取消", null).show();
+                // --- 优化开始：使用自定义统一弹窗样式 ---
+                AlertDialog.Builder delBuilder = new AlertDialog.Builder(getContext());
+                // 加载资产模块同款自定义布局
+                View delView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_confirm_delete, null);
+                delBuilder.setView(delView);
+
+                AlertDialog delDialog = delBuilder.create();
+
+                // 设置背景透明，以适配布局中的圆角设计
+                if (delDialog.getWindow() != null) {
+                    delDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                }
+
+                // 自定义弹窗内的提示文字
+                TextView tvMsg = delView.findViewById(R.id.tv_dialog_message);
+                if (tvMsg != null) {
+                    tvMsg.setText("确定要删除这条记录吗？\n删除后将无法恢复。");
+                }
+
+                // 绑定“取消”按钮点击事件
+                delView.findViewById(R.id.btn_dialog_cancel).setOnClickListener(dv -> delDialog.dismiss());
+
+                // 绑定“删除”按钮点击事件
+                delView.findViewById(R.id.btn_dialog_confirm).setOnClickListener(dv -> {
+                    viewModel.deleteTransaction(existingTransaction); // 执行删除操作
+                    delDialog.dismiss();
+                    dialog.dismiss(); // 同时关闭外层的“记一笔”编辑弹窗
+                });
+
+                delDialog.show();
+                // --- 优化结束 ---
             });
 
             tvRevoke.setVisibility(View.VISIBLE);

@@ -225,6 +225,15 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
         findViewById(R.id.btn_default_record_display).setOnClickListener(v -> showDefaultRecordDisplayDialog());
+// 绑定新添加的按钮点击事件
+        findViewById(R.id.btn_user_notice_settings).setOnClickListener(v -> {
+            startActivity(new Intent(this, UserNoticeActivity.class));
+        });
+
+        findViewById(R.id.btn_donate).setOnClickListener(v -> {
+            startActivity(new Intent(this, DonateActivity.class));
+        });
+
 
         View btnPhotoBackup = findViewById(R.id.btn_photo_backup_setting);
         if (btnPhotoBackup != null) {
@@ -260,6 +269,60 @@ public class SettingsActivity extends AppCompatActivity {
             prefs.edit().putBoolean("minimalist_mode", isChecked).apply();
             Toast.makeText(this, isChecked ? "极简模式已开启" : "极简模式已关闭", Toast.LENGTH_SHORT).show();
         });
+
+        // 检查是否已激活
+        boolean isActivated = prefs.getBoolean("is_premium_activated", false);
+        if (!isActivated) {
+            showActivationDialog(prefs);
+        }
+
+    }
+
+    private void showActivationDialog(SharedPreferences prefs) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_activate_premium, null);
+        builder.setView(view);
+        builder.setCancelable(false); // 强制用户操作
+
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        // 点击二维码保存图片
+        view.findViewById(R.id.iv_pay_alipay).setOnClickListener(v -> saveImageToGallery(R.drawable.pay, "alipay_qr"));
+        view.findViewById(R.id.iv_pay_wechat).setOnClickListener(v -> saveImageToGallery(R.drawable.wechat, "wechat_qr"));
+
+        // 用户须知按钮 (此处可跳转到你的说明页面)
+        view.findViewById(R.id.btn_user_notice).setOnClickListener(v -> {
+            // 从悬浮窗进入独立的页面
+            startActivity(new Intent(this, UserNoticeActivity.class));
+        });
+
+        // 我已诚信付款按钮
+        view.findViewById(R.id.btn_already_paid).setOnClickListener(v -> {
+            prefs.edit().putBoolean("is_premium_activated", true).apply();
+            dialog.dismiss();
+            Toast.makeText(this, "高级设置已激活", Toast.LENGTH_SHORT).show();
+        });
+
+        dialog.show();
+    }
+
+    // 简单的保存图片到相册逻辑
+    private void saveImageToGallery(int resId, String fileName) {
+        try {
+            // 这里可以使用你项目中已有的 PhotoActionActivity 逻辑或标准的 MediaStore 保存逻辑
+            // 简单示例：
+            android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
+            String savedUri = android.provider.MediaStore.Images.Media.insertImage(
+                    getContentResolver(), bitmap, fileName, "Scan to pay");
+            if (savedUri != null) {
+                Toast.makeText(this, "二维码已保存到相册", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "保存失败", Toast.LENGTH_SHORT).show();
+        }
     }
 
     // 注意：已删除 updateCurrencyButtonText 方法，因为它不再被需要

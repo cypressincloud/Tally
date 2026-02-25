@@ -81,6 +81,8 @@
             android:theme="@style/Theme.BudgetApp"
             android:exported="false"/>
 
+        <activity android:name=".ui.UserNoticeActivity" />
+
         <activity
             android:name=".ui.CurrencySettingsActivity"
             android:exported="false" />
