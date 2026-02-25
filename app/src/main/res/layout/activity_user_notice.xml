@@ -57,7 +57,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Tally 是一个纯本地的记账项目，拥有自动记账、照片记账、自动续费提醒、多币种、关联资产等核心功能。"
+                    android:text="Tally 是一个纯本地的记账项目，拥有自动记账、照片备份、自动续费提醒、多币种、关联资产等核心功能。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="6dp"
                     android:layout_marginTop="10dp"
@@ -80,10 +80,33 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="• 自启动：用于自动记账进程的后台保活。\n• 无障碍：实现屏幕读取与自动记账的核心权限。\n• 悬浮窗：用于 1 像素保活机制及记账时的即时弹窗交互。\n• 通知栏：提供实时状态反馈，功能稳定后可手动关闭。"
+                    android:text="• 自启动：用于自动记账进程的后台保活。\n• 无障碍：实现屏幕读取与自动记账的核心权限。\n• 悬浮窗：用于 1 像素保活机制及记账时的即时弹窗交互。\n• 通知：提供实时状态反馈，自动记账功能稳定后可手动关闭。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="10dp"
                     android:layout_marginTop="12dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="自动记账配置"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="使用“无障碍管理器”锁死 Tally 的无障碍权限。微信高版本对无障碍有限制，解决方案是下载“一木记账”，同时锁死 Tally 和一木记账的无障碍权限。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
                     android:textColor="?android:attr/textColorPrimary"/>
 
                 <View
@@ -103,7 +126,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="由于权限较为敏感，Tally 承诺完全不具备联网功能，未来也不会添加。如有云同步需求，建议参考开源代码自行扩展。关注酷安 “Tally” 项目，不定时发布版本更新。"
+                    android:text="由于使用到的权限较为敏感，Tally 承诺完全不具备联网功能，未来也不会添加。如有云同步需求，建议参考开源代码自行扩展。关注酷安 “Tally” 项目，不定时发布版本更新。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="6dp"
                     android:layout_marginTop="10dp"
