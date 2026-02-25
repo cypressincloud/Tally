@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -36,22 +37,37 @@ public class CurrencySettingsActivity extends AppCompatActivity {
 
     // --- 数据同步：扩充了常用货币列表，确保和记账页面尽可能一致 ---
     private final String[] currencyCodes = {
-            "CNY", "USD", "EUR", "JPY",
-            "GBP", "HKD", "TWD", "KRW",
-            "AUD", "CAD", "SGD", "NZD",
-            "CHF", "RUB", "THB", "VND"
+            "CNY", "USD", "EUR", "GBP", "HKD", "TWD",
+            "JPY", "KRW", "CAD", "AUD", "SGD", "NZD",
+            "INR", "RUB", "THB", "VND", "PHP", "BRL",
+            "IDR", "MYR", "CHF", "TRY", "ILS",
+            // --- 欧洲国家补充 ---
+            "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON", "BGN", "RSD", "ISK",
+            "BYN", "UAH", "MDL", "ALL", "BAM", "MKD", "GEL", "AMD", "AZN",
+            // --- 其他地区 ---
+            "KWD", "SAR", "AED", "ZAR", "NGN", "EGP"
     };
+
     private final String[] currencySymbols = {
-            "¥", "$", "€", "¥",
-            "£", "$", "NT$", "₩",
-            "$", "$", "$", "$",
-            "Fr", "₽", "฿", "₫"
+            "¥", "$", "€", "£", "HK$", "NT$",
+            "JP¥", "₩", "C$", "A$", "S$", "NZ$",
+            "₹", "₽", "฿", "₫", "₱", "R$",
+            "Rp", "RM", "CHF", "₺", "₪",
+            // --- 对应符号 ---
+            "kr", "kr", "kr", "zł", "Kč", "Ft", "lei", "лв", "RSD", "kr",
+            "BYN", "₴", "L", "Lek", "KM", "den", "₾", "֏", "₼",
+            "KD", "SR", "DH", "R", "₦", "E£"
     };
+
     private final String[] currencyNames = {
-            "人民币", "美元", "欧元", "日元",
-            "英镑", "港币", "新台币", "韩元",
-            "澳元", "加元", "新加坡元", "新西兰元",
-            "瑞士法郎", "卢布", "泰铢", "越南盾"
+            "人民币", "美元", "欧元", "英镑", "港币", "新台币",
+            "日元", "韩元", "加元", "澳元", "新加坡元", "新西兰元",
+            "印度卢比", "卢布", "泰铢", "越南盾", "比索", "雷亚尔",
+            "印尼盾", "林吉特", "瑞郎", "土耳其里拉", "谢克尔",
+            // --- 对应名称 ---
+            "瑞典克朗", "挪威克朗", "丹麦克朗", "波兰兹罗提", "捷克克朗", "匈牙利福林", "罗马尼亚列伊", "保加利亚列夫", "塞尔维亚第纳尔", "冰岛克朗",
+            "白俄罗斯卢布", "乌克兰格里夫纳", "摩尔多瓦列伊", "阿尔巴尼亚列克", "波黑马克", "马其顿第纳尔", "格鲁吉亚拉里", "亚美尼亚德拉姆", "阿塞拜疆马纳特",
+            "科威特第纳尔", "沙特里亚尔", "阿联酋迪拉姆", "南非兰特", "奈拉", "埃及镑"
     };
 
     @Override
@@ -156,6 +172,7 @@ public class CurrencySettingsActivity extends AppCompatActivity {
         }
 
         dialog.show();
+
     }
 
     private static class CurrencyItem {

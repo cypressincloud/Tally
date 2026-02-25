@@ -90,6 +90,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
     private final Pattern amountPattern = Pattern.compile("(\\d+(\\.\\d{1,2})?)");
     private final Pattern quantityPattern = Pattern.compile("\\[?\\d+\\s*[件个笔条单]\\s*\\]?");
 
+    // 更新金额匹配正则：捕获金额前的1-3位非数字符号
+    private final Pattern amountWithSymbolPattern = Pattern.compile("([^0-9\\s]{1,3})?\\s*(\\d+(\\.\\d{1,2})?)");
+
+    // 内部类，用于同时记录数值和识别到的符号
     private final Runnable scanRunnable = new Runnable() {
         @Override
         public void run() {
@@ -180,37 +184,78 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private void findAmountRecursive(AccessibilityNodeInfo root, int type, String defaultCategory, int matchedAssetId) {
         if (root == null) return;
-        List<Double> candidates = new ArrayList<>();
+        List<AmountResult> candidates = new ArrayList<>();
         collectAllNumbers(root, candidates);
-        double bestAmount = -1;
-        for (Double amount : candidates) {
-            String strAmt = String.valueOf(amount);
-            if (strAmt.contains(".") && !strAmt.endsWith(".0")) {
-                bestAmount = amount;
+
+        AmountResult bestResult = null;
+        for (AmountResult res : candidates) {
+            // 优先选择带小数点且不是整除格式的金额
+            if (String.valueOf(res.value).contains(".") && !String.valueOf(res.value).endsWith(".0")) {
+                bestResult = res;
                 break;
             }
-            if (bestAmount == -1 && amount > 0) {
-                bestAmount = amount;
+            if (bestResult == null && res.value > 0) {
+                bestResult = res;
             }
         }
-        if (bestAmount > 0) {
-            triggerConfirmWindow(bestAmount, type, defaultCategory, matchedAssetId);
+
+        if (bestResult != null) {
+            // 确定最终使用的符号
+            String detectedSymbol = bestResult.symbol;
+            if (detectedSymbol == null) {
+                SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+                detectedSymbol = prefs.getString("default_currency_symbol", "¥");
+            }
+
+            // --- 核心修复：声明为 final 变量以供 Lambda 引用 ---
+            final double finalAmount = bestResult.value;
+            final String finalCurrency = detectedSymbol;
+            final int finalType = type;
+            final String finalCategory = defaultCategory;
+            final int finalAssetId = matchedAssetId;
+
+            long now = System.currentTimeMillis();
+            // 防抖动逻辑：2.5秒内重复触发则忽略
+            if (now - lastWindowDismissTime < 2500) return;
+
+            String signature = finalAmount + "-" + finalType;
+            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            final String timeNote = sdf.format(new Date(now)) + " auto";
+
+            // 通过 Handler 发送到主线程显示悬浮窗
+            handler.post(() -> showConfirmWindow(finalAmount, finalType, finalCategory, timeNote, finalAssetId, finalCurrency));
         }
     }
-
-    private void collectAllNumbers(AccessibilityNodeInfo node, List<Double> list) {
+    private void collectAllNumbers(AccessibilityNodeInfo node, List<AmountResult> list) {
         if (node == null) return;
         String text = getTextOrDescription(node);
         if (text != null && !text.isEmpty()) {
             if (!text.contains(":")) {
                 String cleanText = quantityPattern.matcher(text).replaceAll("");
-                Matcher matcher = amountPattern.matcher(cleanText);
+                Matcher matcher = amountWithSymbolPattern.matcher(cleanText);
                 while (matcher.find()) {
                     try {
-                        String numStr = matcher.group(1).replace(",", "");
+                        String capturedSymbol = matcher.group(1); // 捕获到的符号部分
+                        String numStr = matcher.group(2).replace(",", "");
                         double val = Double.parseDouble(numStr);
+
                         if (val > 0 && val < 200000 && !(val >= 2020 && val <= 2035 && val % 1 == 0)) {
-                            list.add(val);
+                            String validSymbol = null;
+                            if (capturedSymbol != null) {
+                                // 遍历工具类中的货币符号列表进行匹配
+                                for (String s : com.example.budgetapp.util.CurrencyUtils.CURRENCY_SYMBOLS) {
+                                    if (capturedSymbol.trim().contains(s)) {
+                                        validSymbol = s;
+                                        break;
+                                    }
+                                }
+                            }
+                            list.add(new AmountResult(val, validSymbol));
                         }
                     } catch (Exception e) {}
                 }
@@ -230,30 +275,31 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
     private void triggerConfirmWindow(double amount, int type, String category, int assetId) {
         long now = System.currentTimeMillis();
-        if (now - lastWindowDismissTime < 2500) {
-            return;
-        }
-        String signature = amount + "-" + type;
-        if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return;
-        lastRecordTime = now;
-        lastContentSignature = signature;
+        if (now - lastWindowDismissTime < 2500) return;
+
         SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-        String timeNote = sdf.format(new Date(now)) + " auto";
-        handler.post(() -> showConfirmWindow(amount, type, category, timeNote, assetId));
+        final String timeNote = sdf.format(new Date(now)) + " auto";
+
+        // 获取默认货币符号
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        final String defaultSymbol = prefs.getString("default_currency_symbol", "¥");
+
+        handler.post(() -> showConfirmWindow(amount, type, category, timeNote, assetId, defaultSymbol));
     }
 
-    private void showConfirmWindow(double amount, int type, String category, String note, int matchedAssetId) {
+    private void showConfirmWindow(double amount, int type, String category, String note, int matchedAssetId, String initialSymbol) {
         if (isWindowShowing) return;
         selectedSubCategory = null;
 
-        // 【修正点】在这里定义 prefs，后续代码复用它
+        // 获取用户偏好设置
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-        String defaultSymbol = prefs.getString("default_currency_symbol", "¥");
+        boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+        boolean isPhotoBackupEnabled = prefs.getBoolean("enable_photo_backup", false);
 
+        // 如果没有悬浮窗权限，则直接后台静默记账
         if (!Settings.canDrawOverlays(this)) {
             int finalAssetId = (matchedAssetId > 0) ? matchedAssetId : 0;
-            // 使用 defaultSymbol
-            saveToDatabase(amount, type, category, null, note + " (后台)", "", finalAssetId, defaultSymbol, "");
+            saveToDatabase(amount, type, category, null, note + " (后台)", "", finalAssetId, initialSymbol, "");
             return;
         }
 
@@ -279,6 +325,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             this.windowRootView = floatView;
             android.widget.FrameLayout windowContentRoot = floatView.findViewById(R.id.window_root);
 
+            // 点击背景关闭
             View rootView = floatView.findViewById(R.id.window_root);
             if (rootView != null) {
                 rootView.setOnClickListener(v -> closeWindow(windowManager, floatView));
@@ -290,6 +337,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             isWindowShowing = true;
 
+            // 绑定视图
             EditText etAmount = floatView.findViewById(R.id.et_window_amount);
             Button btnCurrency = floatView.findViewById(R.id.btn_window_currency);
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
@@ -298,24 +346,19 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             EditText etNote = floatView.findViewById(R.id.et_window_note);
             EditText etRemark = floatView.findViewById(R.id.et_window_remark);
             Spinner spAsset = floatView.findViewById(R.id.sp_asset);
-
             Button btnSave = floatView.findViewById(R.id.btn_window_save);
             Button btnCancel = floatView.findViewById(R.id.btn_window_cancel);
-
             Button btnTakePhoto = floatView.findViewById(R.id.btn_window_take_photo);
             Button btnViewPhoto = floatView.findViewById(R.id.btn_window_view_photo);
 
+            // 初始化数据展示
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
-            // 【修正点】直接使用上面已经定义的 prefs 变量，不再重新声明 SharedPreferences prefs = ...
-            boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
-            boolean isPhotoBackupEnabled = prefs.getBoolean("enable_photo_backup", false);
-            final String[] currentPhotoPath = {null};
-
+            // 核心改动：设置货币单位按钮初始文字
             if (isCurrencyEnabled) {
                 btnCurrency.setVisibility(View.VISIBLE);
-                btnCurrency.setText(defaultSymbol); // 使用默认符号
+                btnCurrency.setText(initialSymbol); // 显示传递进来的识别结果或默认值
                 btnCurrency.setOnClickListener(v -> {
                     com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(themeContext, btnCurrency, true);
                 });
@@ -323,6 +366,8 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 btnCurrency.setVisibility(View.GONE);
             }
 
+            // 照片备份逻辑
+            final String[] currentPhotoPath = {null};
             if (isPhotoBackupEnabled) {
                 btnTakePhoto.setVisibility(View.VISIBLE);
                 btnTakePhoto.setOnClickListener(v -> {
@@ -330,7 +375,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         hideWindowAndStartPhotoActivity(actionType, null, currentPhotoPath);
                     });
                 });
-
                 btnViewPhoto.setOnClickListener(v -> {
                     if (currentPhotoPath[0] != null) {
                         hideWindowAndStartPhotoActivity(PhotoActionActivity.ACTION_VIEW, currentPhotoPath[0], currentPhotoPath);
@@ -338,16 +382,17 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 });
             }
 
+            // 分类适配器初始化
             List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
             List<String> incomeCategories = CategoryManager.getIncomeCategories(this);
-
             rvCategory.setLayoutManager(new GridLayoutManager(themeContext, 5));
-            final String[] selectedCategory = {category};
 
+            final String[] selectedCategory = {category};
             List<String> currentList = (type == 1) ? incomeCategories : expenseCategories;
 
+            // 处理识别到的商家分类映射
             if (!currentList.contains(category)) {
-                if (type == 0 && (category.equals("淘宝") || category.equals("京东") || category.equals("拼多多"))) {
+                if (type == 0 && (category.equals("微信") || category.equals("支付宝") || category.equals("淘宝") || category.equals("京东") || category.equals("拼多多"))) {
                     selectedCategory[0] = "购物";
                 } else if (type == 0 && category.equals("美团")) {
                     selectedCategory[0] = "餐饮";
@@ -356,67 +401,49 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     etCategory.setText(category);
                     etCategory.setVisibility(View.VISIBLE);
                 }
-            } else {
-                etCategory.setVisibility(View.GONE);
             }
 
             CategoryAdapter categoryAdapter = new CategoryAdapter(themeContext, currentList, selectedCategory[0], cat -> {
                 selectedCategory[0] = cat;
                 selectedSubCategory = null;
-                if ("自定义".equals(cat)) {
-                    etCategory.setVisibility(View.VISIBLE);
-                    etCategory.requestFocus();
-                } else {
-                    etCategory.setVisibility(View.GONE);
-                }
+                etCategory.setVisibility("自定义".equals(cat) ? View.VISIBLE : View.GONE);
             });
 
+            // 长按选择二级分类
             categoryAdapter.setOnCategoryLongClickListener(cat -> {
                 if (CategoryManager.isSubCategoryEnabled(this) && !"自定义".equals(cat)) {
-                    // --- 新增修复：长按时立刻选中该一级分类并重置状态 ---
                     if (!cat.equals(selectedCategory[0])) {
-                        categoryAdapter.setSelectedCategory(cat); // 更新UI高亮
-                        selectedCategory[0] = cat;                // 更新内部记录的主分类
-                        selectedSubCategory = null;               // 切换了主分类，必须清空旧的二级分类
-                        etCategory.setVisibility(View.GONE);      // 隐藏自定义输入框
+                        categoryAdapter.setSelectedCategory(cat);
+                        selectedCategory[0] = cat;
+                        selectedSubCategory = null;
+                        etCategory.setVisibility(View.GONE);
                     }
-                    // ---------------------------------------------------
                     showSubCategoryDialog(themeContext, cat, categoryAdapter);
                     return true;
                 }
                 return false;
             });
-
             rvCategory.setAdapter(categoryAdapter);
 
+            // 类型切换逻辑
             if (type == 1) {
                 rgType.check(R.id.rb_window_income);
             } else {
                 rgType.check(R.id.rb_window_expense);
             }
-
             rgType.setOnCheckedChangeListener((group, checkedId) -> {
-                if (checkedId == R.id.rb_window_income) {
-                    categoryAdapter.updateData(incomeCategories);
-                    String first = incomeCategories.isEmpty() ? "自定义" : incomeCategories.get(0);
-                    categoryAdapter.setSelectedCategory(first);
-                    selectedCategory[0] = first;
-                    selectedSubCategory = null;
-                    etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
-                } else {
-                    categoryAdapter.updateData(expenseCategories);
-                    String first = expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0);
-                    categoryAdapter.setSelectedCategory(first);
-                    selectedCategory[0] = first;
-                    selectedSubCategory = null;
-                    etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
-                }
+                List<String> newList = (checkedId == R.id.rb_window_income) ? incomeCategories : expenseCategories;
+                categoryAdapter.updateData(newList);
+                String first = newList.isEmpty() ? "自定义" : newList.get(0);
+                categoryAdapter.setSelectedCategory(first);
+                selectedCategory[0] = first;
+                selectedSubCategory = null;
+                etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
             });
 
+            // 资产关联逻辑
             if (config == null) config = new AssistantConfig(this);
-            boolean isAssetEnabled = config.isAssetsEnabled();
-
-            if (isAssetEnabled) {
+            if (config.isAssetsEnabled()) {
                 spAsset.setVisibility(View.VISIBLE);
                 ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.item_spinner_dropdown);
                 adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
@@ -430,8 +457,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                     loadedAssets.add(noAsset);
                     if (assets != null) loadedAssets.addAll(assets);
 
-                    int defaultAssetId = config.getDefaultAssetId();
-                    int targetAssetId = (matchedAssetId > 0) ? matchedAssetId : defaultAssetId;
+                    int targetAssetId = (matchedAssetId > 0) ? matchedAssetId : config.getDefaultAssetId();
                     List<String> names = new ArrayList<>();
                     for (AssetAccount a : loadedAssets) names.add(a.name);
 
@@ -439,12 +465,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                         adapter.clear();
                         adapter.addAll(names);
                         adapter.notifyDataSetChanged();
-                        if (targetAssetId != -1) {
-                            for (int i = 0; i < loadedAssets.size(); i++) {
-                                if (loadedAssets.get(i).id == targetAssetId) {
-                                    spAsset.setSelection(i);
-                                    break;
-                                }
+                        for (int i = 0; i < loadedAssets.size(); i++) {
+                            if (loadedAssets.get(i).id == targetAssetId) {
+                                spAsset.setSelection(i);
+                                break;
                             }
                         }
                     });
@@ -453,34 +477,29 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
                 spAsset.setVisibility(View.GONE);
             }
 
+            // 保存按钮逻辑
             btnSave.setOnClickListener(v -> {
                 try {
-                    double finalAmount = Double.parseDouble(etAmount.getText().toString());
-                    String finalNote = etNote.getText().toString();
-                    String finalRemark = etRemark.getText().toString().trim();
-                    int finalType = (rgType.getCheckedRadioButtonId() == R.id.rb_window_income) ? 1 : 0;
+                    double finalAmountValue = Double.parseDouble(etAmount.getText().toString());
+                    String finalNoteText = etNote.getText().toString();
+                    String finalRemarkText = etRemark.getText().toString().trim();
+                    int finalTypeInt = (rgType.getCheckedRadioButtonId() == R.id.rb_window_income) ? 1 : 0;
 
-                    String finalCat = selectedCategory[0];
-                    if ("自定义".equals(finalCat)) {
+                    String finalCatName = selectedCategory[0];
+                    if ("自定义".equals(finalCatName)) {
                         String customInput = etCategory.getText().toString().trim();
-                        if (!customInput.isEmpty()) {
-                            finalCat = customInput;
-                        } else {
-                            finalCat = (finalType == 1) ? "退款" : "其他";
-                        }
+                        finalCatName = !customInput.isEmpty() ? customInput : (finalTypeInt == 1 ? "退款" : "其他");
                     }
 
-                    int assetId = 0;
-                    if (isAssetEnabled) {
-                        int selectedPos = spAsset.getSelectedItemPosition();
-                        if (selectedPos >= 0 && selectedPos < loadedAssets.size()) {
-                            assetId = loadedAssets.get(selectedPos).id;
-                        }
+                    int assetIdInt = 0;
+                    if (config.isAssetsEnabled() && spAsset.getSelectedItemPosition() < loadedAssets.size()) {
+                        assetIdInt = loadedAssets.get(spAsset.getSelectedItemPosition()).id;
                     }
 
-                    String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
+                    // 最终保存时使用的货币单位
+                    String finalSymbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
-                    saveToDatabase(finalAmount, finalType, finalCat, selectedSubCategory, finalNote, finalRemark, assetId, symbol, currentPhotoPath[0]);
+                    saveToDatabase(finalAmountValue, finalTypeInt, finalCatName, selectedSubCategory, finalNoteText, finalRemarkText, assetIdInt, finalSymbol, currentPhotoPath[0]);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "已记账", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -492,11 +511,10 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             windowManager.addView(floatView, params);
 
         } catch (Exception e) {
-            Log.e(TAG, "Window show failed", e);
+            Log.e("AutoTrackService", "Window show failed", e);
             isWindowShowing = false;
         }
     }
-
     private void closeWindow(WindowManager wm, View view) {
         try { wm.removeView(view); } catch (Exception e) {}
         finally {
@@ -506,6 +524,15 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         }
     }
 
+    // 内部类，用于同时记录数值和识别到的符号
+    private static class AmountResult {
+        double value;
+        String symbol;
+        AmountResult(double value, String symbol) {
+            this.value = value;
+            this.symbol = symbol;
+        }
+    }
     interface PhotoActionResult {
         void onAction(int type);
     }
