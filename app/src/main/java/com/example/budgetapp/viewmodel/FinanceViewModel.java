@@ -7,6 +7,7 @@ import androidx.lifecycle.LiveData;
 import com.example.budgetapp.database.AppDatabase;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.AssetAccountDao;
+import com.example.budgetapp.database.RenewalItem;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.database.TransactionDao;
 import java.util.List;
@@ -24,6 +25,30 @@ public class FinanceViewModel extends AndroidViewModel {
         assetDao = db.assetAccountDao();
         allTransactions = transactionDao.getAllTransactions();
         allAssets = assetDao.getAllAssets();
+    }
+
+    // src/main/java/com/example/budgetapp/viewmodel/FinanceViewModel.java
+    public void processAutoRenewal(RenewalItem renewal, int assetId) {
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            // 1. 尝试扣减资产
+            AssetAccount asset = assetDao.getAssetByIdSync(assetId);
+            if (asset != null && asset.amount >= renewal.amount) {
+                asset.amount -= renewal.amount;
+                assetDao.update(asset);
+
+                // 2. 生成对应的支出账单，防止“总资产”计算时因缺少明细而对不上
+                Transaction transaction = new Transaction();
+                transaction.amount = renewal.amount;
+                transaction.type = 0; // 支出
+                transaction.category = "自动续费";
+                transaction.note = "项目: " + renewal.object;
+                transaction.date = System.currentTimeMillis();
+                transaction.assetId = assetId;
+                transactionDao.insert(transaction);
+            } else {
+                // 余额不足处理逻辑...
+            }
+        });
     }
 
     public LiveData<List<Transaction>> getAllTransactions() {

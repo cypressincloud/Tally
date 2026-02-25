@@ -373,6 +373,14 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
 
             categoryAdapter.setOnCategoryLongClickListener(cat -> {
                 if (CategoryManager.isSubCategoryEnabled(this) && !"自定义".equals(cat)) {
+                    // --- 新增修复：长按时立刻选中该一级分类并重置状态 ---
+                    if (!cat.equals(selectedCategory[0])) {
+                        categoryAdapter.setSelectedCategory(cat); // 更新UI高亮
+                        selectedCategory[0] = cat;                // 更新内部记录的主分类
+                        selectedSubCategory = null;               // 切换了主分类，必须清空旧的二级分类
+                        etCategory.setVisibility(View.GONE);      // 隐藏自定义输入框
+                    }
+                    // ---------------------------------------------------
                     showSubCategoryDialog(themeContext, cat, categoryAdapter);
                     return true;
                 }

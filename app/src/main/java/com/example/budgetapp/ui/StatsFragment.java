@@ -358,9 +358,11 @@ public class StatsFragment extends Fragment {
 
         final boolean[] isExpense = {true}; // 默认支出
         final String[] selectedCategory = {expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0)};
+        final String[] selectedSubCategory = {""}; // 【新增】保存选中的二级分类
 
         CategoryAdapter categoryAdapter = new CategoryAdapter(getContext(), expenseCategories, selectedCategory[0], category -> {
             selectedCategory[0] = category;
+            selectedSubCategory[0] = ""; // 【新增】切换主分类时清空二级分类
             if ("自定义".equals(category)) {
                 etCustomCategory.setVisibility(View.VISIBLE);
                 etCustomCategory.requestFocus();
@@ -368,6 +370,91 @@ public class StatsFragment extends Fragment {
                 etCustomCategory.setVisibility(View.GONE);
             }
         });
+
+        // 【新增】长按显示二级分类逻辑
+        categoryAdapter.setOnCategoryLongClickListener(category -> {
+            if (CategoryManager.isSubCategoryEnabled(getContext()) && !"自定义".equals(category)) {
+
+                // 长按时立刻选中该一级分类并重置状态
+                if (!category.equals(selectedCategory[0])) {
+                    categoryAdapter.setSelectedCategory(category);
+                    selectedCategory[0] = category;
+                    selectedSubCategory[0] = "";
+                    etCustomCategory.setVisibility(View.GONE);
+                }
+
+                List<String> subCats = CategoryManager.getSubCategories(getContext(), category);
+                AlertDialog.Builder subBuilder = new AlertDialog.Builder(getContext());
+                View subCatView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_select_sub_category, null);
+                subBuilder.setView(subCatView);
+                AlertDialog subCatDialog = subBuilder.create();
+
+                if (subCatDialog.getWindow() != null) {
+                    subCatDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                }
+
+                TextView tvTitle = subCatView.findViewById(R.id.tv_title);
+                tvTitle.setText(category + " - 选择细分");
+                ChipGroup cgSubCategories = subCatView.findViewById(R.id.cg_sub_categories);
+                Button btnCancel = subCatView.findViewById(R.id.btn_cancel);
+                TextView tvEmpty = subCatView.findViewById(R.id.tv_empty);
+                View nsvContainer = subCatView.findViewById(R.id.nsv_container);
+
+                if (subCats.isEmpty()) {
+                    cgSubCategories.setVisibility(View.GONE);
+                    tvEmpty.setVisibility(View.VISIBLE);
+                    nsvContainer.setMinimumHeight(150);
+                } else {
+                    cgSubCategories.setVisibility(View.VISIBLE);
+                    tvEmpty.setVisibility(View.GONE);
+
+                    String currentSelectedSub = selectedSubCategory[0];
+                    int bgDefault = ContextCompat.getColor(getContext(), R.color.cat_unselected_bg);
+                    int bgChecked = ContextCompat.getColor(getContext(), R.color.app_yellow);
+                    int textDefault = ContextCompat.getColor(getContext(), R.color.text_primary);
+                    int textChecked = ContextCompat.getColor(getContext(), R.color.cat_selected_text);
+
+                    int[][] states = new int[][] { new int[] { android.R.attr.state_checked }, new int[] { } };
+                    ColorStateList bgStateList = new ColorStateList(states, new int[] { bgChecked, bgDefault });
+                    ColorStateList textStateList = new ColorStateList(states, new int[] { textChecked, textDefault });
+
+                    for (String subCatName : subCats) {
+                        Chip chip = new Chip(getContext());
+                        chip.setText(subCatName);
+                        chip.setCheckable(true);
+                        chip.setClickable(true);
+                        chip.setChipBackgroundColor(bgStateList);
+                        chip.setTextColor(textStateList);
+                        chip.setChipStrokeWidth(0);
+                        chip.setCheckedIconVisible(false);
+
+                        if (subCatName.equals(currentSelectedSub)) {
+                            chip.setChecked(true);
+                        }
+
+                        chip.setOnClickListener(v -> {
+                            if (subCatName.equals(selectedSubCategory[0])) {
+                                selectedSubCategory[0] = null;
+                                Toast.makeText(getContext(), "已取消细分", Toast.LENGTH_SHORT).show();
+                            } else {
+                                selectedSubCategory[0] = subCatName;
+                                Toast.makeText(getContext(), "已选择: " + subCatName, Toast.LENGTH_SHORT).show();
+                            }
+                            categoryAdapter.setSelectedCategory(category);
+                            selectedCategory[0] = category;
+                            etCustomCategory.setVisibility(View.GONE);
+                            subCatDialog.dismiss();
+                        });
+                        cgSubCategories.addView(chip);
+                    }
+                }
+                btnCancel.setOnClickListener(v -> subCatDialog.dismiss());
+                subCatDialog.show();
+                return true;
+            }
+            return false;
+        });
+
         rvCategory.setAdapter(categoryAdapter);
 
         // === 资产配置 ===
@@ -470,6 +557,11 @@ public class StatsFragment extends Fragment {
             if (existingTransaction.remark != null) etRemark.setText(existingTransaction.remark);
             if (existingTransaction.note != null) etNote.setText(existingTransaction.note);
 
+            // 【新增】回显二级分类
+            if (existingTransaction.subCategory != null) {
+                selectedSubCategory[0] = existingTransaction.subCategory;
+            }
+
             if (existingTransaction.type == 1) {
                 rgType.check(R.id.rb_income);
                 isExpense[0] = false;
@@ -542,9 +634,11 @@ public class StatsFragment extends Fragment {
                     }
                 }
 
+                // 【修改】保存时带上二级分类数据
                 if (existingTransaction == null) {
                     Transaction t = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     t.assetId = selectedAssetId;
+                    t.subCategory = selectedSubCategory[0]; // 【新增】保存二级分类
                     viewModel.addTransaction(t);
 
                     if (selectedAssetId != 0) {
@@ -561,6 +655,7 @@ public class StatsFragment extends Fragment {
                     Transaction updateT = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     updateT.id = existingTransaction.id;
                     updateT.assetId = selectedAssetId;
+                    updateT.subCategory = selectedSubCategory[0]; // 【新增】更新二级分类
                     viewModel.updateTransaction(updateT);
                 }
                 dialog.dismiss();

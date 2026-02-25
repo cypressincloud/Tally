@@ -29,4 +29,7 @@ public interface AssetAccountDao {
     // 【新增】根据ID获取单个资产，用于更新余额
     @Query("SELECT * FROM asset_accounts WHERE id = :id LIMIT 1")
     AssetAccount getAssetByIdSync(int id);
+
+    @Query("UPDATE asset_accounts SET amount = amount - :deductAmount WHERE id = :id AND amount >= :deductAmount")
+    int decreaseBalanceSafe(int id, float deductAmount);
 }

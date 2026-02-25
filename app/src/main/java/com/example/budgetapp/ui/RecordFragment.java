@@ -575,6 +575,67 @@ public class RecordFragment extends Fragment {
             }
         }
 
+        // === 新增：计算当日汇总并设置彩色文本 ===
+        TextView tvSummary = dialogView.findViewById(R.id.tv_dialog_summary);
+        if (tvSummary != null) {
+            double dayIncome = 0;
+            double dayExpense = 0;
+
+            // 遍历真实的记录计算收支 (不包含虚拟的预览账单)
+            for (Transaction t : dayList) {
+                if ("PREVIEW_BILL".equals(t.remark)) continue;
+                if (t.type == 1) {
+                    dayIncome += t.amount;
+                } else {
+                    dayExpense += t.amount;
+                }
+            }
+
+            if (dayIncome == 0 && dayExpense == 0) {
+                // 没有数据，隐藏
+                tvSummary.setVisibility(View.GONE);
+            } else {
+                tvSummary.setVisibility(View.VISIBLE);
+                double dayBalance = dayIncome - dayExpense;
+
+                // 准备颜色 (主题色为 app_yellow)
+                int colorExpense = ContextCompat.getColor(getContext(), R.color.expense_green);
+                int colorIncome = ContextCompat.getColor(getContext(), R.color.income_red);
+                int colorBalance = ContextCompat.getColor(getContext(), R.color.app_yellow);
+
+                // 构建 Spannable 文本
+                android.text.SpannableStringBuilder ssb = new android.text.SpannableStringBuilder();
+
+                // 支出 (绿色)
+                if (dayExpense > 0) {
+                    String expStr = String.format(Locale.CHINA, "支出: %.2f", dayExpense);
+                    int start = ssb.length();
+                    ssb.append(expStr);
+                    ssb.setSpan(new android.text.style.ForegroundColorSpan(colorExpense), start, ssb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    ssb.append("    "); // 增加间距
+                }
+
+                // 收入 (红色)
+                if (dayIncome > 0) {
+                    String incStr = String.format(Locale.CHINA, "收入: %.2f", dayIncome);
+                    int start = ssb.length();
+                    ssb.append(incStr);
+                    ssb.setSpan(new android.text.style.ForegroundColorSpan(colorIncome), start, ssb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    ssb.append("    "); // 增加间距
+                }
+
+                // 结余 (整体主题色)
+                String balStr = String.format(Locale.CHINA, "结余: %.2f", dayBalance);
+                int startBal = ssb.length();
+                ssb.append(balStr);
+                ssb.setSpan(new android.text.style.ForegroundColorSpan(colorBalance), startBal, ssb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+
+                tvSummary.setText(ssb);
+            }
+        }
+        // ===========================================
+
         listAdapter.setTransactions(dayList);
 
         dialogView.findViewById(R.id.btn_add_transaction).setOnClickListener(v -> showAddOrEditDialog(null, date));
@@ -843,17 +904,29 @@ public class RecordFragment extends Fragment {
             }
         });
 
-        // 长按显示二级分类 (保持原有逻辑)
+        // 长按显示二级分类逻辑
         categoryAdapter.setOnCategoryLongClickListener(category -> {
             if (CategoryManager.isSubCategoryEnabled(getContext()) && !"自定义".equals(category)) {
+
+                // --- 新增修复：长按时立刻选中该一级分类并重置状态 ---
+                if (!category.equals(selectedCategory[0])) {
+                    categoryAdapter.setSelectedCategory(category); // 更新UI高亮
+                    selectedCategory[0] = category;                // 更新内部记录的主分类
+                    selectedSubCategory[0] = "";                   // 切换了主分类，必须清空旧的二级分类
+                    etCustomCategory.setVisibility(View.GONE);     // 隐藏自定义输入框
+                }
+                // ---------------------------------------------------
+
                 List<String> subCats = CategoryManager.getSubCategories(getContext(), category);
                 AlertDialog.Builder subBuilder = new AlertDialog.Builder(getContext());
                 View subCatView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_select_sub_category, null);
                 subBuilder.setView(subCatView);
                 AlertDialog subCatDialog = subBuilder.create();
+
                 if (subCatDialog.getWindow() != null) {
                     subCatDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                 }
+
                 TextView tvTitle = subCatView.findViewById(R.id.tv_title);
                 tvTitle.setText(category + " - 选择细分");
                 ChipGroup cgSubCategories = subCatView.findViewById(R.id.cg_sub_categories);
@@ -868,11 +941,13 @@ public class RecordFragment extends Fragment {
                 } else {
                     cgSubCategories.setVisibility(View.VISIBLE);
                     tvEmpty.setVisibility(View.GONE);
+
                     String currentSelectedSub = selectedSubCategory[0];
                     int bgDefault = ContextCompat.getColor(getContext(), R.color.cat_unselected_bg);
                     int bgChecked = ContextCompat.getColor(getContext(), R.color.app_yellow);
                     int textDefault = ContextCompat.getColor(getContext(), R.color.text_primary);
                     int textChecked = ContextCompat.getColor(getContext(), R.color.cat_selected_text);
+
                     int[][] states = new int[][] { new int[] { android.R.attr.state_checked }, new int[] { } };
                     ColorStateList bgStateList = new ColorStateList(states, new int[] { bgChecked, bgDefault });
                     ColorStateList textStateList = new ColorStateList(states, new int[] { textChecked, textDefault });
@@ -886,9 +961,12 @@ public class RecordFragment extends Fragment {
                         chip.setTextColor(textStateList);
                         chip.setChipStrokeWidth(0);
                         chip.setCheckedIconVisible(false);
+
+                        // 恢复选中状态
                         if (subCatName.equals(currentSelectedSub)) {
                             chip.setChecked(true);
                         }
+
                         chip.setOnClickListener(v -> {
                             if (subCatName.equals(selectedSubCategory[0])) {
                                 selectedSubCategory[0] = null;
@@ -897,6 +975,7 @@ public class RecordFragment extends Fragment {
                                 selectedSubCategory[0] = subCatName;
                                 Toast.makeText(getContext(), "已选择: " + subCatName, Toast.LENGTH_SHORT).show();
                             }
+                            // 再次确保一级分类被选中
                             categoryAdapter.setSelectedCategory(category);
                             selectedCategory[0] = category;
                             etCustomCategory.setVisibility(View.GONE);
