@@ -81,19 +81,20 @@ public class AssetsFragment extends Fragment {
         adapter = new AssetAdapter(
                 account -> showAddOrEditDialog(account, account.type),
                 account -> {
-                    if (account.type == 0) {
+                    // 【修改】允许资产(0)和负债(1)设为默认支付项
+                    if (account.type == 0 || account.type == 1) {
                         int currentDefaultId = config.getDefaultAssetId();
                         if (currentDefaultId == account.id) {
                             config.setDefaultAssetId(-1);
                             adapter.setDefaultId(-1);
-                            Toast.makeText(getContext(), "已取消默认资产", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "已取消默认支付项", Toast.LENGTH_SHORT).show();
                         } else {
                             config.setDefaultAssetId(account.id);
                             adapter.setDefaultId(account.id);
-                            Toast.makeText(getContext(), "已设为默认资产", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "已设为默认支付项", Toast.LENGTH_SHORT).show();
                         }
                     } else {
-                        Toast.makeText(getContext(), "仅支持将资产设为默认支付项", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "仅支持将资产或负债设为默认支付项", Toast.LENGTH_SHORT).show();
                     }
                 }
         );
@@ -105,7 +106,6 @@ public class AssetsFragment extends Fragment {
         layoutLiability.setOnClickListener(v -> switchType(1));
         layoutLent.setOnClickListener(v -> switchType(2));
     }
-
     private void switchType(int type) {
         if (currentType != type) {
             currentType = type;

@@ -112,15 +112,21 @@ public class AutoAssetActivity extends AppCompatActivity {
         }
 
         AppDatabase.databaseWriteExecutor.execute(() -> {
+            // 【修改】同时查询资产(0)和负债(1)
             List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0);
+            List<AssetAccount> liabilities = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(1);
+
+            List<AssetAccount> mergedList = new ArrayList<>();
+            if (assets != null) mergedList.addAll(assets);
+            if (liabilities != null) mergedList.addAll(liabilities);
+
             runOnUiThread(() -> {
                 cachedAssets.clear();
-                if (assets != null) cachedAssets.addAll(assets);
+                cachedAssets.addAll(mergedList);
                 adapter.notifyDataSetChanged();
             });
         });
     }
-
     // 统一的新增/编辑弹窗方法
     private void showRuleDialog(AutoAssetManager.AssetRule oldRule) {
         if (cachedAssets.isEmpty()) {

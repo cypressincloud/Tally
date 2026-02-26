@@ -294,19 +294,22 @@ public class RecordFragment extends Fragment {
         String object = item.object;
         long timestamp = System.currentTimeMillis();
 
-        // 核心修改：分类设为“自动续费”，记录标识 (note) 替换为续费对象名称
         Transaction t = new Transaction(timestamp, 0, "自动续费", amount, object, "系统自动扣费");
         t.assetId = assetId != -1 ? assetId : 0;
 
         viewModel.addTransaction(t);
 
-        // 如果关联了资产，更新资产余额
+        // 如果关联了资产，更新资产/负债余额
         if (t.assetId != 0) {
             viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
                 if (assets != null) {
                     for (AssetAccount a : assets) {
                         if (a.id == t.assetId) {
-                            a.amount -= amount;
+                            if (a.type == 0) {
+                                a.amount -= amount;
+                            } else if (a.type == 1) { // 若关联信用卡等负债，自动扣费属于支出，负债增加
+                                a.amount += amount;
+                            }
                             viewModel.updateAsset(a);
                             break;
                         }
@@ -727,7 +730,6 @@ public class RecordFragment extends Fragment {
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
         if (getContext() == null) return;
 
-        // 外部 Builder
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_transaction, null);
         builder.setView(dialogView);
@@ -749,7 +751,6 @@ public class RecordFragment extends Fragment {
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
 
-        // 【新增】 获取照片相关按钮
         com.google.android.material.button.MaterialButton btnTakePhoto = dialogView.findViewById(R.id.btn_take_photo);
         com.google.android.material.button.MaterialButton btnViewPhoto = dialogView.findViewById(R.id.btn_view_photo);
 
@@ -757,8 +758,6 @@ public class RecordFragment extends Fragment {
 
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
-
-        // 【新增】 检查是否开启照片备份
         boolean isPhotoBackupEnabled = prefs.getBoolean("enable_photo_backup", false);
 
         if (isCurrencyEnabled) {
@@ -766,7 +765,6 @@ public class RecordFragment extends Fragment {
             if (existingTransaction != null && existingTransaction.currencySymbol != null && !existingTransaction.currencySymbol.isEmpty()) {
                 btnCurrency.setText(existingTransaction.currencySymbol);
             } else {
-                // 读取用户设置的默认货币符号
                 String defaultSymbol = prefs.getString("default_currency_symbol", "¥");
                 btnCurrency.setText(defaultSymbol);
             }
@@ -775,10 +773,8 @@ public class RecordFragment extends Fragment {
             btnCurrency.setVisibility(View.GONE);
         }
 
-        // 【新增】 照片逻辑变量
         final String[] currentPhotoPath = { existingTransaction != null ? existingTransaction.photoPath : "" };
 
-        // 【新增】 初始化照片按钮状态
         Runnable updatePhotoButtons = () -> {
             if (currentPhotoPath[0] != null && !currentPhotoPath[0].isEmpty()) {
                 btnViewPhoto.setVisibility(View.VISIBLE);
@@ -791,10 +787,8 @@ public class RecordFragment extends Fragment {
             btnTakePhoto.setVisibility(View.VISIBLE);
             updatePhotoButtons.run();
 
-            // 点击拍照/选图
             btnTakePhoto.setOnClickListener(v -> {
                 Intent intent = new Intent(requireContext(), PhotoActionActivity.class);
-                // 使用 ResultReceiver 获取结果
                 intent.putExtra(PhotoActionActivity.EXTRA_RECEIVER, new android.os.ResultReceiver(new android.os.Handler(android.os.Looper.getMainLooper())) {
                     @Override
                     protected void onReceiveResult(int resultCode, Bundle resultData) {
@@ -803,11 +797,8 @@ public class RecordFragment extends Fragment {
                             currentPhotoPath[0] = uri;
                             updatePhotoButtons.run();
 
-                            // 【修改】选中/拍照后自动保存 (仅针对编辑模式)
                             if (existingTransaction != null) {
-                                // 1. 更新对象中的 photoPath
                                 existingTransaction.photoPath = uri;
-                                // 2. 更新数据库
                                 viewModel.updateTransaction(existingTransaction);
                                 Toast.makeText(getContext(), "照片已添加并保存", Toast.LENGTH_SHORT).show();
                             }
@@ -817,34 +808,25 @@ public class RecordFragment extends Fragment {
                 startActivity(intent);
             });
 
-            // 点击查看照片
             btnViewPhoto.setOnClickListener(v -> {
                 if (currentPhotoPath[0] != null && !currentPhotoPath[0].isEmpty()) {
                     showPhotoDialog(currentPhotoPath[0]);
                 }
             });
 
-            // 【修改】 长按删除照片逻辑 (使用自定义弹窗)
             btnViewPhoto.setOnLongClickListener(v -> {
-                // 1. 构建自定义 View，注意变量名改为 deleteBuilder 以免冲突
                 android.app.AlertDialog.Builder deleteBuilder = new android.app.AlertDialog.Builder(getContext());
                 View deleteView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_delete_photo, null);
                 deleteBuilder.setView(deleteView);
 
                 android.app.AlertDialog deleteDialog = deleteBuilder.create();
-
-                // 设置背景透明，适配圆角
                 if (deleteDialog.getWindow() != null) {
                     deleteDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                 }
 
-                // 2. 绑定事件
-                deleteView.findViewById(R.id.btn_cancel_delete).setOnClickListener(view -> {
-                    deleteDialog.dismiss();
-                });
+                deleteView.findViewById(R.id.btn_cancel_delete).setOnClickListener(view -> deleteDialog.dismiss());
 
                 deleteView.findViewById(R.id.btn_confirm_delete).setOnClickListener(view -> {
-                    // 执行删除逻辑
                     if (currentPhotoPath[0] != null && !currentPhotoPath[0].isEmpty()) {
                         try {
                             Uri uri = Uri.parse(currentPhotoPath[0]);
@@ -862,21 +844,17 @@ public class RecordFragment extends Fragment {
                         }
                     }
 
-                    // 清除引用并更新 UI
                     currentPhotoPath[0] = "";
                     updatePhotoButtons.run();
 
-                    // 【新增】如果是编辑模式，删除后也自动保存清空状态
                     if (existingTransaction != null) {
                         existingTransaction.photoPath = "";
                         viewModel.updateTransaction(existingTransaction);
                     }
-
                     deleteDialog.dismiss();
                 });
-
                 deleteDialog.show();
-                return true; // 消费长按事件
+                return true;
             });
 
         } else {
@@ -904,18 +882,14 @@ public class RecordFragment extends Fragment {
             }
         });
 
-        // 长按显示二级分类逻辑
         categoryAdapter.setOnCategoryLongClickListener(category -> {
             if (CategoryManager.isSubCategoryEnabled(getContext()) && !"自定义".equals(category)) {
-
-                // --- 新增修复：长按时立刻选中该一级分类并重置状态 ---
                 if (!category.equals(selectedCategory[0])) {
-                    categoryAdapter.setSelectedCategory(category); // 更新UI高亮
-                    selectedCategory[0] = category;                // 更新内部记录的主分类
-                    selectedSubCategory[0] = "";                   // 切换了主分类，必须清空旧的二级分类
-                    etCustomCategory.setVisibility(View.GONE);     // 隐藏自定义输入框
+                    categoryAdapter.setSelectedCategory(category);
+                    selectedCategory[0] = category;
+                    selectedSubCategory[0] = "";
+                    etCustomCategory.setVisibility(View.GONE);
                 }
-                // ---------------------------------------------------
 
                 List<String> subCats = CategoryManager.getSubCategories(getContext(), category);
                 AlertDialog.Builder subBuilder = new AlertDialog.Builder(getContext());
@@ -962,7 +936,6 @@ public class RecordFragment extends Fragment {
                         chip.setChipStrokeWidth(0);
                         chip.setCheckedIconVisible(false);
 
-                        // 恢复选中状态
                         if (subCatName.equals(currentSelectedSub)) {
                             chip.setChecked(true);
                         }
@@ -975,7 +948,6 @@ public class RecordFragment extends Fragment {
                                 selectedSubCategory[0] = subCatName;
                                 Toast.makeText(getContext(), "已选择: " + subCatName, Toast.LENGTH_SHORT).show();
                             }
-                            // 再次确保一级分类被选中
                             categoryAdapter.setSelectedCategory(category);
                             selectedCategory[0] = category;
                             etCustomCategory.setVisibility(View.GONE);
@@ -993,10 +965,8 @@ public class RecordFragment extends Fragment {
 
         rvCategory.setAdapter(categoryAdapter);
 
-        if (existingTransaction != null) {
-            if (existingTransaction.subCategory != null) {
-                selectedSubCategory[0] = existingTransaction.subCategory;
-            }
+        if (existingTransaction != null && existingTransaction.subCategory != null) {
+            selectedSubCategory[0] = existingTransaction.subCategory;
         }
 
         AssistantConfig config = new AssistantConfig(requireContext());
@@ -1019,7 +989,8 @@ public class RecordFragment extends Fragment {
                 assetList.add(noAsset);
                 if (assets != null) {
                     for (AssetAccount a : assets) {
-                        if (a.type == 0) {
+                        // 【修改】包含资产(0)和负债(1)
+                        if (a.type == 0 || a.type == 1) {
                             assetList.add(a);
                         }
                     }
@@ -1116,47 +1087,32 @@ public class RecordFragment extends Fragment {
                 etCustomCategory.setText(currentCat);
             }
 
-            // 在 RecordFragment.java 的 showAddOrEditDialog 方法内找到 btnDelete 的逻辑
             btnDelete.setVisibility(View.VISIBLE);
             btnDelete.setOnClickListener(v -> {
-                // --- 优化开始：使用自定义统一弹窗样式 ---
                 AlertDialog.Builder delBuilder = new AlertDialog.Builder(getContext());
-                // 加载资产模块同款自定义布局
                 View delView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_confirm_delete, null);
                 delBuilder.setView(delView);
-
                 AlertDialog delDialog = delBuilder.create();
-
-                // 设置背景透明，以适配布局中的圆角设计
                 if (delDialog.getWindow() != null) {
                     delDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                 }
 
-                // 自定义弹窗内的提示文字
                 TextView tvMsg = delView.findViewById(R.id.tv_dialog_message);
                 if (tvMsg != null) {
                     tvMsg.setText("确定要删除这条记录吗？\n删除后将无法恢复。");
                 }
 
-                // 绑定“取消”按钮点击事件
                 delView.findViewById(R.id.btn_dialog_cancel).setOnClickListener(dv -> delDialog.dismiss());
-
-                // 绑定“删除”按钮点击事件
                 delView.findViewById(R.id.btn_dialog_confirm).setOnClickListener(dv -> {
-                    viewModel.deleteTransaction(existingTransaction); // 执行删除操作
+                    viewModel.deleteTransaction(existingTransaction);
                     delDialog.dismiss();
-                    dialog.dismiss(); // 同时关闭外层的“记一笔”编辑弹窗
+                    dialog.dismiss();
                 });
-
                 delDialog.show();
-                // --- 优化结束 ---
             });
 
             tvRevoke.setVisibility(View.VISIBLE);
-            tvRevoke.setOnClickListener(v -> {
-                showRevokeDialog(existingTransaction, dialog);
-            });
-
+            tvRevoke.setOnClickListener(v -> showRevokeDialog(existingTransaction, dialog));
         } else {
             btnSave.setText("保存");
             btnDelete.setVisibility(View.GONE);
@@ -1194,20 +1150,25 @@ public class RecordFragment extends Fragment {
 
                 String currencySymbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
-                // 【修改】 保存时带入 photoPath
                 if (existingTransaction == null) {
                     Transaction t = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     t.assetId = selectedAssetId;
                     t.currencySymbol = currencySymbol;
                     t.subCategory = selectedSubCategory[0];
-                    t.photoPath = currentPhotoPath[0]; // 保存照片路径
+                    t.photoPath = currentPhotoPath[0];
                     viewModel.addTransaction(t);
 
                     if (selectedAssetId != 0) {
                         for (AssetAccount asset : assetList) {
                             if (asset.id == selectedAssetId) {
-                                if (type == 1) asset.amount += amount;
-                                else asset.amount -= amount;
+                                // 【修改】处理资产与负债的增减逻辑
+                                if (asset.type == 0) { // 资产
+                                    if (type == 1) asset.amount += amount;
+                                    else asset.amount -= amount;
+                                } else if (asset.type == 1) { // 负债
+                                    if (type == 1) asset.amount -= amount; // 收入还款，负债降低
+                                    else asset.amount += amount; // 支出刷卡，负债增加
+                                }
                                 viewModel.updateAsset(asset);
                                 break;
                             }
@@ -1219,7 +1180,7 @@ public class RecordFragment extends Fragment {
                     updateT.assetId = selectedAssetId;
                     updateT.currencySymbol = currencySymbol;
                     updateT.subCategory = selectedSubCategory[0];
-                    updateT.photoPath = currentPhotoPath[0]; // 更新照片路径
+                    updateT.photoPath = currentPhotoPath[0];
                     viewModel.updateTransaction(updateT);
                 }
                 dialog.dismiss();
@@ -1227,7 +1188,6 @@ public class RecordFragment extends Fragment {
         });
         dialog.show();
     }
-
     // 新增：显示大图的 Dialog
     private void showPhotoDialog(String uriStr) {
         if (getContext() == null || uriStr == null) return;
@@ -1273,7 +1233,8 @@ public class RecordFragment extends Fragment {
             assetList.add(noAsset);
             if (assets != null) {
                 for (AssetAccount a : assets) {
-                    if (a.type == 0) {
+                    // 【修改】同时包含资产和负债
+                    if (a.type == 0 || a.type == 1) {
                         assetList.add(a);
                     }
                 }
@@ -1305,7 +1266,7 @@ public class RecordFragment extends Fragment {
                 // 1. 执行数据库撤回操作
                 viewModel.revokeTransaction(transaction, selectedAsset.id);
 
-                // 2. 【新增】 如果有照片，删除物理文件
+                // 2. 如果有照片，删除物理文件
                 if (transaction.photoPath != null && !transaction.photoPath.isEmpty()) {
                     try {
                         Uri uri = Uri.parse(transaction.photoPath);
@@ -1321,7 +1282,7 @@ public class RecordFragment extends Fragment {
                     }
                 }
 
-                String msg = selectedAsset.id == 0 ? "已撤回记录（无资产变动）" : "已撤回并退款至 " + selectedAsset.name;
+                String msg = selectedAsset.id == 0 ? "已撤回记录（无资产变动）" : "已撤回并退回至 " + selectedAsset.name;
                 Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
                 revokeDialog.dismiss();
                 if (parentDialog != null && parentDialog.isShowing()) {
@@ -1332,7 +1293,6 @@ public class RecordFragment extends Fragment {
 
         revokeDialog.show();
     }
-
     private static class DecimalDigitsInputFilter implements InputFilter {
         private final Pattern mPattern;
         public DecimalDigitsInputFilter(int digitsAfterZero) {

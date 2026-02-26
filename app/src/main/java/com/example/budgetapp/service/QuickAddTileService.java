@@ -129,11 +129,8 @@ public class QuickAddTileService extends TileService {
             ContextThemeWrapper themeContext = new ContextThemeWrapper(this, R.style.Theme_BudgetApp);
             LayoutInflater inflater = LayoutInflater.from(themeContext);
             View floatView = inflater.inflate(R.layout.window_confirm_transaction, null);
-            
-            // 【新增】赋值给成员变量
-            this.windowRootView = floatView;
 
-            // 获取根容器，用于添加局部弹窗
+            this.windowRootView = floatView;
             android.widget.FrameLayout windowContentRoot = floatView.findViewById(R.id.window_root);
 
             View rootView = floatView.findViewById(R.id.window_root);
@@ -182,20 +179,16 @@ public class QuickAddTileService extends TileService {
                 btnCurrency.setVisibility(View.GONE);
             }
 
-            // 【修改】照片按钮逻辑：使用局部弹窗和隐藏窗口策略
             if (isPhotoBackupEnabled) {
                 btnTakePhoto.setVisibility(View.VISIBLE);
                 btnTakePhoto.setOnClickListener(v -> {
-                    // 显示局部遮罩弹窗
                     showLocalPhotoDialog(themeContext, windowContentRoot, actionType -> {
-                        // 回调：隐藏悬浮窗并启动 Activity
                         hideWindowAndStartPhotoActivity(actionType, null, currentPhotoPath);
                     });
                 });
 
                 btnViewPhoto.setOnClickListener(v -> {
                     if (currentPhotoPath[0] != null) {
-                        // 查看大图
                         hideWindowAndStartPhotoActivity(PhotoActionActivity.ACTION_VIEW, currentPhotoPath[0], currentPhotoPath);
                     }
                 });
@@ -220,14 +213,12 @@ public class QuickAddTileService extends TileService {
 
             categoryAdapter.setOnCategoryLongClickListener(cat -> {
                 if (CategoryManager.isSubCategoryEnabled(this) && !"自定义".equals(cat)) {
-                    // --- 新增修复：长按时立刻选中该一级分类并重置状态 ---
                     if (!cat.equals(selectedCategory[0])) {
-                        categoryAdapter.setSelectedCategory(cat); // 更新UI高亮
-                        selectedCategory[0] = cat;                // 更新内部记录的主分类
-                        selectedSubCategory = null;               // 切换了主分类，必须清空旧的二级分类
-                        etCategory.setVisibility(View.GONE);      // 隐藏自定义输入框
+                        categoryAdapter.setSelectedCategory(cat);
+                        selectedCategory[0] = cat;
+                        selectedSubCategory = null;
+                        etCategory.setVisibility(View.GONE);
                     }
-                    // ---------------------------------------------------
                     showSubCategoryDialog(themeContext, cat, categoryAdapter);
                     return true;
                 }
@@ -267,14 +258,21 @@ public class QuickAddTileService extends TileService {
                 spAsset.setAdapter(adapter);
 
                 AppDatabase.databaseWriteExecutor.execute(() -> {
+                    // 【修改】同时加载资产(0)和负债(1)
                     List<AssetAccount> assets = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(0);
+                    List<AssetAccount> liabilities = AppDatabase.getDatabase(this).assetAccountDao().getAssetsByTypeSync(1);
+
                     loadedAssets.clear();
                     AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
                     noAsset.id = 0;
                     loadedAssets.add(noAsset);
+
                     if (assets != null) loadedAssets.addAll(assets);
+                    if (liabilities != null) loadedAssets.addAll(liabilities);
+
                     List<String> names = new ArrayList<>();
                     for (AssetAccount a : loadedAssets) names.add(a.name);
+
                     int defaultAssetId = config.getDefaultAssetId();
                     new Handler(Looper.getMainLooper()).post(() -> {
                         adapter.clear();
@@ -342,7 +340,6 @@ public class QuickAddTileService extends TileService {
             e.printStackTrace();
         }
     }
-
     // --- 新增辅助方法 START ---
 
     interface PhotoActionResult {
@@ -536,10 +533,13 @@ public class QuickAddTileService extends TileService {
             if (assetId != 0) {
                 AssetAccount asset = db.assetAccountDao().getAssetByIdSync(assetId);
                 if (asset != null) {
-                    if (type == 1) {
-                        asset.amount += amount;
-                    } else {
-                        asset.amount -= amount;
+                    // 【修改】区分资产和负债的计算逻辑
+                    if (asset.type == 0) {
+                        if (type == 1) asset.amount += amount;
+                        else asset.amount -= amount;
+                    } else if (asset.type == 1) {
+                        if (type == 1) asset.amount -= amount; // 收入还款，负债减少
+                        else asset.amount += amount; // 支出刷卡，负债增加
                     }
                     db.assetAccountDao().update(asset);
                 }

@@ -30,10 +30,20 @@ public class FinanceViewModel extends AndroidViewModel {
     // src/main/java/com/example/budgetapp/viewmodel/FinanceViewModel.java
     public void processAutoRenewal(RenewalItem renewal, int assetId) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            // 1. 尝试扣减资产
+            // 1. 尝试扣减资产或增加负债
             AssetAccount asset = assetDao.getAssetByIdSync(assetId);
-            if (asset != null && asset.amount >= renewal.amount) {
-                asset.amount -= renewal.amount;
+            boolean canProcess = false;
+            if (asset != null) {
+                if (asset.type == 0 && asset.amount >= renewal.amount) {
+                    asset.amount -= renewal.amount;
+                    canProcess = true;
+                } else if (asset.type == 1) { // 如果是负债账户，直接增加负债额度
+                    asset.amount += renewal.amount;
+                    canProcess = true;
+                }
+            }
+
+            if (canProcess) {
                 assetDao.update(asset);
 
                 // 2. 生成对应的支出账单，防止“总资产”计算时因缺少明细而对不上
@@ -50,7 +60,6 @@ public class FinanceViewModel extends AndroidViewModel {
             }
         });
     }
-
     public LiveData<List<Transaction>> getAllTransactions() {
         return allTransactions;
     }
@@ -95,13 +104,19 @@ public class FinanceViewModel extends AndroidViewModel {
             if (targetAssetId != 0) {
                 AssetAccount asset = assetDao.getAssetByIdSync(targetAssetId);
                 if (asset != null) {
-                    // 撤回逻辑：
-                    // 如果原账单是支出(type=0)，撤回意味着钱回到了资产，资产增加
-                    // 如果原账单是收入(type=1)，撤回意味着钱被扣除，资产减少
-                    if (transaction.type == 0) {
-                        asset.amount += transaction.amount;
-                    } else if (transaction.type == 1) {
-                        asset.amount -= transaction.amount;
+                    // 撤回逻辑：区分资产和负债
+                    if (asset.type == 0) { // 普通资产
+                        if (transaction.type == 0) {
+                            asset.amount += transaction.amount; // 撤回支出，资产增加
+                        } else if (transaction.type == 1) {
+                            asset.amount -= transaction.amount; // 撤回收入，资产减少
+                        }
+                    } else if (asset.type == 1) { // 负债账户
+                        if (transaction.type == 0) {
+                            asset.amount -= transaction.amount; // 撤回支出(如刷信用卡)，负债减少
+                        } else if (transaction.type == 1) {
+                            asset.amount += transaction.amount; // 撤回收入(如还款)，负债增加
+                        }
                     }
                     assetDao.update(asset);
                 }
