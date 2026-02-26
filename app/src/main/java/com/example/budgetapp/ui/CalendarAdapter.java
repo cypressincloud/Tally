@@ -237,9 +237,12 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             holder.tvNet.setText("");
         }
 
-        holder.itemView.setOnClickListener(v -> listener.onDateClick(date));
+        holder.itemView.setOnClickListener(v -> {
+            // 修改为 KEYBOARD_TAP (模拟键盘敲击的清脆感)
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            listener.onDateClick(date);
+        });
     }
-
     @Override
     public int getItemCount() {
         return days.size();

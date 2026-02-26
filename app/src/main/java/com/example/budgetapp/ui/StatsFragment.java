@@ -834,7 +834,11 @@ public class StatsFragment extends Fragment {
         btnPrev.setOnClickListener(v -> changeDate(-1));
         btnNext.setOnClickListener(v -> changeDate(1));
 
-        tvDateRange.setOnClickListener(v -> showCustomDatePicker());
+        tvDateRange.setOnClickListener(v -> {
+            // 添加 CLOCK_TICK 清脆振动反馈
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            showCustomDatePicker();
+        });
     }
 
     private void changeDate(int offset) {

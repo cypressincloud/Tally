@@ -100,7 +100,11 @@ public class AssetsFragment extends Fragment {
         );
         rvAssets.setAdapter(adapter);
 
-        view.findViewById(R.id.fab_add_asset).setOnClickListener(v -> showAddOrEditDialog(null, currentType));
+        view.findViewById(R.id.fab_add_asset).setOnClickListener(v -> {
+            // 添加触摸振动反馈
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+            showAddOrEditDialog(null, currentType);
+        });
 
         layoutAssets.setOnClickListener(v -> switchType(0));
         layoutLiability.setOnClickListener(v -> switchType(1));

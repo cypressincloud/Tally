@@ -154,7 +154,11 @@ public class RecordFragment extends Fragment {
 
         FloatingActionButton btnQuickRecord = view.findViewById(R.id.btn_quick_record);
         if (btnQuickRecord != null) {
-            btnQuickRecord.setOnClickListener(v -> showDateDetailDialog(LocalDate.now()));
+            btnQuickRecord.setOnClickListener(v -> {
+                // 修改为清脆的 KEYBOARD_TAP
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                showDateDetailDialog(LocalDate.now());
+            });
         }
 
         RecyclerView recyclerView = view.findViewById(R.id.calendar_recycler);
@@ -201,7 +205,11 @@ public class RecordFragment extends Fragment {
         layoutExpense.setOnClickListener(v -> switchFilterMode(2));
         layoutOvertime.setOnClickListener(v -> switchFilterMode(3));
 
-        tvMonthTitle.setOnClickListener(v -> showCustomDatePicker());
+        tvMonthTitle.setOnClickListener(v -> {
+            // 修改为清脆的 KEYBOARD_TAP
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            showCustomDatePicker();
+        });
 
         view.findViewById(R.id.btn_prev_month).setOnClickListener(v -> {
             currentMonth = currentMonth.minusYears(1);
@@ -240,7 +248,6 @@ public class RecordFragment extends Fragment {
         updateCalendar();
         return view;
     }
-
     @Override
     public void onResume() {
         super.onResume();
@@ -383,6 +390,7 @@ public class RecordFragment extends Fragment {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnConfirm.setOnClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
             int year = npYear.getValue();
             int month = npMonth.getValue();
             int day = npDay.getValue();
@@ -398,7 +406,6 @@ public class RecordFragment extends Fragment {
 
         dialog.show();
     }
-
     private void updatePreviewText(TextView tv, int year, int month, int day) {
         if (tv == null) return;
         try {

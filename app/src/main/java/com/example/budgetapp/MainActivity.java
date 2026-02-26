@@ -156,6 +156,9 @@ public class MainActivity extends AppCompatActivity {
             NavigationUI.setupWithNavController(bottomNav, navController);
 
             bottomNav.setOnItemSelectedListener(item -> {
+                // 添加触摸振动反馈
+                bottomNav.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+
                 if (item.getItemId() != navController.getCurrentDestination().getId()) {
                     navController.navigate(item.getItemId());
                     return true;
