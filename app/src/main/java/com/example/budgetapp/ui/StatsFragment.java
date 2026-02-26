@@ -916,6 +916,9 @@ public class StatsFragment extends Fragment {
         npDay.setMaxValue(maxDays);
         npDay.setValue(curDay);
         NumberPicker.OnValueChangeListener dateChangeListener = (picker, oldVal, newVal) -> {
+            // 新增：在数值发生变化（即滚动）时触发清脆的滴答振动
+            picker.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+
             int y = npYear.getValue();
             int m = npMonth.getValue();
             int newMaxDays = YearMonth.of(y, m).lengthOfMonth();
