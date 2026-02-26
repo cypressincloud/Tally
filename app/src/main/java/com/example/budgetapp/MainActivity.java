@@ -10,6 +10,7 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
@@ -215,22 +216,40 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showPermissionDialog(String title, String message, String action) {
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton("去开启", (dialog, which) -> {
-                    try {
-                        Intent intent = new Intent(action);
-                        if (Settings.ACTION_MANAGE_OVERLAY_PERMISSION.equals(action)) {
-                            intent.setData(Uri.parse("package:" + getPackageName()));
-                        }
-                        startActivity(intent);
-                    } catch (Exception e) {
-                        Toast.makeText(this, "无法打开设置页，请手动前往设置", Toast.LENGTH_LONG).show();
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = getLayoutInflater().inflate(R.layout.dialog_permission_request, null);
+        builder.setView(view);
+
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            // 背景透明以显示圆角
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        // 绑定数据
+        TextView tvTitle = view.findViewById(R.id.tv_permission_title);
+        TextView tvMessage = view.findViewById(R.id.tv_permission_message);
+        tvTitle.setText(title);
+        tvMessage.setText(message);
+
+        // 取消按钮
+        view.findViewById(R.id.btn_cancel_permission).setOnClickListener(v -> dialog.dismiss());
+
+        // 去授权按钮
+        view.findViewById(R.id.btn_grant_permission).setOnClickListener(v -> {
+            try {
+                Intent intent = new Intent(action);
+                if (Settings.ACTION_MANAGE_OVERLAY_PERMISSION.equals(action)) {
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                }
+                startActivity(intent);
+            } catch (Exception e) {
+                Toast.makeText(this, "无法打开设置页，请手动前往设置", Toast.LENGTH_LONG).show();
+            }
+            dialog.dismiss();
+        });
+
+        dialog.show();
     }
 
     private boolean isAccessibilitySettingsOn() {

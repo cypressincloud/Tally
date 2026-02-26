@@ -181,14 +181,35 @@ public class AssistantManagerActivity extends AppCompatActivity {
 
     private void checkAccessibilityPermission() {
         if (!isAccessibilitySettingsOn()) {
-            new AlertDialog.Builder(this)
-                    .setTitle("需要开启辅助服务")
-                    .setMessage("屏幕自动记账需要开启'记账屏幕同步助手'服务。")
-                    .setPositiveButton("去开启", (d, w) -> {
-                        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                    })
-                    .setNegativeButton("取消", (d, w) -> switchAutoTrack.setChecked(false))
-                    .show();
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            View view = LayoutInflater.from(this).inflate(R.layout.dialog_permission_request, null);
+            builder.setView(view);
+            AlertDialog dialog = builder.create();
+
+            if (dialog.getWindow() != null) {
+                // 背景透明以显示圆角
+                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
+
+            // 绑定数据
+            TextView tvTitle = view.findViewById(R.id.tv_permission_title);
+            TextView tvMessage = view.findViewById(R.id.tv_permission_message);
+            tvTitle.setText("需要开启辅助服务");
+            tvMessage.setText("屏幕自动记账需要开启'记账屏幕同步助手'服务。");
+
+            // 取消按钮：不仅关闭弹窗，还要把开关关掉
+            view.findViewById(R.id.btn_cancel_permission).setOnClickListener(v -> {
+                switchAutoTrack.setChecked(false);
+                dialog.dismiss();
+            });
+
+            // 去授权按钮
+            view.findViewById(R.id.btn_grant_permission).setOnClickListener(v -> {
+                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                dialog.dismiss();
+            });
+
+            dialog.show();
         }
     }
 
@@ -239,6 +260,7 @@ public class AssistantManagerActivity extends AppCompatActivity {
 //        }
 //        return false;
 //    }
+
 
     private void loadData() {
         dataList.clear();

@@ -47,7 +47,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="点击二维码可保存到系统相册"
+        android:text="点击二维码保存到相册"
         android:textSize="12sp"
         android:textColor="#999999"
         android:layout_marginTop="8dp"/>
@@ -55,7 +55,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Tally 采取诚信付款方式，打赏 ￥12 即可激活高级设置。您也可以先体验，若觉得软件不错，后续可在设置页面的“捐赠支持”中补票。Tally 是纯本地项目，不设检测逻辑，不绑定账号系统，详情请查看用户须知。"
+        android:text="Tally 采取诚信付款方式，打赏 ￥12 即可激活高级设置。您也可以先体验，若觉得软件不错，后续可在设置页面的“捐赠支持”中补票。Tally 是纯本地项目，不设检测逻辑，不绑定账号系统。使用Tally前请查看用户须知。"
         android:textSize="13sp"
         android:textColor="#666666"
         android:layout_marginTop="16dp"
@@ -80,6 +80,7 @@
         android:textColor="@color/real_white"
         android:layout_marginTop="4dp"
         android:insetTop="0dp"
+        app:cornerRadius="16dp"
         android:insetBottom="0dp"/>
 
 </LinearLayout>

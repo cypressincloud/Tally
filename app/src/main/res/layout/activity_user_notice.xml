@@ -16,6 +16,7 @@
         android:paddingBottom="24dp">
 
         <TextView
+            android:id="@+id/tv_notice_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="用户须知"
@@ -126,7 +127,30 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="由于使用到的权限较为敏感，Tally 承诺完全不具备联网功能，未来也不会添加。如有云同步需求，建议参考开源代码自行扩展。关注酷安 “Tally” 项目，不定时发布版本更新。"
+                    android:text="由于使用到的权限较为敏感，Tally 承诺完全不具备联网功能，未来也不会添加。如有云同步等需求，建议参考开源代码自行扩展。关注酷安 “Tally” 项目，不定时发布版本更新。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="联系我"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="如果有bug反馈或者有新的想法，可以在评论区里发表想法。也可以私信我，酷安“柏芸”、B站“路过的柏芸”。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="6dp"
                     android:layout_marginTop="10dp"

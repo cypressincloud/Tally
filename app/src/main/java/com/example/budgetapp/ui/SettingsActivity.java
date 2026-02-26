@@ -278,22 +278,70 @@ public class SettingsActivity extends AppCompatActivity {
 
     }
 
+    // 新增：显示保存二维码的二次确认弹窗
+    private void showSaveQrConfirmDialog(int resId, String fileName) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        // 加载项目中已有的 dialog_save_qr 布局
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_save_qr, null);
+        builder.setView(view);
+
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            // 设置背景透明以支持圆角样式
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        // 适配常见的取消按钮 ID (请确保与 dialog_save_qr.xml 中的 ID 对应)
+        View btnCancel = view.findViewById(R.id.btn_dialog_cancel);
+        if (btnCancel == null) btnCancel = view.findViewById(R.id.btn_cancel); // 兼容性回退
+
+        // 适配常见的确认按钮 ID
+        View btnConfirm = view.findViewById(R.id.btn_dialog_confirm);
+        if (btnConfirm == null) btnConfirm = view.findViewById(R.id.btn_confirm);
+
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        if (btnConfirm != null) {
+            btnConfirm.setOnClickListener(v -> {
+                // 用户点击确认后，执行保存操作
+                saveImageToGallery(resId, fileName);
+                dialog.dismiss();
+            });
+        }
+
+        dialog.show();
+    }
+
     private void showActivationDialog(SharedPreferences prefs) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_activate_premium, null);
         builder.setView(view);
-        builder.setCancelable(false); // 强制用户操作
+
+        // 【修改1】允许用户通过手势或返回键取消弹窗
+        builder.setCancelable(true);
 
         AlertDialog dialog = builder.create();
+
+        // 【修改2】禁止点击弹窗外部的空白处关闭弹窗（防止误触导致退出设置界面）
+        dialog.setCanceledOnTouchOutside(false);
+
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
 
-        // 点击二维码保存图片
-        view.findViewById(R.id.iv_pay_alipay).setOnClickListener(v -> saveImageToGallery(R.drawable.pay, "alipay_qr"));
-        view.findViewById(R.id.iv_pay_wechat).setOnClickListener(v -> saveImageToGallery(R.drawable.wechat, "wechat_qr"));
+        // 【修改3】监听弹窗的取消事件（即用户触发了返回手势/返回键）
+        // 当用户返回时，由于没有点击"我已诚信付款"，状态未保存，同时直接关闭设置界面
+        dialog.setOnCancelListener(dialogInterface -> {
+            finish(); // 退出 SettingsActivity，返回上一级界面
+        });
 
-        // 用户须知按钮 (此处可跳转到你的说明页面)
+        // 点击二维码保存图片
+        view.findViewById(R.id.iv_pay_alipay).setOnClickListener(v -> showSaveQrConfirmDialog(R.drawable.pay, "alipay_qr"));
+        view.findViewById(R.id.iv_pay_wechat).setOnClickListener(v -> showSaveQrConfirmDialog(R.drawable.wechat, "wechat_qr"));
+
+        // 用户须知按钮
         view.findViewById(R.id.btn_user_notice).setOnClickListener(v -> {
             // 从悬浮窗进入独立的页面
             startActivity(new Intent(this, UserNoticeActivity.class));
@@ -303,7 +351,7 @@ public class SettingsActivity extends AppCompatActivity {
         view.findViewById(R.id.btn_already_paid).setOnClickListener(v -> {
             prefs.edit().putBoolean("is_premium_activated", true).apply();
             dialog.dismiss();
-            Toast.makeText(this, "高级设置已激活", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "高级设置已激活，感谢支持", Toast.LENGTH_SHORT).show();
         });
 
         dialog.show();

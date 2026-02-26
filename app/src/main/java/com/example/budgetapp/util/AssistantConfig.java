@@ -70,7 +70,7 @@ public class AssistantConfig {
 
     // --- 自动记账总开关 ---
     public boolean isEnabled() {
-        return prefs.getBoolean(KEY_ENABLE, true);
+        return prefs.getBoolean(KEY_ENABLE, false);
     }
 
     public void setEnabled(boolean enabled) {

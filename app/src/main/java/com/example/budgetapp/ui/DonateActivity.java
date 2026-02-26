@@ -60,6 +60,16 @@ public class DonateActivity extends AppCompatActivity {
                 showSaveQrConfirmDialog(bitmap, "alipay_pay_qr");
             }
         });
+
+        // 新增：底部 Github 链接复制逻辑
+        View btnCopyGithubDonate = findViewById(R.id.btn_copy_github_donate);
+        if (btnCopyGithubDonate != null) {
+            btnCopyGithubDonate.setOnClickListener(v -> {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                cm.setText("https://github.com/cypressincloud/Tally");
+                Toast.makeText(this, "链接已复制到剪切板", Toast.LENGTH_SHORT).show();
+            });
+        }
     }
 
     private void showSaveQrConfirmDialog(Bitmap bitmap, String fileNamePrefix) {
