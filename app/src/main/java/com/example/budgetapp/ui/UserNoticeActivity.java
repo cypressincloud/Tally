@@ -37,6 +37,13 @@ public class UserNoticeActivity extends AppCompatActivity {
             Toast.makeText(this, "链接已复制到剪切板", Toast.LENGTH_SHORT).show();
         });
 
+        // 新增：123盘链接复制逻辑
+        findViewById(R.id.btn_copy_123pan).setOnClickListener(v -> {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            cm.setText("https://www.123pan.com/s/Ih5uVv-nYapd.html");
+            Toast.makeText(this, "链接已复制到剪切板", Toast.LENGTH_SHORT).show();
+        });
+
         // 隐藏彩蛋：长按标题取消激活高级设置
         TextView tvTitle = findViewById(R.id.tv_notice_title);
         tvTitle.setOnLongClickListener(v -> {

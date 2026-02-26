@@ -190,15 +190,39 @@
                     android:textColor="#888888"
                     android:layout_gravity="center"
                     android:layout_marginTop="40dp"
-                    app:rippleColor="@android:color/transparent"/> <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="点击后复制到剪切板"
-                android:textSize="11sp"
-                android:textColor="#999999"
-                android:layout_gravity="center"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="20dp"/>
+                    app:rippleColor="@android:color/transparent"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="点击后复制到剪切板"
+                    android:textSize="11sp"
+                    android:textColor="#999999"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="4dp"/>
+
+                <Button
+                    android:id="@+id/btn_copy_123pan"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="https://www.123pan.com/s/Ih5uVv-nYapd.html"
+                    android:textSize="12sp"
+                    android:textAllCaps="false"
+                    android:textColor="#888888"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="16dp"
+                    app:rippleColor="@android:color/transparent"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="点击后复制到剪切板"
+                    android:textSize="11sp"
+                    android:textColor="#999999"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="20dp"/>
 
             </LinearLayout>
         </ScrollView>
