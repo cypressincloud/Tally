@@ -36,4 +36,4 @@ Tally 是一个纯本地的记账项目，拥有自动记账、照片备份、�
 - **B站**：路过的柏芸
 
 ---
-🔗 **123云盘地址**：[https://www.123pan.com/s/Ih5uVv-nYapd.html)
+🔗 **123云盘地址**：[https://www.123pan.com/s/Ih5uVv-nYapd.html](https://www.123pan.com/s/Ih5uVv-nYapd.html)
