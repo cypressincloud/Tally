@@ -1,169 +1,177 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="@color/bar_background"
-    android:scrollbars="none">
+    android:paddingHorizontal="24dp">
 
-    <LinearLayout
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingHorizontal="24dp"
-        android:paddingBottom="24dp">
+        android:text="分类预设管理"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="?android:attr/textColorPrimary"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="24dp"/>
 
-        <TextView
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="分类预设管理"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:textColor="?android:attr/textColorPrimary"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="24dp"/>
+            android:orientation="vertical"
+            android:paddingBottom="24dp">
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="0dp"
-            app:cardBackgroundColor="@color/white"
-            android:layout_marginBottom="16dp">
-
-            <LinearLayout
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="20dp">
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/white"
+                android:layout_marginBottom="16dp">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="20dp">
 
-                    <TextView
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="开启二级分类"
+                            android:textSize="16sp"
+                            android:textColor="@color/text_primary"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="开启后长按分类可添加细分选项"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary"
+                            android:layout_marginTop="4dp"/>
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switch_sub_category"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="开启二级分类"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_primary"
-                        android:textStyle="bold"/>
+                        android:thumb="@drawable/switch_thumb_custom"
+                        app:track="@drawable/switch_track_custom"
+                        app:showText="false"
+                        app:thumbTint="@null"
+                        app:trackTint="@null"
+                        android:background="@null"/>
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="开启后长按分类可添加细分选项"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"
-                        android:layout_marginTop="4dp"/>
                 </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
-                <androidx.appcompat.widget.SwitchCompat
-                    android:id="@+id/switch_sub_category"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:thumb="@drawable/switch_thumb_custom"
-                    app:track="@drawable/switch_track_custom"
-                    app:showText="false"
-                    app:thumbTint="@null"
-                    app:trackTint="@null"
-                    android:background="@null"/>
-
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="0dp"
-            app:cardBackgroundColor="@color/white"
-            android:layout_marginBottom="16dp">
-
-            <LinearLayout
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/white"
+                android:layout_marginBottom="16dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="支出分类"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/income_red"
-                    android:layout_marginBottom="16dp"/>
-
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/chip_group_expense"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:chipSpacing="10dp"/>
+                    android:orientation="vertical"
+                    android:padding="20dp">
 
-                <Button
-                    android:id="@+id/btn_add_expense"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="+ 添加支出分类"
-                    android:textColor="@color/app_yellow"
-                    android:layout_marginTop="12dp"/>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="支出分类"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/income_red"
+                        android:layout_marginBottom="16dp"/>
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="0dp"
-            app:cardBackgroundColor="@color/white">
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chip_group_expense"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:chipSpacing="10dp"/>
 
-            <LinearLayout
+                    <Button
+                        android:id="@+id/btn_add_expense"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="+ 添加支出分类"
+                        android:textColor="@color/app_yellow"
+                        android:layout_marginTop="12dp"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/white">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="收入分类"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/expense_green"
-                    android:layout_marginBottom="16dp"/>
-
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/chip_group_income"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:chipSpacing="10dp"/>
+                    android:orientation="vertical"
+                    android:padding="20dp">
 
-                <Button
-                    android:id="@+id/btn_add_income"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="+ 添加收入分类"
-                    android:textColor="@color/app_yellow"
-                    android:layout_marginTop="12dp"/>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="收入分类"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/expense_green"
+                        android:layout_marginBottom="16dp"/>
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="点击分类可删除，长按分类可管理二级分类"
-            android:gravity="center"
-            android:textColor="#999999"
-            android:textSize="12sp"
-            android:layout_marginTop="32dp"
-            android:layout_marginBottom="20dp"/>
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chip_group_income"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:chipSpacing="10dp"/>
 
-    </LinearLayout>
-</ScrollView>
+                    <Button
+                        android:id="@+id/btn_add_income"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="+ 添加收入分类"
+                        android:textColor="@color/app_yellow"
+                        android:layout_marginTop="12dp"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="点击分类可删除，长按分类可管理二级分类"
+                android:gravity="center"
+                android:textColor="#999999"
+                android:textSize="12sp"
+                android:layout_marginTop="32dp"
+                android:layout_marginBottom="20dp"/>
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
