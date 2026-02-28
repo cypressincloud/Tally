@@ -472,18 +472,27 @@ public class BackupManager {
     // ============================================================================================
     // 微信账单导入 (支持 .xlsx 和 .csv)
     // ============================================================================================
-    public static List<Transaction> importFromWeChat(Context context, Uri uri) throws Exception {
+    public static BackupData importFromWeChat(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
         try {
-            // 首先尝试按照 Excel (XLSX / XLS) 格式解析
-            return importWeChatAsExcel(context, uri);
+            return importWeChatAsExcel(context, uri, allAssets);
         } catch (Exception e) {
-            // 如果抛出异常 (说明它可能不是合法的 Excel 文件，而是 CSV 文本)，回退到 CSV 解析
-            return importWeChatAsCsv(context, uri);
+            return importWeChatAsCsv(context, uri, allAssets);
         }
     }
 
-    private static List<Transaction> importWeChatAsExcel(Context context, Uri uri) throws Exception {
+    private static BackupData importWeChatAsExcel(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
         List<Transaction> transactions = new ArrayList<>();
+        List<AssetAccount> newAssetsToCreate = new ArrayList<>();
+        Map<String, Integer> newAssetMap = new HashMap<>(); // 用于记录本次解析中已分配过的新资产
+
+        // 获取当前最大的资产 ID，防止冲突
+        int maxAssetId = 0;
+        if (allAssets != null) {
+            for (AssetAccount a : allAssets) {
+                if (a.id > maxAssetId) maxAssetId = a.id;
+            }
+        }
+
         try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
              Workbook workbook = WorkbookFactory.create(inputStream)) {
 
@@ -493,28 +502,24 @@ public class BackupManager {
             for (Row row : sheet) {
                 if (row == null) continue;
 
-                // 尝试获取第一列内容判断是否到达表头
                 String firstColText = getCellText(row.getCell(0));
 
                 if (firstColText.contains("交易时间")) {
                     isDataSection = true;
-                    continue; // 跳过表头行自身
+                    continue;
                 }
 
-                // 未到数据区域，跳过前置的总结信息
                 if (!isDataSection) continue;
-
-                // 微信明细通常至少有 6 列及以上
-                if (row.getLastCellNum() < 6) continue;
+                if (row.getLastCellNum() < 7) continue;
 
                 String timeStr = getCellText(row.getCell(0));
                 if (TextUtils.isEmpty(timeStr) || !timeStr.contains("-")) {
-                    continue; // 可能是文件底部的空行或统计数据
+                    continue;
                 }
 
                 Transaction t = new Transaction();
 
-                // 1. 交易时间 -> 时间 & 记录标识 (对应 t.note)
+                // 1. 交易时间 -> 记录标识 (note)
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
                 try {
                     Date date = sdf.parse(timeStr.trim());
@@ -524,32 +529,52 @@ public class BackupManager {
                 }
                 t.note = timeStr.trim();
 
-                // 2. 交易对方 -> 备注 (对应 t.remark，微信账单在第3列，索引2)
+                // 2. 交易对方 -> 备注 (remark)
                 t.remark = getCellText(row.getCell(2));
 
-                // 3. 收/支 -> 类型 (微信账单在第5列，索引4)
+                // 3. 收/支 -> 类型
                 String typeStr = getCellText(row.getCell(4));
                 if ("收入".equals(typeStr)) {
                     t.type = 1;
                 } else if ("支出".equals(typeStr)) {
                     t.type = 0;
                 } else {
-                    t.type = 0; // 中立交易默认设为支出
+                    t.type = 0;
                 }
 
-                // 4. 金额(元) -> 金额 (微信账单在第6列，索引5)
+                // 4. 金额(元) -> 金额
                 String amountStr = getCellText(row.getCell(5));
                 amountStr = amountStr.replace("¥", "").replace(",", "").trim();
                 t.amount = parseDoubleSafe(amountStr);
 
-                // 5. 分类统一为微信
+                // 5. 支付方式 -> 资产账户 (如果没有则照抄名字新建)
+                String paymentMethod = getCellText(row.getCell(6)).trim();
+                int matchedId = matchAssetId(paymentMethod, allAssets);
+
+                if (matchedId == 0 && !TextUtils.isEmpty(paymentMethod) && !"/".equals(paymentMethod)) {
+                    // 没匹配到，且不是空或斜杠
+                    if (newAssetMap.containsKey(paymentMethod)) {
+                        t.assetId = newAssetMap.get(paymentMethod); // 这次解析中已经建过同名的了
+                    } else {
+                        maxAssetId++; // 分配一个全新且不冲突的 ID
+                        int newId = maxAssetId;
+                        AssetAccount newAsset = new AssetAccount(paymentMethod, 0.0, 0); // 默认类型0(资产)
+                        newAsset.id = newId;
+                        newAssetsToCreate.add(newAsset);
+                        newAssetMap.put(paymentMethod, newId);
+                        t.assetId = newId;
+                    }
+                } else {
+                    t.assetId = matchedId;
+                }
+
+                // 6. 分类统一为微信
                 t.category = "微信";
-                t.assetId = 0;
 
                 transactions.add(t);
             }
         }
-        return transactions;
+        return new BackupData(transactions, newAssetsToCreate);
     }
 
     // 辅助方法：安全获取 Excel 单元格内容
@@ -572,8 +597,18 @@ public class BackupManager {
     }
 
     // 回退使用的原生 CSV 解析方法
-    private static List<Transaction> importWeChatAsCsv(Context context, Uri uri) throws Exception {
+    private static BackupData importWeChatAsCsv(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
         List<Transaction> transactions = new ArrayList<>();
+        List<AssetAccount> newAssetsToCreate = new ArrayList<>();
+        Map<String, Integer> newAssetMap = new HashMap<>();
+
+        int maxAssetId = 0;
+        if (allAssets != null) {
+            for (AssetAccount a : allAssets) {
+                if (a.id > maxAssetId) maxAssetId = a.id;
+            }
+        }
+
         try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
              BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
 
@@ -593,7 +628,7 @@ public class BackupManager {
                 if (!isDataSection) continue;
 
                 List<String> tokens = parseCsvLine(line);
-                if (tokens.size() < 6) continue;
+                if (tokens.size() < 7) continue;
 
                 Transaction t = new Transaction();
                 String timeStr = tokens.get(0);
@@ -604,7 +639,6 @@ public class BackupManager {
                     continue;
                 }
 
-                // 调换：交易时间 -> 记录标识 (note), 交易对方 -> 备注 (remark)
                 t.note = timeStr;
                 t.remark = tokens.get(2);
 
@@ -615,12 +649,167 @@ public class BackupManager {
                 String amountStr = tokens.get(5).replace("¥", "").replace(",", "").trim();
                 t.amount = parseDoubleSafe(amountStr);
 
+                // 处理支付方式：如没匹配到同样新建
+                String paymentMethod = tokens.get(6).trim();
+                int matchedId = matchAssetId(paymentMethod, allAssets);
+
+                if (matchedId == 0 && !TextUtils.isEmpty(paymentMethod) && !"/".equals(paymentMethod)) {
+                    if (newAssetMap.containsKey(paymentMethod)) {
+                        t.assetId = newAssetMap.get(paymentMethod);
+                    } else {
+                        maxAssetId++;
+                        int newId = maxAssetId;
+                        AssetAccount newAsset = new AssetAccount(paymentMethod, 0.0, 0);
+                        newAsset.id = newId;
+                        newAssetsToCreate.add(newAsset);
+                        newAssetMap.put(paymentMethod, newId);
+                        t.assetId = newId;
+                    }
+                } else {
+                    t.assetId = matchedId;
+                }
+
                 t.category = "微信";
-                t.assetId = 0;
+
                 transactions.add(t);
             }
         }
-        return transactions;
+        return new BackupData(transactions, newAssetsToCreate);
+    }
+
+    // 辅助方法：通过支付方式文本匹配当前项目中的资产ID
+    private static int matchAssetId(String paymentMethod, List<AssetAccount> allAssets) {
+        if (TextUtils.isEmpty(paymentMethod) || "/".equals(paymentMethod)) {
+            return 0; // 无有效支付方式，不关联资产
+        }
+
+        if (allAssets != null) {
+            for (AssetAccount asset : allAssets) {
+                // 模糊匹配：例如微信的 "招商银行信用卡(1234)" 能够匹配上 app 里的 "招商银行" 或 "招商银行信用卡"
+                if (paymentMethod.contains(asset.name) || asset.name.contains(paymentMethod)) {
+                    return asset.id;
+                }
+            }
+        }
+        return 0; // 未匹配到任何现有资产，设为默认(0)
+    }
+
+    // ============================================================================================
+    // 支付宝账单导入 (支持 CSV, 动态列索引与双重编码尝试)
+    // ============================================================================================
+    public static BackupData importFromAlipay(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
+        BackupData data = parseAlipayCsvWithEncoding(context, uri, "GBK", allAssets);
+        if (data.records.isEmpty()) {
+            data = parseAlipayCsvWithEncoding(context, uri, "UTF-8", allAssets);
+        }
+        return data;
+    }
+
+    private static BackupData parseAlipayCsvWithEncoding(Context context, Uri uri, String charsetName, List<AssetAccount> allAssets) throws Exception {
+        List<Transaction> transactions = new ArrayList<>();
+        List<AssetAccount> newAssetsToCreate = new ArrayList<>();
+        Map<String, Integer> newAssetMap = new HashMap<>();
+
+        // 获取当前最大的资产 ID
+        int maxAssetId = 0;
+        if (allAssets != null) {
+            for (AssetAccount a : allAssets) {
+                if (a.id > maxAssetId) maxAssetId = a.id;
+            }
+        }
+
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, charsetName))) {
+
+            String line;
+            boolean isDataSection = false;
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+
+            // 动态记录需要的列索引
+            int timeIdx = -1, typeIdx = -1, amountIdx = -1, descIdx = -1, paymentIdx = -1;
+
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("\ufeff")) line = line.substring(1);
+                if (TextUtils.isEmpty(line.trim())) continue;
+
+                if (isDataSection && line.startsWith("---")) break;
+
+                // 检测表头行，并动态绑定各字段的索引，新增“收/付款方式”
+                if (!isDataSection && line.contains("交易时间") && line.contains("收/支") && line.contains("金额")) {
+                    isDataSection = true;
+                    List<String> headers = parseCsvLine(line);
+                    for (int i = 0; i < headers.size(); i++) {
+                        String h = headers.get(i).trim();
+                        if (h.contains("交易时间")) timeIdx = i;
+                        else if (h.contains("收/支")) typeIdx = i;
+                        else if (h.contains("金额")) amountIdx = i;
+                        else if (h.contains("商品说明") || h.contains("商品名称")) descIdx = i;
+                        else if (h.contains("收/付款方式")) paymentIdx = i;
+                    }
+                    continue;
+                }
+
+                if (!isDataSection) continue;
+
+                List<String> tokens = parseCsvLine(line);
+                int maxRequiredIdx = Math.max(Math.max(timeIdx, typeIdx), Math.max(amountIdx, descIdx));
+                maxRequiredIdx = Math.max(maxRequiredIdx, paymentIdx); // 包含 paymentIdx
+
+                if (timeIdx == -1 || typeIdx == -1 || amountIdx == -1 || tokens.size() <= maxRequiredIdx) {
+                    continue;
+                }
+
+                Transaction t = new Transaction();
+                String timeStr = tokens.get(timeIdx).trim();
+                try {
+                    Date date = sdf.parse(timeStr);
+                    t.date = (date != null) ? date.getTime() : System.currentTimeMillis();
+                } catch (Exception e) {
+                    continue;
+                }
+
+                t.note = timeStr;
+                t.remark = (descIdx != -1) ? tokens.get(descIdx).trim() : "";
+
+                String typeStr = tokens.get(typeIdx).trim();
+                if ("收入".equals(typeStr)) {
+                    t.type = 1;
+                } else if ("支出".equals(typeStr)) {
+                    t.type = 0;
+                } else {
+                    t.type = 0;
+                }
+
+                String amountStr = tokens.get(amountIdx).replace("¥", "").replace(",", "").trim();
+                t.amount = parseDoubleSafe(amountStr);
+
+                // 处理 收/付款方式 -> 资产账户
+                String paymentMethod = (paymentIdx != -1) ? tokens.get(paymentIdx).trim() : "";
+                int matchedId = matchAssetId(paymentMethod, allAssets);
+
+                if (matchedId == 0 && !TextUtils.isEmpty(paymentMethod) && !"/".equals(paymentMethod)) {
+                    // 没有匹配到，自动创建新资产
+                    if (newAssetMap.containsKey(paymentMethod)) {
+                        t.assetId = newAssetMap.get(paymentMethod);
+                    } else {
+                        maxAssetId++;
+                        int newId = maxAssetId;
+                        AssetAccount newAsset = new AssetAccount(paymentMethod, 0.0, 0); // 默认类型0(资产)
+                        newAsset.id = newId;
+                        newAssetsToCreate.add(newAsset);
+                        newAssetMap.put(paymentMethod, newId);
+                        t.assetId = newId;
+                    }
+                } else {
+                    t.assetId = matchedId;
+                }
+
+                t.category = "支付宝";
+
+                transactions.add(t);
+            }
+        }
+        return new BackupData(transactions, newAssetsToCreate);
     }
 
     // ... (rest of the helper methods: restoreAssistantConfig, joinSet, splitSet, parseCsvLine, parseDoubleSafe, escapeCsv remain unchanged) ...

@@ -319,20 +319,86 @@ public class SettingsActivity extends AppCompatActivity {
             uri -> {
                 if (uri != null) {
                     try {
-                        List<Transaction> wechatTransactions = BackupManager.importFromWeChat(this, uri);
+                        // 接收 BackupData 而不是 List<Transaction>
+                        BackupData data = BackupManager.importFromWeChat(this, uri, allAssets);
 
-                        if (!wechatTransactions.isEmpty()) {
-                            for (Transaction t : wechatTransactions) {
+                        int recordCount = 0;
+                        int newAssetCount = 0;
+
+                        // 1. 先保存需要新建的资产账户
+                        if (data.assets != null && !data.assets.isEmpty()) {
+                            for (AssetAccount a : data.assets) {
+                                financeViewModel.addAsset(a);
+                            }
+                            newAssetCount = data.assets.size();
+                        }
+
+                        // 2. 再保存账单记录
+                        if (data.records != null && !data.records.isEmpty()) {
+                            for (Transaction t : data.records) {
                                 financeViewModel.addTransaction(t);
                             }
-                            Toast.makeText(this, "成功从微信导入 " + wechatTransactions.size() + " 条账单", Toast.LENGTH_SHORT).show();
+                            recordCount = data.records.size();
+                        }
+
+                        if (recordCount > 0) {
+                            String msg = "成功导入 " + recordCount + " 条账单";
+                            if (newAssetCount > 0) {
+                                msg += "\n自动创建了 " + newAssetCount + " 个新资产账户";
+                            }
+                            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
                         } else {
-                            Toast.makeText(this, "未找到有效的微信账单数据或文件格式错误", Toast.LENGTH_LONG).show();
+                            Toast.makeText(this, "未找到有效的微信账单数据或格式错误", Toast.LENGTH_LONG).show();
                         }
 
                     } catch (Exception e) {
                         e.printStackTrace();
                         Toast.makeText(this, "微信导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
+    private final ActivityResultLauncher<String[]> importAlipayLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        // 传入 allAssets，并接收 BackupData
+                        BackupData data = BackupManager.importFromAlipay(this, uri, allAssets);
+
+                        int recordCount = 0;
+                        int newAssetCount = 0;
+
+                        // 1. 先保存需要新建的资产账户
+                        if (data.assets != null && !data.assets.isEmpty()) {
+                            for (AssetAccount a : data.assets) {
+                                financeViewModel.addAsset(a);
+                            }
+                            newAssetCount = data.assets.size();
+                        }
+
+                        // 2. 再保存账单记录
+                        if (data.records != null && !data.records.isEmpty()) {
+                            for (Transaction t : data.records) {
+                                financeViewModel.addTransaction(t);
+                            }
+                            recordCount = data.records.size();
+                        }
+
+                        if (recordCount > 0) {
+                            String msg = "成功从支付宝导入 " + recordCount + " 条账单";
+                            if (newAssetCount > 0) {
+                                msg += "\n自动创建了 " + newAssetCount + " 个新资产账户";
+                            }
+                            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(this, "未找到有效的支付宝数据或文件格式错误", Toast.LENGTH_LONG).show();
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "支付宝导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     }
                 }
             }
@@ -451,6 +517,17 @@ public class SettingsActivity extends AppCompatActivity {
                     "text/csv",
                     "text/plain",
                     "application/vnd.ms-excel",
+                    "*/*"
+            });
+            dialog.dismiss();
+        });
+
+        view.findViewById(R.id.tv_import_alipay).setOnClickListener(v -> {
+            importAlipayLauncher.launch(new String[]{
+                    "text/csv",
+                    "text/plain",
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     "*/*"
             });
             dialog.dismiss();
