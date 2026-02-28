@@ -32,7 +32,14 @@ public interface TransactionDao {
     @Query("DELETE FROM transactions")
     void deleteAll();
 
-    // 【新增】查询指定范围内的账单
     @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end")
     List<Transaction> getTransactionsByRange(long start, long end);
+
+    // 【新增】批量修改一级分类名称（历史账单同步）
+    @Query("UPDATE transactions SET category = :newCategory WHERE category = :oldCategory")
+    void updateCategoryName(String oldCategory, String newCategory);
+
+    // 【新增】批量修改二级分类名称（历史账单同步）
+    @Query("UPDATE transactions SET subCategory = :newSubCategory WHERE category = :parentCategory AND subCategory = :oldSubCategory")
+    void updateSubCategoryName(String parentCategory, String oldSubCategory, String newSubCategory);
 }

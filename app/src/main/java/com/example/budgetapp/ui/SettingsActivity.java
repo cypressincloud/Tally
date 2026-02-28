@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -47,7 +48,36 @@ public class SettingsActivity extends AppCompatActivity {
     private List<AssetAccount> allAssets = new ArrayList<>();
     private SwitchCompat switchMinimalist;
 
-    // ... (ActivityResultLauncher 代码保持不变) ...
+    // --- 查重辅助方法 开始 ---
+    private boolean isDuplicateAsset(AssetAccount a, List<AssetAccount> existingList) {
+        if (existingList == null || existingList.isEmpty()) return false;
+        for (AssetAccount ext : existingList) {
+            // 资产名称和类型一致即认为重复
+            if (Objects.equals(ext.name, a.name) && ext.type == a.type) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isDuplicateTransaction(Transaction newTx, List<Transaction> existingList) {
+        if (existingList == null || existingList.isEmpty()) return false;
+        for (Transaction ext : existingList) {
+            // 时间、类型、金额、分类、备注完全一致视为重复
+            if (ext.date == newTx.date &&
+                    ext.type == newTx.type &&
+                    Math.abs(ext.amount - newTx.amount) < 0.01 &&
+                    Objects.equals(ext.category, newTx.category) &&
+                    Objects.equals(ext.subCategory, newTx.subCategory) &&
+                    Objects.equals(ext.note, newTx.note) &&
+                    Objects.equals(ext.remark, newTx.remark)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    // --- 查重辅助方法 结束 ---
+
     private final ActivityResultLauncher<String> exportLauncher = registerForActivityResult(
             new ActivityResultContracts.CreateDocument("application/zip"),
             uri -> {
@@ -87,23 +117,18 @@ public class SettingsActivity extends AppCompatActivity {
                         int recordCount = 0;
                         int assetCount = 0;
 
-                        if (data.records != null && !data.records.isEmpty()) {
-                            for (Transaction t : data.records) {
-                                Transaction newT = t;
-                                newT.id = 0;
-                                financeViewModel.addTransaction(newT);
-                            }
-                            recordCount = data.records.size();
-                        }
-
+                        List<AssetAccount> currentAssets = new ArrayList<>(allAssets);
                         if (data.assets != null && !data.assets.isEmpty()) {
                             for (AssetAccount a : data.assets) {
-                                AssetAccount newA = a;
-                                newA.id = 0;
-                                financeViewModel.addAsset(newA);
+                                if (!isDuplicateAsset(a, currentAssets)) {
+                                    a.id = 0;
+                                    financeViewModel.addAsset(a);
+                                    currentAssets.add(a);
+                                    assetCount++;
+                                }
                             }
-                            assetCount = data.assets.size();
                         }
+
                         if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
                             CategoryManager.saveExpenseCategories(this, data.expenseCategories);
                         }
@@ -111,7 +136,19 @@ public class SettingsActivity extends AppCompatActivity {
                             CategoryManager.saveIncomeCategories(this, data.incomeCategories);
                         }
 
-                        Toast.makeText(this, String.format("成功导入: %d条账单, %d个资产", recordCount, assetCount), Toast.LENGTH_LONG).show();
+                        List<Transaction> currentTransactions = new ArrayList<>(allTransactions);
+                        if (data.records != null && !data.records.isEmpty()) {
+                            for (Transaction t : data.records) {
+                                if (!isDuplicateTransaction(t, currentTransactions)) {
+                                    t.id = 0;
+                                    financeViewModel.addTransaction(t);
+                                    currentTransactions.add(t);
+                                    recordCount++;
+                                }
+                            }
+                        }
+
+                        Toast.makeText(this, String.format("成功导入: %d条账单, %d个资产 (已过滤重复)", recordCount, assetCount), Toast.LENGTH_LONG).show();
                     } catch (Exception e) {
                         e.printStackTrace();
                         Toast.makeText(this, "导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -129,21 +166,16 @@ public class SettingsActivity extends AppCompatActivity {
                         int recordCount = 0;
                         int assetCount = 0;
 
-                        if (data.records != null && !data.records.isEmpty()) {
-                            for (Transaction t : data.records) {
-                                Transaction newT = t;
-                                newT.id = 0;
-                                financeViewModel.addTransaction(newT);
-                            }
-                            recordCount = data.records.size();
-                        }
-
+                        List<AssetAccount> currentAssets = new ArrayList<>(allAssets);
                         if (data.assets != null && !data.assets.isEmpty()) {
                             for (AssetAccount a : data.assets) {
-                                AssetAccount newA = a;
-                                financeViewModel.addAsset(newA);
+                                if (!isDuplicateAsset(a, currentAssets)) {
+                                    a.id = 0;
+                                    financeViewModel.addAsset(a);
+                                    currentAssets.add(a);
+                                    assetCount++;
+                                }
                             }
-                            assetCount = data.assets.size();
                         }
 
                         if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
@@ -153,7 +185,19 @@ public class SettingsActivity extends AppCompatActivity {
                             CategoryManager.saveIncomeCategories(this, data.incomeCategories);
                         }
 
-                        Toast.makeText(this, String.format("Excel导入成功: %d条账单, %d个资产", recordCount, assetCount), Toast.LENGTH_LONG).show();
+                        List<Transaction> currentTransactions = new ArrayList<>(allTransactions);
+                        if (data.records != null && !data.records.isEmpty()) {
+                            for (Transaction t : data.records) {
+                                if (!isDuplicateTransaction(t, currentTransactions)) {
+                                    t.id = 0;
+                                    financeViewModel.addTransaction(t);
+                                    currentTransactions.add(t);
+                                    recordCount++;
+                                }
+                            }
+                        }
+
+                        Toast.makeText(this, String.format("Excel导入成功: %d条账单, %d个资产 (已过滤重复)", recordCount, assetCount), Toast.LENGTH_LONG).show();
                     } catch (Exception e) {
                         e.printStackTrace();
                         Toast.makeText(this, "Excel导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -181,10 +225,17 @@ public class SettingsActivity extends AppCompatActivity {
                         List<Transaction> externalTransactions = ExternalImportHelper.parseExternalData(jsonContent);
 
                         if (!externalTransactions.isEmpty()) {
+                            int recordCount = 0;
+                            List<Transaction> currentTransactions = new ArrayList<>(allTransactions);
                             for (Transaction t : externalTransactions) {
-                                financeViewModel.addTransaction(t);
+                                if (!isDuplicateTransaction(t, currentTransactions)) {
+                                    t.id = 0;
+                                    financeViewModel.addTransaction(t);
+                                    currentTransactions.add(t);
+                                    recordCount++;
+                                }
                             }
-                            Toast.makeText(this, "成功导入 " + externalTransactions.size() + " 条外部数据", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "成功导入 " + recordCount + " 条外部数据 (已过滤重复)", Toast.LENGTH_SHORT).show();
                         } else {
                             Toast.makeText(this, "未解析到有效数据，请检查文件格式", Toast.LENGTH_LONG).show();
                         }
@@ -225,7 +276,6 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
         findViewById(R.id.btn_default_record_display).setOnClickListener(v -> showDefaultRecordDisplayDialog());
-// 绑定新添加的按钮点击事件
         findViewById(R.id.btn_user_notice_settings).setOnClickListener(v -> {
             startActivity(new Intent(this, UserNoticeActivity.class));
         });
@@ -240,24 +290,12 @@ public class SettingsActivity extends AppCompatActivity {
             btnPhotoBackup.setOnClickListener(v -> startActivity(new Intent(this, PhotoBackupSettingsActivity.class)));
         }
 
-        // --- 修改开始：货币单位设置逻辑 ---
-        // 之前是直接 Toggle，现在改为跳转到 CurrencySettingsActivity
         findViewById(R.id.btn_currency_setting).setOnClickListener(v -> {
             startActivity(new Intent(this, CurrencySettingsActivity.class));
         });
-        // --- 修改结束 ---
-
-        findViewById(R.id.btn_donate).setOnClickListener(v -> {
-            startActivity(new Intent(this, DonateActivity.class));
-        });
 
         findViewById(R.id.btn_auto_renewal_setting).setOnClickListener(v -> {
-            // 跳转到新创建的自动续费设置页面
             startActivity(new Intent(this, AutoRenewalActivity.class));
-        });
-
-        findViewById(R.id.btn_donate).setOnClickListener(v -> {
-            startActivity(new Intent(this, DonateActivity.class));
         });
 
         // 极简模式逻辑
@@ -275,27 +313,21 @@ public class SettingsActivity extends AppCompatActivity {
         if (!isActivated) {
             showActivationDialog(prefs);
         }
-
     }
 
-    // 新增：显示保存二维码的二次确认弹窗
     private void showSaveQrConfirmDialog(int resId, String fileName) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        // 加载项目中已有的 dialog_save_qr 布局
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_save_qr, null);
         builder.setView(view);
 
         AlertDialog dialog = builder.create();
         if (dialog.getWindow() != null) {
-            // 设置背景透明以支持圆角样式
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
 
-        // 适配常见的取消按钮 ID (请确保与 dialog_save_qr.xml 中的 ID 对应)
         View btnCancel = view.findViewById(R.id.btn_dialog_cancel);
-        if (btnCancel == null) btnCancel = view.findViewById(R.id.btn_cancel); // 兼容性回退
+        if (btnCancel == null) btnCancel = view.findViewById(R.id.btn_cancel);
 
-        // 适配常见的确认按钮 ID
         View btnConfirm = view.findViewById(R.id.btn_dialog_confirm);
         if (btnConfirm == null) btnConfirm = view.findViewById(R.id.btn_confirm);
 
@@ -305,7 +337,6 @@ public class SettingsActivity extends AppCompatActivity {
 
         if (btnConfirm != null) {
             btnConfirm.setOnClickListener(v -> {
-                // 用户点击确认后，执行保存操作
                 saveImageToGallery(resId, fileName);
                 dialog.dismiss();
             });
@@ -319,21 +350,23 @@ public class SettingsActivity extends AppCompatActivity {
             uri -> {
                 if (uri != null) {
                     try {
-                        // 接收 BackupData 而不是 List<Transaction>
                         BackupData data = BackupManager.importFromWeChat(this, uri, allAssets);
 
                         int recordCount = 0;
                         int newAssetCount = 0;
 
-                        // 1. 先保存需要新建的资产账户
+                        List<AssetAccount> currentAssets = new ArrayList<>(allAssets);
                         if (data.assets != null && !data.assets.isEmpty()) {
                             for (AssetAccount a : data.assets) {
-                                financeViewModel.addAsset(a);
+                                if (!isDuplicateAsset(a, currentAssets)) {
+                                    a.id = 0;
+                                    financeViewModel.addAsset(a);
+                                    currentAssets.add(a);
+                                    newAssetCount++;
+                                }
                             }
-                            newAssetCount = data.assets.size();
                         }
 
-                        // 【新增】：保存导入过程中可能新建的收支分类
                         if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
                             CategoryManager.saveExpenseCategories(this, data.expenseCategories);
                         }
@@ -341,22 +374,26 @@ public class SettingsActivity extends AppCompatActivity {
                             CategoryManager.saveIncomeCategories(this, data.incomeCategories);
                         }
 
-                        // 2. 再保存账单记录
+                        List<Transaction> currentTransactions = new ArrayList<>(allTransactions);
                         if (data.records != null && !data.records.isEmpty()) {
                             for (Transaction t : data.records) {
-                                financeViewModel.addTransaction(t);
+                                if (!isDuplicateTransaction(t, currentTransactions)) {
+                                    t.id = 0;
+                                    financeViewModel.addTransaction(t);
+                                    currentTransactions.add(t);
+                                    recordCount++;
+                                }
                             }
-                            recordCount = data.records.size();
                         }
 
                         if (recordCount > 0) {
-                            String msg = "成功导入 " + recordCount + " 条账单";
+                            String msg = "成功导入 " + recordCount + " 条账单 (已过滤重复)";
                             if (newAssetCount > 0) {
                                 msg += "\n自动创建了 " + newAssetCount + " 个新资产账户";
                             }
                             Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
                         } else {
-                            Toast.makeText(this, "未找到有效的微信账单数据或格式错误", Toast.LENGTH_LONG).show();
+                            Toast.makeText(this, "所有账单均已存在，或未找到有效数据", Toast.LENGTH_LONG).show();
                         }
 
                     } catch (Exception e) {
@@ -372,21 +409,23 @@ public class SettingsActivity extends AppCompatActivity {
             uri -> {
                 if (uri != null) {
                     try {
-                        // 传入 allAssets，并接收 BackupData
                         BackupData data = BackupManager.importFromAlipay(this, uri, allAssets);
 
                         int recordCount = 0;
                         int newAssetCount = 0;
 
-                        // 1. 先保存需要新建的资产账户
+                        List<AssetAccount> currentAssets = new ArrayList<>(allAssets);
                         if (data.assets != null && !data.assets.isEmpty()) {
                             for (AssetAccount a : data.assets) {
-                                financeViewModel.addAsset(a);
+                                if (!isDuplicateAsset(a, currentAssets)) {
+                                    a.id = 0;
+                                    financeViewModel.addAsset(a);
+                                    currentAssets.add(a);
+                                    newAssetCount++;
+                                }
                             }
-                            newAssetCount = data.assets.size();
                         }
 
-                        // 【新增】：保存导入过程中可能新建的收支分类
                         if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
                             CategoryManager.saveExpenseCategories(this, data.expenseCategories);
                         }
@@ -394,22 +433,26 @@ public class SettingsActivity extends AppCompatActivity {
                             CategoryManager.saveIncomeCategories(this, data.incomeCategories);
                         }
 
-                        // 2. 再保存账单记录
+                        List<Transaction> currentTransactions = new ArrayList<>(allTransactions);
                         if (data.records != null && !data.records.isEmpty()) {
                             for (Transaction t : data.records) {
-                                financeViewModel.addTransaction(t);
+                                if (!isDuplicateTransaction(t, currentTransactions)) {
+                                    t.id = 0;
+                                    financeViewModel.addTransaction(t);
+                                    currentTransactions.add(t);
+                                    recordCount++;
+                                }
                             }
-                            recordCount = data.records.size();
                         }
 
                         if (recordCount > 0) {
-                            String msg = "成功从支付宝导入 " + recordCount + " 条账单";
+                            String msg = "成功从支付宝导入 " + recordCount + " 条账单 (已过滤重复)";
                             if (newAssetCount > 0) {
                                 msg += "\n自动创建了 " + newAssetCount + " 个新资产账户";
                             }
                             Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
                         } else {
-                            Toast.makeText(this, "未找到有效的支付宝数据或文件格式错误", Toast.LENGTH_LONG).show();
+                            Toast.makeText(this, "所有账单均已存在，或未找到有效数据", Toast.LENGTH_LONG).show();
                         }
 
                     } catch (Exception e) {
@@ -425,35 +468,26 @@ public class SettingsActivity extends AppCompatActivity {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_activate_premium, null);
         builder.setView(view);
 
-        // 【修改1】允许用户通过手势或返回键取消弹窗
         builder.setCancelable(true);
 
         AlertDialog dialog = builder.create();
-
-        // 【修改2】禁止点击弹窗外部的空白处关闭弹窗（防止误触导致退出设置界面）
         dialog.setCanceledOnTouchOutside(false);
 
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
 
-        // 【修改3】监听弹窗的取消事件（即用户触发了返回手势/返回键）
-        // 当用户返回时，由于没有点击"我已诚信付款"，状态未保存，同时直接关闭设置界面
         dialog.setOnCancelListener(dialogInterface -> {
-            finish(); // 退出 SettingsActivity，返回上一级界面
+            finish();
         });
 
-        // 点击二维码保存图片
         view.findViewById(R.id.iv_pay_alipay).setOnClickListener(v -> showSaveQrConfirmDialog(R.drawable.pay, "alipay_qr"));
         view.findViewById(R.id.iv_pay_wechat).setOnClickListener(v -> showSaveQrConfirmDialog(R.drawable.wechat, "wechat_qr"));
 
-        // 用户须知按钮
         view.findViewById(R.id.btn_user_notice).setOnClickListener(v -> {
-            // 从悬浮窗进入独立的页面
             startActivity(new Intent(this, UserNoticeActivity.class));
         });
 
-        // 我已诚信付款按钮
         view.findViewById(R.id.btn_already_paid).setOnClickListener(v -> {
             prefs.edit().putBoolean("is_premium_activated", true).apply();
             dialog.dismiss();
@@ -463,11 +497,8 @@ public class SettingsActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    // 简单的保存图片到相册逻辑
     private void saveImageToGallery(int resId, String fileName) {
         try {
-            // 这里可以使用你项目中已有的 PhotoActionActivity 逻辑或标准的 MediaStore 保存逻辑
-            // 简单示例：
             android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeResource(getResources(), resId);
             String savedUri = android.provider.MediaStore.Images.Media.insertImage(
                     getContentResolver(), bitmap, fileName, "Scan to pay");
@@ -479,9 +510,6 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
-    // 注意：已删除 updateCurrencyButtonText 方法，因为它不再被需要
-
-    // ... (showBackupOptions, showThemeSettingDialog, showSetOvertimeRateDialog, showDefaultRecordDisplayDialog 等方法保持不变) ...
     private void showBackupOptions() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_backup_options, null);
