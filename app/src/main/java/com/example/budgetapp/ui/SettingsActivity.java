@@ -419,6 +419,7 @@ public class SettingsActivity extends AppCompatActivity {
                 }
             }
     );
+
     private void showActivationDialog(SharedPreferences prefs) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_activate_premium, null);
