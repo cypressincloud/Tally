@@ -41,6 +41,8 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import java.util.ArrayList;
 import java.util.List;
 
+import androidx.activity.OnBackPressedCallback;
+
 public class MainActivity extends AppCompatActivity {
 
     private FinanceViewModel financeViewModel;
@@ -191,6 +193,27 @@ public class MainActivity extends AppCompatActivity {
                 View assetsTab = bottomNav.findViewById(R.id.nav_assets);
                 if (assetsTab != null) {
                     assetsTab.setOnLongClickListener(v -> true);
+                }
+            });
+
+            // 【新增】拦截返回手势逻辑
+            getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+                @Override
+                public void handleOnBackPressed() {
+                    if (navController.getCurrentDestination() != null) {
+                        int currentId = navController.getCurrentDestination().getId();
+                        // 如果当前处在记账、资产、统计这三个主模块之一，直接退出应用
+                        if (currentId == R.id.nav_record || currentId == R.id.nav_assets || currentId == R.id.nav_stats) {
+                            finish();
+                        } else {
+                            // 如果在其他较深的子页面中，则执行正常的返回上一页操作
+                            if (!navController.popBackStack()) {
+                                finish();
+                            }
+                        }
+                    } else {
+                        finish();
+                    }
                 }
             });
         }
