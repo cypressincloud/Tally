@@ -112,6 +112,15 @@ public class StatsFragment extends Fragment {
     private List<AssetAccount> assetList = new ArrayList<>();
     private CustomMarkerView markerView;
 
+    // 新增状态变量，用于记录当前打开的弹窗
+    private AlertDialog currentCategoryDetailDialog;
+    private TransactionListAdapter currentCategoryDetailAdapter;
+    private String currentDetailCategory;
+    private int currentDetailType;
+    private ChipGroup currentDetailChipGroup;
+    private View currentDetailHsvSubCategories;
+    private List<Transaction> currentDetailBaseList;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -124,6 +133,10 @@ public class StatsFragment extends Fragment {
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
             this.allTransactions = list;
             refreshData();
+            // 新增：如果详细分类列表弹窗正在显示，即时刷新它
+            if (currentCategoryDetailDialog != null && currentCategoryDetailDialog.isShowing()) {
+                updateCategoryDetailDialogData();
+            }
         });
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             this.assetList = assets;
@@ -158,52 +171,115 @@ public class StatsFragment extends Fragment {
     // 【修改】showCategoryDetailDialog 方法
     private void showCategoryDetailDialog(String category, int type) {
         if (allTransactions == null) return;
-        long startMillis;
-        long endMillis;
+
+        // 记录状态以便后续即时刷新
+        currentDetailCategory = category;
+        currentDetailType = type;
+
         String dateRangeStr = "";
         ZoneId zone = ZoneId.systemDefault();
+        if (currentMode == 0) {
+            dateRangeStr = selectedDate.format(DateTimeFormatter.ofPattern("yyyy年"));
+        } else if (currentMode == 1) {
+            dateRangeStr = selectedDate.format(DateTimeFormatter.ofPattern("yyyy年MM月"));
+        } else {
+            LocalDate startOfWeek = selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            LocalDate endOfWeek = selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("M.d");
+            dateRangeStr = startOfWeek.format(fmt) + " - " + endOfWeek.format(fmt);
+        }
 
-        // 1. 确定时间范围
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_transaction_list, null);
+        builder.setView(dialogView);
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+        currentCategoryDetailDialog = dialog;
+
+        TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
+        String typeStr = (type == 1) ? "收入" : "消费";
+        tvTitle.setText(dateRangeStr + " " + category + " - " + typeStr + "清单");
+
+        RecyclerView rv = dialogView.findViewById(R.id.rv_detail_list);
+        rv.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+        TransactionListAdapter adapter = new TransactionListAdapter(t -> {
+            LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
+            showAddOrEditDialog(t, date);
+            // 核心修复点：这里移除 dialog.dismiss()，修改完毕后不再关闭当前弹窗
+        });
+
+        adapter.setAssets(assetList);
+        currentCategoryDetailAdapter = adapter;
+        rv.setAdapter(adapter);
+
+        currentDetailHsvSubCategories = dialogView.findViewById(R.id.hsv_sub_categories);
+        currentDetailChipGroup = dialogView.findViewById(R.id.cg_dialog_sub_categories);
+
+        // 初始化加载数据
+        updateCategoryDetailDialogData();
+
+        // 隐藏不必要的按钮
+        View btnOvertime = dialogView.findViewById(R.id.btn_add_overtime);
+        View btnAdd = dialogView.findViewById(R.id.btn_add_transaction);
+        if (btnOvertime != null) btnOvertime.setVisibility(View.GONE);
+        if (btnAdd != null) btnAdd.setVisibility(View.GONE);
+
+        Button btnClose = dialogView.findViewById(R.id.btn_close_dialog);
+        if (btnClose != null) btnClose.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.setOnDismissListener(d -> {
+            currentCategoryDetailDialog = null;
+            currentCategoryDetailAdapter = null;
+            currentDetailChipGroup = null;
+            currentDetailHsvSubCategories = null;
+            currentDetailBaseList = null;
+        });
+
+        dialog.show();
+    }
+
+    // 新增：提取的实时刷新数据和二级分类胶囊方法
+    private void updateCategoryDetailDialogData() {
+        if (currentCategoryDetailAdapter == null || allTransactions == null) return;
+        long startMillis;
+        long endMillis;
+        ZoneId zone = ZoneId.systemDefault();
+
         if (currentMode == 0) {
             LocalDate start = LocalDate.of(selectedDate.getYear(), 1, 1);
             startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli();
             endMillis = start.plusYears(1).atStartOfDay(zone).toInstant().toEpochMilli();
-            dateRangeStr = selectedDate.format(DateTimeFormatter.ofPattern("yyyy年"));
         } else if (currentMode == 1) {
             LocalDate start = LocalDate.of(selectedDate.getYear(), selectedDate.getMonthValue(), 1);
             startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli();
             endMillis = start.plusMonths(1).atStartOfDay(zone).toInstant().toEpochMilli();
-            dateRangeStr = selectedDate.format(DateTimeFormatter.ofPattern("yyyy年MM月"));
         } else {
             LocalDate startOfWeek = selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
             LocalDate endOfWeek = selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
             startMillis = startOfWeek.atStartOfDay(zone).toInstant().toEpochMilli();
             endMillis = endOfWeek.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli();
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("M.d");
-            dateRangeStr = startOfWeek.format(fmt) + " - " + endOfWeek.format(fmt);
         }
 
-        // 2. 预计算总额，用于判断"其他"
         Map<String, Double> categorySums = new HashMap<>();
         double totalScopeAmount = 0;
         for (Transaction t : allTransactions) {
-            if (t.date >= startMillis && t.date < endMillis && t.type == type) {
-                if (type == 1 && "加班".equals(t.category)) continue;
+            if (t.date >= startMillis && t.date < endMillis && t.type == currentDetailType) {
+                if (currentDetailType == 1 && "加班".equals(t.category)) continue;
                 categorySums.put(t.category, categorySums.getOrDefault(t.category, 0.0) + t.amount);
                 totalScopeAmount += t.amount;
             }
         }
         double threshold = totalScopeAmount * 0.05;
 
-        // 3. 筛选当前分类的所有账单（基础数据）
-        // 这里使用 final 列表，方便 Lambda 表达式使用
-        final List<Transaction> baseList = new ArrayList<>();
+        List<Transaction> baseList = new ArrayList<>();
         for (Transaction t : allTransactions) {
-            if (t.date >= startMillis && t.date < endMillis && t.type == type) {
-                if (type == 1 && "加班".equals(t.category)) continue;
+            if (t.date >= startMillis && t.date < endMillis && t.type == currentDetailType) {
+                if (currentDetailType == 1 && "加班".equals(t.category)) continue;
 
                 boolean isMatch = false;
-                if ("其他".equals(category)) {
+                if ("其他".equals(currentDetailCategory)) {
                     Double catSum = categorySums.get(t.category);
                     if (catSum != null && catSum < threshold) {
                         isMatch = true;
@@ -211,7 +287,7 @@ public class StatsFragment extends Fragment {
                         isMatch = true;
                     }
                 } else {
-                    if (t.category.equals(category)) {
+                    if (t.category.equals(currentDetailCategory)) {
                         isMatch = true;
                     }
                 }
@@ -222,36 +298,21 @@ public class StatsFragment extends Fragment {
             }
         }
 
-        // 4. 显示弹窗
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_transaction_list, null);
-        builder.setView(dialogView);
-        AlertDialog dialog = builder.create();
-        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        currentDetailBaseList = baseList;
 
-        TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
-        String typeStr = (type == 1) ? "收入" : "消费";
-        tvTitle.setText(dateRangeStr + " " + category + " - " + typeStr + "清单");
+        // 保存刷新前选中的二级分类，防止刷新时跳回"全部"
+        String selectedSubCat = null;
+        if (currentDetailChipGroup != null) {
+            int checkedId = currentDetailChipGroup.getCheckedChipId();
+            if (checkedId != View.NO_ID) {
+                Chip checkedChip = currentDetailChipGroup.findViewById(checkedId);
+                if (checkedChip != null) {
+                    selectedSubCat = checkedChip.getText().toString();
+                }
+            }
+        }
 
-        RecyclerView rv = dialogView.findViewById(R.id.rv_detail_list);
-        rv.setLayoutManager(new LinearLayoutManager(requireContext()));
-        TransactionListAdapter adapter = new TransactionListAdapter(t -> {
-            LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
-            showAddOrEditDialog(t, date);
-            dialog.dismiss(); // 编辑后关闭列表，避免数据不同步
-        });
-        adapter.setAssets(assetList);
-        // 初始显示全部
-        adapter.setTransactions(baseList);
-        rv.setAdapter(adapter);
-
-        // --- 新增：二级分类筛选逻辑 ---
-        View hsvSubCategories = dialogView.findViewById(R.id.hsv_sub_categories);
-        ChipGroup cgSubCategories = dialogView.findViewById(R.id.cg_dialog_sub_categories);
-
-        // 判断是否开启了二级分类
-        if (CategoryManager.isSubCategoryEnabled(requireContext())) {
-            // 提取该分类下实际存在的所有二级分类
+        if (CategoryManager.isSubCategoryEnabled(requireContext()) && currentDetailChipGroup != null) {
             Set<String> subCats = new HashSet<>();
             for (Transaction t : baseList) {
                 if (t.subCategory != null && !t.subCategory.isEmpty()) {
@@ -260,10 +321,9 @@ public class StatsFragment extends Fragment {
             }
 
             if (!subCats.isEmpty()) {
-                hsvSubCategories.setVisibility(View.VISIBLE);
-                cgSubCategories.removeAllViews();
+                currentDetailHsvSubCategories.setVisibility(View.VISIBLE);
+                currentDetailChipGroup.removeAllViews();
 
-                // 准备样式颜色
                 int bgDefault = ContextCompat.getColor(requireContext(), R.color.cat_unselected_bg);
                 int bgChecked = ContextCompat.getColor(requireContext(), R.color.app_yellow);
                 int textDefault = ContextCompat.getColor(requireContext(), R.color.text_primary);
@@ -272,61 +332,58 @@ public class StatsFragment extends Fragment {
                 ColorStateList bgStateList = new ColorStateList(states, new int[]{bgChecked, bgDefault});
                 ColorStateList textStateList = new ColorStateList(states, new int[]{textChecked, textDefault});
 
-                // 动态添加胶囊
                 for (String subCat : subCats) {
                     Chip chip = new Chip(requireContext());
                     chip.setText(subCat);
                     chip.setCheckable(true);
                     chip.setClickable(true);
-
-                    // 样式设置
                     chip.setChipBackgroundColor(bgStateList);
                     chip.setTextColor(textStateList);
                     chip.setChipStrokeWidth(0);
                     chip.setCheckedIconVisible(false);
 
-                    // 点击筛选逻辑
-                    chip.setOnClickListener(v -> {
-                        List<Transaction> filteredList = new ArrayList<>();
+                    if (subCat.equals(selectedSubCat)) {
+                        chip.setChecked(true);
+                    }
 
-                        // 检查是否有 Chip 被选中
-                        int checkedId = cgSubCategories.getCheckedChipId();
-                        if (checkedId == View.NO_ID) {
-                            // 没有选中 -> 显示该大类下的全部
-                            filteredList.addAll(baseList);
-                        } else {
-                            // 有选中 -> 筛选特定二级分类
-                            for (Transaction t : baseList) {
-                                if (subCat.equals(t.subCategory)) {
-                                    filteredList.add(t);
-                                }
-                            }
-                        }
-                        adapter.setTransactions(filteredList);
-                    });
-
-                    cgSubCategories.addView(chip);
+                    chip.setOnClickListener(v -> applySubCategoryFilter());
+                    currentDetailChipGroup.addView(chip);
                 }
             } else {
-                hsvSubCategories.setVisibility(View.GONE);
+                currentDetailHsvSubCategories.setVisibility(View.GONE);
             }
-        } else {
-            hsvSubCategories.setVisibility(View.GONE);
         }
-        // ---------------------------
 
-        // 隐藏不必要的按钮 (因为这是查看统计详情，不是记账)
-        View btnOvertime = dialogView.findViewById(R.id.btn_add_overtime);
-        View btnAdd = dialogView.findViewById(R.id.btn_add_transaction);
-        if (btnOvertime != null) btnOvertime.setVisibility(View.GONE);
-        if (btnAdd != null) btnAdd.setVisibility(View.GONE);
-
-        Button btnClose = dialogView.findViewById(R.id.btn_close_dialog);
-        if (btnClose != null) btnClose.setOnClickListener(v -> dialog.dismiss());
-
-        dialog.show();
+        applySubCategoryFilter();
     }
 
+    private void applySubCategoryFilter() {
+        if (currentCategoryDetailAdapter == null || currentDetailBaseList == null) return;
+        List<Transaction> filteredList = new ArrayList<>();
+
+        if (currentDetailChipGroup != null && CategoryManager.isSubCategoryEnabled(requireContext())) {
+            int checkedId = currentDetailChipGroup.getCheckedChipId();
+            if (checkedId == View.NO_ID) {
+                filteredList.addAll(currentDetailBaseList);
+            } else {
+                Chip checkedChip = currentDetailChipGroup.findViewById(checkedId);
+                if (checkedChip != null) {
+                    String subCat = checkedChip.getText().toString();
+                    for (Transaction t : currentDetailBaseList) {
+                        if (subCat.equals(t.subCategory)) {
+                            filteredList.add(t);
+                        }
+                    }
+                } else {
+                    filteredList.addAll(currentDetailBaseList);
+                }
+            }
+        } else {
+            filteredList.addAll(currentDetailBaseList);
+        }
+
+        currentCategoryDetailAdapter.setTransactions(filteredList);
+    }
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
         if (getContext() == null) return;
 

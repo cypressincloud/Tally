@@ -98,6 +98,10 @@ public class RecordFragment extends Fragment {
     // Activity Result Launcher
     private ActivityResultLauncher<Intent> yearCalendarLauncher;
 
+    // 新增的成员变量
+    private AlertDialog currentDetailDialog;
+    private TextView currentDetailSummaryTextView;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -222,17 +226,12 @@ public class RecordFragment extends Fragment {
 
         // 确保实时观察所有交易记录，包含自动生成的账单
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
-            // 强制刷新日历统计，确保“自动续费”或“关键字记账”产生的记录立即显示
+            // 强制刷新日历统计
             updateCalendar();
 
-            // 如果当前打开了详情对话框，需要实时刷新对话框内部的列表适配器
-            if (currentDetailAdapter != null && selectedDate != null) {
-                long start = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                long end = selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                List<Transaction> dayList = list.stream()
-                        .filter(t -> t.date >= start && t.date < end)
-                        .collect(Collectors.toList());
-                currentDetailAdapter.setTransactions(dayList); // 关键：更新详情列表
+            // 如果当前打开了详情对话框，需要实时刷新对话框内部的列表适配器和顶部统计文本
+            if (currentDetailDialog != null && currentDetailDialog.isShowing() && selectedDate != null) {
+                updateDetailDialogData(selectedDate);
             }
         });
 
@@ -525,10 +524,16 @@ public class RecordFragment extends Fragment {
         AlertDialog dialog = builder.create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 
+        // 保存当前的 Dialog 实例
+        currentDetailDialog = dialog;
+
         TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
         if (tvTitle != null) {
             tvTitle.setText(date.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.CHINA)));
         }
+
+        // 缓存当前的 Summary TextView
+        currentDetailSummaryTextView = dialogView.findViewById(R.id.tv_dialog_summary);
 
         RecyclerView rvList = dialogView.findViewById(R.id.rv_detail_list);
         rvList.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -547,7 +552,23 @@ public class RecordFragment extends Fragment {
         currentDetailAdapter = listAdapter;
         rvList.setAdapter(listAdapter);
 
-        // 1. 获取数据库中当天的真实记录
+        // 调用新抽离的方法，首次加载数据
+        updateDetailDialogData(date);
+
+        dialogView.findViewById(R.id.btn_add_transaction).setOnClickListener(v -> showAddOrEditDialog(null, date));
+        dialogView.findViewById(R.id.btn_add_overtime).setOnClickListener(v -> { dialog.dismiss(); showOvertimeDialog(date); });
+        dialogView.findViewById(R.id.btn_close_dialog).setOnClickListener(v -> dialog.dismiss());
+        dialog.setOnDismissListener(d -> {
+            currentDetailAdapter = null;
+            currentDetailDialog = null;
+            currentDetailSummaryTextView = null;
+        });
+        dialog.show();
+    }
+
+    // 新增：专用于刷新弹窗内部列表与汇总文字的方法
+    private void updateDetailDialogData(LocalDate date) {
+        if (currentDetailAdapter == null) return;
         List<Transaction> all = viewModel.getAllTransactions().getValue();
         List<Transaction> dayList = new ArrayList<>();
         if (all != null) {
@@ -558,7 +579,6 @@ public class RecordFragment extends Fragment {
                     .collect(Collectors.toList());
         }
 
-        // 2. 核心逻辑：匹配续费项并生成预览账单
         List<RenewalItem> renewals = assistantConfig.getRenewalList();
         for (RenewalItem item : renewals) {
             boolean matchesDate = false;
@@ -569,32 +589,27 @@ public class RecordFragment extends Fragment {
             }
 
             if (matchesDate) {
-                // 检查数据库中是否已存在该笔自动续费的正式记录
                 String objectName = item.object;
                 boolean alreadyExecuted = dayList.stream().anyMatch(t ->
                         "自动续费".equals(t.category) && objectName.equals(t.note));
 
                 if (!alreadyExecuted) {
-                    // 创建虚拟预览账单
                     Transaction preview = new Transaction();
                     preview.amount = item.amount;
-                    preview.type = 0; // 支出
+                    preview.type = 0;
                     preview.category = "自动续费";
                     preview.note = objectName;
-                    preview.remark = "PREVIEW_BILL"; // 预览标识
+                    preview.remark = "PREVIEW_BILL";
                     preview.date = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                     dayList.add(preview);
                 }
             }
         }
 
-        // === 新增：计算当日汇总并设置彩色文本 ===
-        TextView tvSummary = dialogView.findViewById(R.id.tv_dialog_summary);
-        if (tvSummary != null) {
+        if (currentDetailSummaryTextView != null) {
             double dayIncome = 0;
             double dayExpense = 0;
 
-            // 遍历真实的记录计算收支 (不包含虚拟的预览账单)
             for (Transaction t : dayList) {
                 if ("PREVIEW_BILL".equals(t.remark)) continue;
                 if (t.type == 1) {
@@ -605,59 +620,41 @@ public class RecordFragment extends Fragment {
             }
 
             if (dayIncome == 0 && dayExpense == 0) {
-                // 没有数据，隐藏
-                tvSummary.setVisibility(View.GONE);
+                currentDetailSummaryTextView.setVisibility(View.GONE);
             } else {
-                tvSummary.setVisibility(View.VISIBLE);
+                currentDetailSummaryTextView.setVisibility(View.VISIBLE);
                 double dayBalance = dayIncome - dayExpense;
 
-                // 准备颜色 (主题色为 app_yellow)
                 int colorExpense = ContextCompat.getColor(getContext(), R.color.expense_green);
                 int colorIncome = ContextCompat.getColor(getContext(), R.color.income_red);
                 int colorBalance = ContextCompat.getColor(getContext(), R.color.app_yellow);
 
-                // 构建 Spannable 文本
                 android.text.SpannableStringBuilder ssb = new android.text.SpannableStringBuilder();
 
-                // 支出 (绿色)
                 if (dayExpense > 0) {
                     String expStr = String.format(Locale.CHINA, "支出: %.2f", dayExpense);
                     int start = ssb.length();
                     ssb.append(expStr);
                     ssb.setSpan(new android.text.style.ForegroundColorSpan(colorExpense), start, ssb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    ssb.append("    "); // 增加间距
+                    ssb.append("    ");
                 }
-
-                // 收入 (红色)
                 if (dayIncome > 0) {
                     String incStr = String.format(Locale.CHINA, "收入: %.2f", dayIncome);
                     int start = ssb.length();
                     ssb.append(incStr);
                     ssb.setSpan(new android.text.style.ForegroundColorSpan(colorIncome), start, ssb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    ssb.append("    "); // 增加间距
+                    ssb.append("    ");
                 }
-
-                // 结余 (整体主题色)
                 String balStr = String.format(Locale.CHINA, "结余: %.2f", dayBalance);
                 int startBal = ssb.length();
                 ssb.append(balStr);
                 ssb.setSpan(new android.text.style.ForegroundColorSpan(colorBalance), startBal, ssb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
-
-                tvSummary.setText(ssb);
+                currentDetailSummaryTextView.setText(ssb);
             }
         }
-        // ===========================================
-
-        listAdapter.setTransactions(dayList);
-
-        dialogView.findViewById(R.id.btn_add_transaction).setOnClickListener(v -> showAddOrEditDialog(null, date));
-        dialogView.findViewById(R.id.btn_add_overtime).setOnClickListener(v -> { dialog.dismiss(); showOvertimeDialog(date); });
-        dialogView.findViewById(R.id.btn_close_dialog).setOnClickListener(v -> dialog.dismiss());
-        dialog.setOnDismissListener(d -> currentDetailAdapter = null);
-        dialog.show();
+        currentDetailAdapter.setTransactions(dayList);
     }
-
     private void showOvertimeDialog(LocalDate date) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View view = getLayoutInflater().inflate(R.layout.dialog_add_overtime, null);
