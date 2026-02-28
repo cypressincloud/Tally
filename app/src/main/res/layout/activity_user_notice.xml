@@ -127,10 +127,33 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="使用“无障碍管理器”锁死 Tally 的无障碍权限。微信高版本对无障碍有限制，解决方案是下载里面的“小米钱包”，同时锁死 Tally 和小米钱包的无障碍权限。\n“无障碍管理器”、“小米钱包”和“shizuku”在123链接里面的“辅助软件”，具体使用方法看B站视频。"
+                    android:text="使用“无障碍管理器”锁死 Tally 的无障碍权限。微信高版本对无障碍有限制，解决方案是下载123链接里面的“小米钱包”，同时锁死 Tally 和小米钱包的无障碍权限。\n“无障碍管理器”、“小米钱包”和“shizuku”在123链接里面的“辅助软件”，具体使用方法看B站视频。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="6dp"
                     android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="无障碍原理"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Tally的自动记账功能依赖于无障碍权限，下面的原理适用于“记账助手设置”、“自动记账设置”：\n\n• 触发机制：只要在指定的应用内的屏幕出现了设定的关键字，就会触发自动记账（弹出悬浮窗、自动输入对应的金额）。例如，在“微信”这个应用设定关键字“微信”，那么每次打开“微信”都会触发自动记账。\n• 注意事项：无障碍不识别图片。\n• 资产关联：“自动资产设置”是对自动记账功能的补充，如果没有设定相关的自动资产，那么记账会关联默认资产（长按资产设置默认资产）。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="8dp"
+                    android:layout_marginTop="12dp"
                     android:textColor="?android:attr/textColorPrimary"/>
 
                 <View
