@@ -164,7 +164,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="点击分类可删除，长按分类可管理二级分类"
+                android:text="点击分类可编辑，长按分类可管理二级分类"
                 android:gravity="center"
                 android:textColor="#999999"
                 android:textSize="12sp"
