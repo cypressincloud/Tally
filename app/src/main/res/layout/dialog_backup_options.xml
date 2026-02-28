@@ -97,6 +97,23 @@
         android:drawablePadding="12dp"
         android:gravity="center_vertical"/>
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?android:attr/listDivider"/>
+
+    <TextView
+        android:id="@+id/tv_import_wechat"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="从微信导入数据 (CSV)"
+        android:textSize="16sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:padding="16dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:drawablePadding="12dp"
+        android:gravity="center_vertical"/>
+
     <Button
         android:id="@+id/btn_cancel_backup"
         android:layout_width="match_parent"

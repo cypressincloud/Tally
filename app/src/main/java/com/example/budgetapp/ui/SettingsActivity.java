@@ -314,6 +314,29 @@ public class SettingsActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private final ActivityResultLauncher<String[]> importWeChatLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        List<Transaction> wechatTransactions = BackupManager.importFromWeChat(this, uri);
+
+                        if (!wechatTransactions.isEmpty()) {
+                            for (Transaction t : wechatTransactions) {
+                                financeViewModel.addTransaction(t);
+                            }
+                            Toast.makeText(this, "成功从微信导入 " + wechatTransactions.size() + " 条账单", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(this, "未找到有效的微信账单数据或文件格式错误", Toast.LENGTH_LONG).show();
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "微信导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
     private void showActivationDialog(SharedPreferences prefs) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_activate_premium, null);
@@ -420,6 +443,16 @@ public class SettingsActivity extends AppCompatActivity {
 
         view.findViewById(R.id.tv_import_external).setOnClickListener(v -> {
             importExternalJsonLauncher.launch(new String[]{"application/json", "text/plain", "*/*"});
+            dialog.dismiss();
+        });
+
+        view.findViewById(R.id.tv_import_wechat).setOnClickListener(v -> {
+            importWeChatLauncher.launch(new String[]{
+                    "text/csv",
+                    "text/plain",
+                    "application/vnd.ms-excel",
+                    "*/*"
+            });
             dialog.dismiss();
         });
 

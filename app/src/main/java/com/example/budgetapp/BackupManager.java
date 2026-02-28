@@ -28,6 +28,12 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 
 public class BackupManager {
 
@@ -461,6 +467,160 @@ public class BackupManager {
         data.autoAssetRules = restoredRules;
         data.subCategoryMap = restoredSubMap;
         return data;
+    }
+
+    // ============================================================================================
+    // 微信账单导入 (支持 .xlsx 和 .csv)
+    // ============================================================================================
+    public static List<Transaction> importFromWeChat(Context context, Uri uri) throws Exception {
+        try {
+            // 首先尝试按照 Excel (XLSX / XLS) 格式解析
+            return importWeChatAsExcel(context, uri);
+        } catch (Exception e) {
+            // 如果抛出异常 (说明它可能不是合法的 Excel 文件，而是 CSV 文本)，回退到 CSV 解析
+            return importWeChatAsCsv(context, uri);
+        }
+    }
+
+    private static List<Transaction> importWeChatAsExcel(Context context, Uri uri) throws Exception {
+        List<Transaction> transactions = new ArrayList<>();
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+             Workbook workbook = WorkbookFactory.create(inputStream)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            boolean isDataSection = false;
+
+            for (Row row : sheet) {
+                if (row == null) continue;
+
+                // 尝试获取第一列内容判断是否到达表头
+                String firstColText = getCellText(row.getCell(0));
+
+                if (firstColText.contains("交易时间")) {
+                    isDataSection = true;
+                    continue; // 跳过表头行自身
+                }
+
+                // 未到数据区域，跳过前置的总结信息
+                if (!isDataSection) continue;
+
+                // 微信明细通常至少有 6 列及以上
+                if (row.getLastCellNum() < 6) continue;
+
+                String timeStr = getCellText(row.getCell(0));
+                if (TextUtils.isEmpty(timeStr) || !timeStr.contains("-")) {
+                    continue; // 可能是文件底部的空行或统计数据
+                }
+
+                Transaction t = new Transaction();
+
+                // 1. 交易时间 -> 时间 & 记录标识 (对应 t.note)
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                try {
+                    Date date = sdf.parse(timeStr.trim());
+                    t.date = (date != null) ? date.getTime() : System.currentTimeMillis();
+                } catch (Exception e) {
+                    continue;
+                }
+                t.note = timeStr.trim();
+
+                // 2. 交易对方 -> 备注 (对应 t.remark，微信账单在第3列，索引2)
+                t.remark = getCellText(row.getCell(2));
+
+                // 3. 收/支 -> 类型 (微信账单在第5列，索引4)
+                String typeStr = getCellText(row.getCell(4));
+                if ("收入".equals(typeStr)) {
+                    t.type = 1;
+                } else if ("支出".equals(typeStr)) {
+                    t.type = 0;
+                } else {
+                    t.type = 0; // 中立交易默认设为支出
+                }
+
+                // 4. 金额(元) -> 金额 (微信账单在第6列，索引5)
+                String amountStr = getCellText(row.getCell(5));
+                amountStr = amountStr.replace("¥", "").replace(",", "").trim();
+                t.amount = parseDoubleSafe(amountStr);
+
+                // 5. 分类统一为微信
+                t.category = "微信";
+                t.assetId = 0;
+
+                transactions.add(t);
+            }
+        }
+        return transactions;
+    }
+
+    // 辅助方法：安全获取 Excel 单元格内容
+    private static String getCellText(Cell cell) {
+        if (cell == null) return "";
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue().trim();
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(cell.getDateCellValue());
+                }
+                // 返回纯数字，避免科学计数法导致的解析问题
+                return String.valueOf(cell.getNumericCellValue());
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            default:
+                return "";
+        }
+    }
+
+    // 回退使用的原生 CSV 解析方法
+    private static List<Transaction> importWeChatAsCsv(Context context, Uri uri) throws Exception {
+        List<Transaction> transactions = new ArrayList<>();
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+
+            String line;
+            boolean isDataSection = false;
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("\ufeff")) line = line.substring(1);
+                if (TextUtils.isEmpty(line.trim())) continue;
+
+                if (line.contains("交易时间") && line.contains("收/支") && line.contains("金额(元)")) {
+                    isDataSection = true;
+                    continue;
+                }
+
+                if (!isDataSection) continue;
+
+                List<String> tokens = parseCsvLine(line);
+                if (tokens.size() < 6) continue;
+
+                Transaction t = new Transaction();
+                String timeStr = tokens.get(0);
+                try {
+                    Date date = sdf.parse(timeStr);
+                    t.date = (date != null) ? date.getTime() : System.currentTimeMillis();
+                } catch (Exception e) {
+                    continue;
+                }
+
+                // 调换：交易时间 -> 记录标识 (note), 交易对方 -> 备注 (remark)
+                t.note = timeStr;
+                t.remark = tokens.get(2);
+
+                String typeStr = tokens.get(4);
+                if ("收入".equals(typeStr)) t.type = 1;
+                else t.type = 0;
+
+                String amountStr = tokens.get(5).replace("¥", "").replace(",", "").trim();
+                t.amount = parseDoubleSafe(amountStr);
+
+                t.category = "微信";
+                t.assetId = 0;
+                transactions.add(t);
+            }
+        }
+        return transactions;
     }
 
     // ... (rest of the helper methods: restoreAssistantConfig, joinSet, splitSet, parseCsvLine, parseDoubleSafe, escapeCsv remain unchanged) ...
