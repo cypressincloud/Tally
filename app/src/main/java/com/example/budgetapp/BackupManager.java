@@ -472,6 +472,41 @@ public class BackupManager {
     // ============================================================================================
     // 微信账单导入 (支持 .xlsx 和 .csv)
     // ============================================================================================
+
+    // 辅助方法：模糊匹配当前应用内的一级/二级分类，若都未匹配到则新建一级分类
+    private static String[] matchOrCreateCategory(String rawCategory, int type, List<String> expCats, List<String> incCats, Map<String, List<String>> subCatMap) {
+        if (TextUtils.isEmpty(rawCategory) || "/".equals(rawCategory)) {
+            rawCategory = "其它";
+        }
+
+        List<String> targetList = (type == 1) ? incCats : expCats;
+
+        // 1. 模糊匹配一级分类
+        for (String cat : targetList) {
+            if (rawCategory.contains(cat) || cat.contains(rawCategory)) {
+                return new String[]{cat, ""};
+            }
+        }
+
+        // 2. 模糊匹配二级分类
+        for (String parentCat : targetList) {
+            List<String> subs = subCatMap.get(parentCat);
+            if (subs != null) {
+                for (String sub : subs) {
+                    if (rawCategory.contains(sub) || sub.contains(rawCategory)) {
+                        return new String[]{parentCat, sub};
+                    }
+                }
+            }
+        }
+
+        // 3. 都没有匹配到，新建并加入一级分类列表
+        if (!targetList.contains(rawCategory)) {
+            targetList.add(rawCategory);
+        }
+        return new String[]{rawCategory, ""};
+    }
+
     public static BackupData importFromWeChat(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
         try {
             return importWeChatAsExcel(context, uri, allAssets);
@@ -483,9 +518,21 @@ public class BackupManager {
     private static BackupData importWeChatAsExcel(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
         List<Transaction> transactions = new ArrayList<>();
         List<AssetAccount> newAssetsToCreate = new ArrayList<>();
-        Map<String, Integer> newAssetMap = new HashMap<>(); // 用于记录本次解析中已分配过的新资产
+        Map<String, Integer> newAssetMap = new HashMap<>();
 
-        // 获取当前最大的资产 ID，防止冲突
+        // 获取并构建现有分类及子分类的数据结构
+        List<String> expCats = new ArrayList<>(CategoryManager.getExpenseCategories(context));
+        List<String> incCats = new ArrayList<>(CategoryManager.getIncomeCategories(context));
+        Map<String, List<String>> subCatMap = new HashMap<>();
+        for (String cat : expCats) {
+            List<String> subs = CategoryManager.getSubCategories(context, cat);
+            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
+        }
+        for (String cat : incCats) {
+            List<String> subs = CategoryManager.getSubCategories(context, cat);
+            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
+        }
+
         int maxAssetId = 0;
         if (allAssets != null) {
             for (AssetAccount a : allAssets) {
@@ -509,17 +556,12 @@ public class BackupManager {
                     continue;
                 }
 
-                if (!isDataSection) continue;
-                if (row.getLastCellNum() < 7) continue;
+                if (!isDataSection || row.getLastCellNum() < 7) continue;
 
                 String timeStr = getCellText(row.getCell(0));
-                if (TextUtils.isEmpty(timeStr) || !timeStr.contains("-")) {
-                    continue;
-                }
+                if (TextUtils.isEmpty(timeStr) || !timeStr.contains("-")) continue;
 
                 Transaction t = new Transaction();
-
-                // 1. 交易时间 -> 记录标识 (note)
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
                 try {
                     Date date = sdf.parse(timeStr.trim());
@@ -528,11 +570,8 @@ public class BackupManager {
                     continue;
                 }
                 t.note = timeStr.trim();
-
-                // 2. 交易对方 -> 备注 (remark)
                 t.remark = getCellText(row.getCell(2));
 
-                // 3. 收/支 -> 类型
                 String typeStr = getCellText(row.getCell(4));
                 if ("收入".equals(typeStr)) {
                     t.type = 1;
@@ -542,23 +581,18 @@ public class BackupManager {
                     t.type = 0;
                 }
 
-                // 4. 金额(元) -> 金额
-                String amountStr = getCellText(row.getCell(5));
-                amountStr = amountStr.replace("¥", "").replace(",", "").trim();
+                String amountStr = getCellText(row.getCell(5)).replace("¥", "").replace(",", "").trim();
                 t.amount = parseDoubleSafe(amountStr);
 
-                // 5. 支付方式 -> 资产账户 (如果没有则照抄名字新建)
                 String paymentMethod = getCellText(row.getCell(6)).trim();
                 int matchedId = matchAssetId(paymentMethod, allAssets);
-
                 if (matchedId == 0 && !TextUtils.isEmpty(paymentMethod) && !"/".equals(paymentMethod)) {
-                    // 没匹配到，且不是空或斜杠
                     if (newAssetMap.containsKey(paymentMethod)) {
-                        t.assetId = newAssetMap.get(paymentMethod); // 这次解析中已经建过同名的了
+                        t.assetId = newAssetMap.get(paymentMethod);
                     } else {
-                        maxAssetId++; // 分配一个全新且不冲突的 ID
+                        maxAssetId++;
                         int newId = maxAssetId;
-                        AssetAccount newAsset = new AssetAccount(paymentMethod, 0.0, 0); // 默认类型0(资产)
+                        AssetAccount newAsset = new AssetAccount(paymentMethod, 0.0, 0);
                         newAsset.id = newId;
                         newAssetsToCreate.add(newAsset);
                         newAssetMap.put(paymentMethod, newId);
@@ -568,13 +602,19 @@ public class BackupManager {
                     t.assetId = matchedId;
                 }
 
-                // 6. 分类统一为微信
-                t.category = "微信";
+                // 【修改】获取微信的交易类型(第2列, 索引1)并匹配
+                String rawCategory = getCellText(row.getCell(1)).trim();
+                String[] matchedCat = matchOrCreateCategory(rawCategory, t.type, expCats, incCats, subCatMap);
+                t.category = matchedCat[0];
+                t.subCategory = matchedCat[1];
 
                 transactions.add(t);
             }
         }
-        return new BackupData(transactions, newAssetsToCreate);
+        BackupData data = new BackupData(transactions, newAssetsToCreate);
+        data.expenseCategories = expCats;
+        data.incomeCategories = incCats;
+        return data;
     }
 
     // 辅助方法：安全获取 Excel 单元格内容
@@ -601,6 +641,18 @@ public class BackupManager {
         List<Transaction> transactions = new ArrayList<>();
         List<AssetAccount> newAssetsToCreate = new ArrayList<>();
         Map<String, Integer> newAssetMap = new HashMap<>();
+
+        List<String> expCats = new ArrayList<>(CategoryManager.getExpenseCategories(context));
+        List<String> incCats = new ArrayList<>(CategoryManager.getIncomeCategories(context));
+        Map<String, List<String>> subCatMap = new HashMap<>();
+        for (String cat : expCats) {
+            List<String> subs = CategoryManager.getSubCategories(context, cat);
+            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
+        }
+        for (String cat : incCats) {
+            List<String> subs = CategoryManager.getSubCategories(context, cat);
+            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
+        }
 
         int maxAssetId = 0;
         if (allAssets != null) {
@@ -649,10 +701,8 @@ public class BackupManager {
                 String amountStr = tokens.get(5).replace("¥", "").replace(",", "").trim();
                 t.amount = parseDoubleSafe(amountStr);
 
-                // 处理支付方式：如没匹配到同样新建
                 String paymentMethod = tokens.get(6).trim();
                 int matchedId = matchAssetId(paymentMethod, allAssets);
-
                 if (matchedId == 0 && !TextUtils.isEmpty(paymentMethod) && !"/".equals(paymentMethod)) {
                     if (newAssetMap.containsKey(paymentMethod)) {
                         t.assetId = newAssetMap.get(paymentMethod);
@@ -669,14 +719,20 @@ public class BackupManager {
                     t.assetId = matchedId;
                 }
 
-                t.category = "微信";
+                // 【修改】获取微信交易类型(通常在索引1)并匹配
+                String rawCategory = tokens.size() > 1 ? tokens.get(1).trim() : "其它";
+                String[] matchedCat = matchOrCreateCategory(rawCategory, t.type, expCats, incCats, subCatMap);
+                t.category = matchedCat[0];
+                t.subCategory = matchedCat[1];
 
                 transactions.add(t);
             }
         }
-        return new BackupData(transactions, newAssetsToCreate);
+        BackupData data = new BackupData(transactions, newAssetsToCreate);
+        data.expenseCategories = expCats;
+        data.incomeCategories = incCats;
+        return data;
     }
-
     // 辅助方法：通过支付方式文本匹配当前项目中的资产ID
     private static int matchAssetId(String paymentMethod, List<AssetAccount> allAssets) {
         if (TextUtils.isEmpty(paymentMethod) || "/".equals(paymentMethod)) {
@@ -710,7 +766,18 @@ public class BackupManager {
         List<AssetAccount> newAssetsToCreate = new ArrayList<>();
         Map<String, Integer> newAssetMap = new HashMap<>();
 
-        // 获取当前最大的资产 ID
+        List<String> expCats = new ArrayList<>(CategoryManager.getExpenseCategories(context));
+        List<String> incCats = new ArrayList<>(CategoryManager.getIncomeCategories(context));
+        Map<String, List<String>> subCatMap = new HashMap<>();
+        for (String cat : expCats) {
+            List<String> subs = CategoryManager.getSubCategories(context, cat);
+            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
+        }
+        for (String cat : incCats) {
+            List<String> subs = CategoryManager.getSubCategories(context, cat);
+            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
+        }
+
         int maxAssetId = 0;
         if (allAssets != null) {
             for (AssetAccount a : allAssets) {
@@ -725,8 +792,8 @@ public class BackupManager {
             boolean isDataSection = false;
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
 
-            // 动态记录需要的列索引
-            int timeIdx = -1, typeIdx = -1, amountIdx = -1, descIdx = -1, paymentIdx = -1;
+            // 新增 tradeCatIdx 用于定位“交易分类”列
+            int timeIdx = -1, typeIdx = -1, amountIdx = -1, descIdx = -1, paymentIdx = -1, tradeCatIdx = -1;
 
             while ((line = reader.readLine()) != null) {
                 if (line.startsWith("\ufeff")) line = line.substring(1);
@@ -734,7 +801,6 @@ public class BackupManager {
 
                 if (isDataSection && line.startsWith("---")) break;
 
-                // 检测表头行，并动态绑定各字段的索引，新增“收/付款方式”
                 if (!isDataSection && line.contains("交易时间") && line.contains("收/支") && line.contains("金额")) {
                     isDataSection = true;
                     List<String> headers = parseCsvLine(line);
@@ -745,6 +811,7 @@ public class BackupManager {
                         else if (h.contains("金额")) amountIdx = i;
                         else if (h.contains("商品说明") || h.contains("商品名称")) descIdx = i;
                         else if (h.contains("收/付款方式")) paymentIdx = i;
+                        else if (h.contains("交易分类")) tradeCatIdx = i;
                     }
                     continue;
                 }
@@ -753,7 +820,8 @@ public class BackupManager {
 
                 List<String> tokens = parseCsvLine(line);
                 int maxRequiredIdx = Math.max(Math.max(timeIdx, typeIdx), Math.max(amountIdx, descIdx));
-                maxRequiredIdx = Math.max(maxRequiredIdx, paymentIdx); // 包含 paymentIdx
+                maxRequiredIdx = Math.max(maxRequiredIdx, paymentIdx);
+                maxRequiredIdx = Math.max(maxRequiredIdx, tradeCatIdx); // 把交易分类也算进下限检查
 
                 if (timeIdx == -1 || typeIdx == -1 || amountIdx == -1 || tokens.size() <= maxRequiredIdx) {
                     continue;
@@ -783,18 +851,16 @@ public class BackupManager {
                 String amountStr = tokens.get(amountIdx).replace("¥", "").replace(",", "").trim();
                 t.amount = parseDoubleSafe(amountStr);
 
-                // 处理 收/付款方式 -> 资产账户
                 String paymentMethod = (paymentIdx != -1) ? tokens.get(paymentIdx).trim() : "";
                 int matchedId = matchAssetId(paymentMethod, allAssets);
 
                 if (matchedId == 0 && !TextUtils.isEmpty(paymentMethod) && !"/".equals(paymentMethod)) {
-                    // 没有匹配到，自动创建新资产
                     if (newAssetMap.containsKey(paymentMethod)) {
                         t.assetId = newAssetMap.get(paymentMethod);
                     } else {
                         maxAssetId++;
                         int newId = maxAssetId;
-                        AssetAccount newAsset = new AssetAccount(paymentMethod, 0.0, 0); // 默认类型0(资产)
+                        AssetAccount newAsset = new AssetAccount(paymentMethod, 0.0, 0);
                         newAsset.id = newId;
                         newAssetsToCreate.add(newAsset);
                         newAssetMap.put(paymentMethod, newId);
@@ -804,14 +870,20 @@ public class BackupManager {
                     t.assetId = matchedId;
                 }
 
-                t.category = "支付宝";
+                // 【修改】获取支付宝交易分类进行匹配
+                String rawCategory = (tradeCatIdx != -1) ? tokens.get(tradeCatIdx).trim() : "其它";
+                String[] matchedCat = matchOrCreateCategory(rawCategory, t.type, expCats, incCats, subCatMap);
+                t.category = matchedCat[0];
+                t.subCategory = matchedCat[1];
 
                 transactions.add(t);
             }
         }
-        return new BackupData(transactions, newAssetsToCreate);
+        BackupData data = new BackupData(transactions, newAssetsToCreate);
+        data.expenseCategories = expCats;
+        data.incomeCategories = incCats;
+        return data;
     }
-
     // ... (rest of the helper methods: restoreAssistantConfig, joinSet, splitSet, parseCsvLine, parseDoubleSafe, escapeCsv remain unchanged) ...
     private static void restoreAssistantConfig(Context context, BackupData.AssistantConfigData cd) {
         if (cd == null) return;

@@ -333,6 +333,14 @@ public class SettingsActivity extends AppCompatActivity {
                             newAssetCount = data.assets.size();
                         }
 
+                        // 【新增】：保存导入过程中可能新建的收支分类
+                        if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
+                            CategoryManager.saveExpenseCategories(this, data.expenseCategories);
+                        }
+                        if (data.incomeCategories != null && !data.incomeCategories.isEmpty()) {
+                            CategoryManager.saveIncomeCategories(this, data.incomeCategories);
+                        }
+
                         // 2. 再保存账单记录
                         if (data.records != null && !data.records.isEmpty()) {
                             for (Transaction t : data.records) {
@@ -376,6 +384,14 @@ public class SettingsActivity extends AppCompatActivity {
                                 financeViewModel.addAsset(a);
                             }
                             newAssetCount = data.assets.size();
+                        }
+
+                        // 【新增】：保存导入过程中可能新建的收支分类
+                        if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
+                            CategoryManager.saveExpenseCategories(this, data.expenseCategories);
+                        }
+                        if (data.incomeCategories != null && !data.incomeCategories.isEmpty()) {
+                            CategoryManager.saveIncomeCategories(this, data.incomeCategories);
                         }
 
                         // 2. 再保存账单记录
