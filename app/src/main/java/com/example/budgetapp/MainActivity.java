@@ -24,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
@@ -119,6 +120,10 @@ public class MainActivity extends AppCompatActivity {
         AppCompatDelegate.setDefaultNightMode(themeMode);
 
         super.onCreate(savedInstanceState);
+
+        // 【关键新增】允许内容延伸到状态栏和导航栏区域
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
         setContentView(R.layout.activity_main);
 
         financeViewModel = new ViewModelProvider(this).get(FinanceViewModel.class);

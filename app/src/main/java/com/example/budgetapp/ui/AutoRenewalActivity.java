@@ -11,7 +11,9 @@ import android.view.Window;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.budgetapp.R;
@@ -33,6 +35,14 @@ public class AutoRenewalActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setupImmersion(); // 实现状态栏与小白条沉浸
         setContentView(R.layout.activity_auto_renewal);
+
+        // 【新增】处理内边距，避让状态栏和底部小白条
+        View rootView = findViewById(android.R.id.content);
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, windowInsets) -> {
+            androidx.core.graphics.Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            return WindowInsetsCompat.CONSUMED;
+        });
 
         config = new AssistantConfig(this);
         rvRenewalList = findViewById(R.id.rv_renewal_list);
