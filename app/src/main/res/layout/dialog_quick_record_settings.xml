@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="300dp"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="@color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="选择快捷按钮行为"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:gravity="center"
+            android:layout_marginBottom="24dp"/>
+
+        <RadioGroup
+            android:id="@+id/rg_quick_record"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/rb_quick_default"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="进入账单详情页"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
+                android:layout_marginBottom="8dp"
+                android:buttonTint="?attr/colorPrimary"/>
+
+            <RadioButton
+                android:id="@+id/rb_quick_add"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="直接进入记一笔"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
+                android:buttonTint="?attr/colorPrimary"/>
+        </RadioGroup>
+
+        <Button
+            android:id="@+id/btn_cancel_quick_record"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="@color/input_bg"
+            android:text="取消"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="14sp"
+            app:cornerRadius="16dp" />
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

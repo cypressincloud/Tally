@@ -298,6 +298,9 @@ public class SettingsActivity extends AppCompatActivity {
             startActivity(new Intent(this, AutoRenewalActivity.class));
         });
 
+        // 新增：快捷按钮设置
+        findViewById(R.id.btn_quick_record_setting).setOnClickListener(v -> showQuickRecordSettingDialog());
+
         // 新增：点击进入密码与生物识别页面
         findViewById(R.id.btn_security_settings).setOnClickListener(v -> {
             startActivity(new Intent(this, SecuritySettingsActivity.class));
@@ -720,6 +723,51 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         view.findViewById(R.id.btn_cancel_display).setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
+    private void showQuickRecordSettingDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_quick_record_settings, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+
+        // 设置弹窗背景为透明，以便显示 CardView 的圆角
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        android.widget.RadioGroup rgQuickRecord = view.findViewById(R.id.rg_quick_record);
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        int currentMode = prefs.getInt("quick_record_mode", 0);
+
+        // 初始化选中状态
+        if (currentMode == 1) {
+            rgQuickRecord.check(R.id.rb_quick_add);
+        } else {
+            rgQuickRecord.check(R.id.rb_quick_default);
+        }
+
+        // 监听选项改变
+        rgQuickRecord.setOnCheckedChangeListener((group, checkedId) -> {
+            int selectedMode = 0;
+            String text = "进入账单详情页";
+
+            if (checkedId == R.id.rb_quick_add) {
+                selectedMode = 1;
+                text = "直接进入记一笔";
+            }
+
+            prefs.edit().putInt("quick_record_mode", selectedMode).apply();
+            Toast.makeText(this, "已设置为: " + text, Toast.LENGTH_SHORT).show();
+
+            // 延迟一点关闭，让用户能看到选中的反馈效果
+            view.postDelayed(dialog::dismiss, 200);
+        });
+
+        // 取消按钮点击事件
+        view.findViewById(R.id.btn_cancel_quick_record).setOnClickListener(v -> dialog.dismiss());
 
         dialog.show();
     }

@@ -161,7 +161,18 @@ public class RecordFragment extends Fragment {
             btnQuickRecord.setOnClickListener(v -> {
                 // 修改为清脆的 KEYBOARD_TAP
                 v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
-                showDateDetailDialog(LocalDate.now());
+
+                // 读取用户设置的快捷按钮模式
+                SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+                int quickMode = prefs.getInt("quick_record_mode", 0);
+
+                if (quickMode == 1) {
+                    // 模式 1：直接进入“记一笔”页面 (传入 null 代表新建账单，LocalDate.now() 为当天)
+                    showAddOrEditDialog(null, LocalDate.now());
+                } else {
+                    // 模式 0：进入账单详情列表 (默认)
+                    showDateDetailDialog(LocalDate.now());
+                }
             });
         }
 
