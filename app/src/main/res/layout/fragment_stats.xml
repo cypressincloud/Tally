@@ -237,6 +237,35 @@
                         android:lineSpacingExtra="6dp"/>
 
                     <View
+                        android:id="@+id/divider_income"
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#EEEEEE"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="12dp"
+                        android:visibility="gone"/>
+
+                    <TextView
+                        android:id="@+id/tv_income_summary_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="本周收入"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp"
+                        android:visibility="gone"/>
+
+                    <TextView
+                        android:id="@+id/tv_income_summary_content"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:lineSpacingExtra="6dp"
+                        android:visibility="gone"/>
+
+                    <View
                         android:id="@+id/divider_overtime"
                         android:layout_width="match_parent"
                         android:layout_height="1dp"

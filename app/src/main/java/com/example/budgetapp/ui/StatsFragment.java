@@ -121,6 +121,10 @@ public class StatsFragment extends Fragment {
     private View currentDetailHsvSubCategories;
     private List<Transaction> currentDetailBaseList;
 
+    private View dividerIncome;
+    private TextView tvIncomeSummaryTitle;
+    private TextView tvIncomeSummaryContent;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -162,6 +166,11 @@ public class StatsFragment extends Fragment {
         tvOvertimeContent = view.findViewById(R.id.tv_overtime_content);
         scrollView = view.findViewById(R.id.scroll_view_stats);
         touchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
+
+        dividerIncome = view.findViewById(R.id.divider_income);
+        tvIncomeSummaryTitle = view.findViewById(R.id.tv_income_summary_title);
+        tvIncomeSummaryContent = view.findViewById(R.id.tv_income_summary_content);
+
     }
 
     // ... (中间的 setupGestures, setupListeners, changeDate, updateDateRangeDisplay 等未修改方法省略，保持原样) ...
@@ -1159,7 +1168,7 @@ public class StatsFragment extends Fragment {
 
         double totalExpense = 0;
         for (Double val : expensePieMap.values()) totalExpense += val;
-        updateSummarySection(expensePieMap, totalExpense);
+        updateSummarySection(expensePieMap, totalExpense, incomePieMap, totalIncome); // 新调用，把收入数据也传进去
     }
 
     private void updateSinglePieChart(PieChart chart, Map<String, Double> pieMap) {
@@ -1233,7 +1242,8 @@ public class StatsFragment extends Fragment {
         chart.invalidate();
     }
 
-    private void updateSummarySection(Map<String, Double> pieMap, double totalAmount) {
+    // 更新方法签名，增加 incomePieMap 和 totalIncomeAmount 两个参数
+    private void updateSummarySection(Map<String, Double> pieMap, double totalAmount, Map<String, Double> incomePieMap, double totalIncomeAmount) {
         String scopeStr;
         if (currentMode == 0) scopeStr = "本年";
         else if (currentMode == 1) scopeStr = "本月";
@@ -1255,8 +1265,10 @@ public class StatsFragment extends Fragment {
 
         boolean hasOvertime = checkHasOvertime(startOfPeriod, endOfPeriod);
         boolean hasExpense = !pieMap.isEmpty() && totalAmount > 0;
+        boolean hasIncome = !incomePieMap.isEmpty() && totalIncomeAmount > 0; // 检查是否有收入
 
-        if (!hasExpense && !hasOvertime) {
+        // 如果三个数据都没有，隐藏整个总结面板
+        if (!hasExpense && !hasOvertime && !hasIncome) {
             if (layoutSummary != null) layoutSummary.setVisibility(View.GONE);
             return;
         }
@@ -1266,6 +1278,7 @@ public class StatsFragment extends Fragment {
         if (dividerOvertime != null) dividerOvertime.setVisibility(View.GONE);
         if (tvOvertimeContent != null) tvOvertimeContent.setVisibility(View.GONE);
 
+        // --- 原有的消费展示逻辑（保持不变）---
         if (!hasExpense) {
             tvSummaryContent.setText("暂无消费记录");
         } else {
@@ -1343,11 +1356,96 @@ public class StatsFragment extends Fragment {
             tvSummaryContent.setText(ssb);
         }
 
+        // --- 新增：收入展示逻辑 ---
+        if (hasIncome) {
+            if (dividerIncome != null) dividerIncome.setVisibility(View.VISIBLE);
+            if (tvIncomeSummaryTitle != null) {
+                tvIncomeSummaryTitle.setVisibility(View.VISIBLE);
+                tvIncomeSummaryTitle.setText(scopeStr + "收入");
+            }
+            if (tvIncomeSummaryContent != null) {
+                tvIncomeSummaryContent.setVisibility(View.VISIBLE);
+
+                List<Map.Entry<String, Double>> sortedIncome = new ArrayList<>(incomePieMap.entrySet());
+                Collections.sort(sortedIncome, (e1, e2) -> Double.compare(e2.getValue(), e1.getValue()));
+
+                SpannableStringBuilder incomeSsb = new SpannableStringBuilder();
+                String[] prefixes = {"最多是", "其次是", "然后是"};
+
+                int yellowColor = ContextCompat.getColor(requireContext(), R.color.app_yellow);
+                int greenColor = ContextCompat.getColor(requireContext(), R.color.expense_green);
+                int redColor = ContextCompat.getColor(requireContext(), R.color.income_red);
+
+                int count = Math.min(sortedIncome.size(), 3);
+                for (int i = 0; i < count; i++) {
+                    if (i > 0) incomeSsb.append("\n");
+
+                    Map.Entry<String, Double> e = sortedIncome.get(i);
+                    double percent = (e.getValue() / totalIncomeAmount) * 100;
+
+                    incomeSsb.append(prefixes[i]);
+
+                    int startCat = incomeSsb.length();
+                    incomeSsb.append(e.getKey());
+                    incomeSsb.setSpan(new ForegroundColorSpan(yellowColor), startCat, incomeSsb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+                    incomeSsb.append(", 占比");
+
+                    String percentStr = String.format(Locale.CHINA, "%.1f%%", percent);
+                    int startPer = incomeSsb.length();
+                    incomeSsb.append(percentStr);
+                    incomeSsb.setSpan(new ForegroundColorSpan(greenColor), startPer, incomeSsb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+                    incomeSsb.append(", 收入");
+
+                    String amountStr = String.format(Locale.CHINA, "%.2f", e.getValue());
+                    int startAmt = incomeSsb.length();
+                    incomeSsb.append(amountStr);
+                    incomeSsb.setSpan(new ForegroundColorSpan(redColor), startAmt, incomeSsb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+                    incomeSsb.append("元");
+                }
+
+                incomeSsb.append("\n共计收入");
+                String totalIncStr = String.format(Locale.CHINA, "%.2f", totalIncomeAmount);
+                int startTotal = incomeSsb.length();
+                incomeSsb.append(totalIncStr);
+                incomeSsb.setSpan(new ForegroundColorSpan(redColor), startTotal, incomeSsb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                incomeSsb.append("元"); // 结尾直接去掉日均计算
+
+                // ======== 新增：计算并显示本年/本月结余 ========
+                if (currentMode == 0 || currentMode == 1) {
+                    // 结余 = 总收入 - 总支出
+                    double balance = totalIncomeAmount - totalAmount;
+                    String balanceLabel = (currentMode == 0) ? ", 本年结余" : ", 本月结余";
+                    incomeSsb.append(balanceLabel);
+
+                    String balanceStr = String.format(Locale.CHINA, "%.2f", balance);
+                    int startBalance = incomeSsb.length();
+                    incomeSsb.append(balanceStr);
+
+                    // 结余为正用红色（收入色），为负用绿色（支出色），可以根据需要修改颜色
+                    int balanceColor = balance >= 0 ? redColor : greenColor;
+                    incomeSsb.setSpan(new ForegroundColorSpan(balanceColor), startBalance, incomeSsb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+                    incomeSsb.append("元");
+                }
+                // ======== 结束新增 ========
+
+                tvIncomeSummaryContent.setText(incomeSsb);
+            }
+        } else {
+            // 如果没有收入，隐藏相关的视图
+            if (dividerIncome != null) dividerIncome.setVisibility(View.GONE);
+            if (tvIncomeSummaryTitle != null) tvIncomeSummaryTitle.setVisibility(View.GONE);
+            if (tvIncomeSummaryContent != null) tvIncomeSummaryContent.setVisibility(View.GONE);
+        }
+
+        // --- 原有的加班逻辑（保持不变）---
         if (hasOvertime) {
             calculateAndShowOvertime(startOfPeriod, endOfPeriod, scopeStr);
         }
     }
-
     private boolean checkHasOvertime(LocalDate start, LocalDate end) {
         long startMillis = start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
         long endMillis = end.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();

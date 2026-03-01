@@ -40,7 +40,7 @@
         android:text="解 锁"
         android:textSize="18sp"
         android:padding="12dp"
-        android:textColor="@color/white"
+        android:textColor="@color/real_white"
         android:layout_marginBottom="24dp"/>
 
     <LinearLayout
