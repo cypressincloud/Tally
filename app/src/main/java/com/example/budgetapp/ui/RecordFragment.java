@@ -198,9 +198,13 @@ public class RecordFragment extends Fragment {
         int defaultMode = prefs.getInt("default_record_mode", 0);
         switchFilterMode(defaultMode);
 
-        recyclerView.setOnTouchListener((v, event) -> {
-            gestureDetector.onTouchEvent(event);
-            return false;
+        // 使用 addOnItemTouchListener 拦截事件，确保滑动事件优先被手势检测器捕获
+        // 并且如果判断为滑动，可以拦截掉点击事件，防止误触日期
+        recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+            @Override
+            public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
+                return gestureDetector.onTouchEvent(e);
+            }
         });
 
         if (tvMonthLabel != null) {
