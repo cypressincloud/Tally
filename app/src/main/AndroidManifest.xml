@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
+        android:name=".MyApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -56,6 +57,16 @@
             android:label="捐赠支持"
             android:theme="@style/Theme.BudgetApp"
             android:exported="false"/>
+
+        <activity
+            android:name=".ui.SecuritySettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"/>
+
+        <activity
+            android:name=".ui.AuthActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"/>
 
         <activity
             android:name=".ui.CategorySettingsActivity"

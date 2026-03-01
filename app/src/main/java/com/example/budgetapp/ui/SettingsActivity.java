@@ -298,6 +298,15 @@ public class SettingsActivity extends AppCompatActivity {
             startActivity(new Intent(this, AutoRenewalActivity.class));
         });
 
+        // 新增：点击进入密码与生物识别页面
+        findViewById(R.id.btn_security_settings).setOnClickListener(v -> {
+            startActivity(new Intent(this, SecuritySettingsActivity.class));
+        });
+
+        findViewById(R.id.btn_user_notice_settings).setOnClickListener(v -> {
+            startActivity(new Intent(this, UserNoticeActivity.class));
+        });
+
         // 极简模式逻辑
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         switchMinimalist = findViewById(R.id.switch_minimalist);
