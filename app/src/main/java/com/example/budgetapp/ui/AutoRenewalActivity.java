@@ -36,8 +36,8 @@ public class AutoRenewalActivity extends AppCompatActivity {
         setupImmersion(); // 实现状态栏与小白条沉浸
         setContentView(R.layout.activity_auto_renewal);
 
-        // 【新增】处理内边距，避让状态栏和底部小白条
-        View rootView = findViewById(android.R.id.content);
+        // 【修改】将内边距应用到 XML 根视图上，这样根视图的背景就能正常延伸到状态栏下方
+        View rootView = findViewById(R.id.root_layout);
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, windowInsets) -> {
             androidx.core.graphics.Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
