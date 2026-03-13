@@ -28,6 +28,9 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class YearCalendarActivity extends AppCompatActivity {
 
@@ -35,20 +38,25 @@ public class YearCalendarActivity extends AppCompatActivity {
     private RecyclerView rvYearList;
     private TextView tvTitle;
     private GestureDetector gestureDetector;
-    
+
     // 共享回收池
     private final RecyclerView.RecycledViewPool viewPool = new RecyclerView.RecycledViewPool();
 
-    // 手势拦截相关变量
     private float downX, downY;
-    private boolean isMoved; // 是否判定为滑动
-    private int touchSlop;   // 系统最小滑动距离阈值
+    private boolean isMoved;
+    private int touchSlop;
+    private boolean isAnimating = false;
+
+    // 【新增 1】年份数据缓存，使用 ConcurrentHashMap 保证多线程安全
+    private final Map<Integer, Map<Integer, Map<Integer, Double>>> yearStatsCache = new ConcurrentHashMap<>();
+
+    // 【新增 2】单线程池，专门用于后台去数据库捞数据，防止频繁 new Thread 造成资源浪费
+    private final ExecutorService dbExecutor = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 沉浸式状态栏
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
 
@@ -61,17 +69,14 @@ public class YearCalendarActivity extends AppCompatActivity {
             return WindowInsetsCompat.CONSUMED;
         });
 
-        // 获取系统认为的“滑动”最小距离
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
-
         currentYear = getIntent().getIntExtra("year", LocalDate.now().getYear());
 
         tvTitle = findViewById(R.id.tv_year_title);
         tvTitle.setText(String.valueOf(currentYear));
 
         rvYearList = findViewById(R.id.rv_year_list);
-        
-        // 禁止垂直滑动
+
         GridLayoutManager layoutManager = new GridLayoutManager(this, 3) {
             @Override
             public boolean canScrollVertically() {
@@ -79,26 +84,20 @@ public class YearCalendarActivity extends AppCompatActivity {
             }
         };
         rvYearList.setLayoutManager(layoutManager);
-        
-        // 禁用边缘回弹效果 & 优化性能
         rvYearList.setOverScrollMode(View.OVER_SCROLL_NEVER);
         rvYearList.setHasFixedSize(true);
         rvYearList.setNestedScrollingEnabled(false);
 
-        // 初始化手势识别
         initGestureDetector();
-        
-        // 注意：这里移除了 rvYearList.setOnTouchListener，改由 dispatchTouchEvent 全局接管
 
-        loadData();
+        // 首次加载当前年
+        loadData(0, currentYear);
     }
 
-    /**
-     * 重写事件分发，实现 滑动优先级 > 点击
-     */
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        // 1. 优先让 GestureDetector 处理（检测 Fling 切换年份）
+        if (isAnimating) return true;
+
         if (gestureDetector != null) {
             gestureDetector.onTouchEvent(ev);
         }
@@ -109,48 +108,33 @@ public class YearCalendarActivity extends AppCompatActivity {
                 downY = ev.getY();
                 isMoved = false;
                 break;
-
             case MotionEvent.ACTION_MOVE:
                 if (!isMoved) {
                     float dx = Math.abs(ev.getX() - downX);
                     float dy = Math.abs(ev.getY() - downY);
-                    // 如果移动距离超过系统阈值，判定为滑动意图
                     if (dx > touchSlop || dy > touchSlop) {
                         isMoved = true;
-                        // 发送 CANCEL 事件给子 View（如月份卡片），让它们取消按压状态
                         MotionEvent cancel = MotionEvent.obtain(ev);
                         cancel.setAction(MotionEvent.ACTION_CANCEL);
                         super.dispatchTouchEvent(cancel);
                         cancel.recycle();
-                        return true; // 拦截后续 MOVE 事件，不再传递给子 View
+                        return true;
                     }
                 } else {
-                    return true; // 已经判定为滑动，拦截所有 MOVE
+                    return true;
                 }
                 break;
-
             case MotionEvent.ACTION_UP:
-                if (isMoved) {
-                    // 如果是滑动操作，直接拦截 UP 事件
-                    // 这样子 View 就永远收不到 UP，也就不会触发 onClick
-                    return true; 
-                }
+                if (isMoved) return true;
                 break;
         }
-
-        // 如果不是滑动，正常分发事件（触发点击）
         return super.dispatchTouchEvent(ev);
     }
 
     private void initGestureDetector() {
         gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            private static final int SWIPE_THRESHOLD = 100;
-            private static final int SWIPE_VELOCITY_THRESHOLD = 100;
-
             @Override
-            public boolean onDown(MotionEvent e) {
-                return true; // 必须返回 true 才能接收后续事件
-            }
+            public boolean onDown(MotionEvent e) { return true; }
 
             @Override
             public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
@@ -159,19 +143,15 @@ public class YearCalendarActivity extends AppCompatActivity {
                 float diffX = e2.getX() - e1.getX();
                 float diffY = e2.getY() - e1.getY();
 
-                // 水平滑动判断
                 if (Math.abs(diffX) > Math.abs(diffY) &&
-                        Math.abs(diffX) > SWIPE_THRESHOLD &&
-                        Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
-                    
+                        Math.abs(diffX) > 100 && Math.abs(velocityX) > 100) {
                     if (diffX > 0) {
-                        // 向右滑 -> 上一年
                         currentYear--;
+                        updateYearDisplay(-1);
                     } else {
-                        // 向左滑 -> 下一年
                         currentYear++;
+                        updateYearDisplay(1);
                     }
-                    updateYearDisplay();
                     return true;
                 }
                 return false;
@@ -179,48 +159,125 @@ public class YearCalendarActivity extends AppCompatActivity {
         });
     }
 
-    private void updateYearDisplay() {
+    private void updateYearDisplay(int direction) {
         tvTitle.setText(String.valueOf(currentYear));
-        loadData();
+        if (direction != 0 && rvYearList.getWidth() > 0) {
+            isAnimating = true;
+            rvYearList.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            int screenWidth = rvYearList.getWidth();
+
+            // 旧数据滑出屏幕
+            rvYearList.animate()
+                    .translationX(direction == 1 ? -screenWidth : screenWidth)
+                    .alpha(0f)
+                    .setDuration(150)
+                    .withEndAction(() -> {
+                        // 动画结束后，去加载/读取新一年的数据
+                        loadData(direction, currentYear);
+                    })
+                    .start();
+        } else {
+            loadData(0, currentYear);
+        }
     }
 
-    private void loadData() {
-        new Thread(() -> {
-            ZoneId zoneId = ZoneId.systemDefault();
-            long start = LocalDate.of(currentYear, 1, 1).atStartOfDay(zoneId).toInstant().toEpochMilli();
-            long end = LocalDate.of(currentYear, 12, 31).atTime(LocalTime.MAX).atZone(zoneId).toInstant().toEpochMilli();
-
-            TransactionDao dao = AppDatabase.getDatabase(this).transactionDao();
-            List<Transaction> transactions = dao.getTransactionsByRange(start, end);
-
-            Map<Integer, Map<Integer, Double>> stats = new HashMap<>();
-
-            for (Transaction t : transactions) {
-                LocalDate date = Instant.ofEpochMilli(t.date).atZone(zoneId).toLocalDate();
-                int month = date.getMonthValue();
-                int day = date.getDayOfMonth();
-
-                if (!stats.containsKey(month)) {
-                    stats.put(month, new HashMap<>());
-                }
-                Map<Integer, Double> monthMap = stats.get(month);
-
-                double amount = (t.type == 1) ? t.amount : -t.amount;
-                monthMap.put(day, monthMap.getOrDefault(day, 0.0) + amount);
-            }
-
-            runOnUiThread(() -> {
-                // 传入 viewPool
-                YearCalendarAdapter adapter = new YearCalendarAdapter(currentYear, stats, viewPool);
-                adapter.setOnMonthClickListener((year, month) -> {
-                    Intent resultIntent = new Intent();
-                    resultIntent.putExtra("year", year);
-                    resultIntent.putExtra("month", month);
-                    setResult(RESULT_OK, resultIntent);
-                    finish();
+    // 【修改】核心逻辑：先读缓存，没缓存再查数据库，最后执行预加载
+    private void loadData(int direction, int targetYear) {
+        if (yearStatsCache.containsKey(targetYear)) {
+            // 缓存命中：直接在主线程渲染，无需等待数据库！
+            renderData(direction, targetYear, yearStatsCache.get(targetYear));
+            prefetchAdjacentYears(targetYear);
+        } else {
+            // 缓存未命中：交由线程池去数据库查询
+            dbExecutor.execute(() -> {
+                Map<Integer, Map<Integer, Double>> stats = fetchYearStatsFromDb(targetYear);
+                // 存入缓存
+                yearStatsCache.put(targetYear, stats);
+                runOnUiThread(() -> {
+                    renderData(direction, targetYear, stats);
+                    prefetchAdjacentYears(targetYear);
                 });
-                rvYearList.setAdapter(adapter);
             });
-        }).start();
+        }
+    }
+
+    // 【新增】纯粹的数据库查询逻辑抽离
+    private Map<Integer, Map<Integer, Double>> fetchYearStatsFromDb(int year) {
+        ZoneId zoneId = ZoneId.systemDefault();
+        long start = LocalDate.of(year, 1, 1).atStartOfDay(zoneId).toInstant().toEpochMilli();
+        long end = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX).atZone(zoneId).toInstant().toEpochMilli();
+
+        TransactionDao dao = AppDatabase.getDatabase(this).transactionDao();
+        List<Transaction> transactions = dao.getTransactionsByRange(start, end);
+
+        Map<Integer, Map<Integer, Double>> stats = new HashMap<>();
+        for (Transaction t : transactions) {
+            LocalDate date = Instant.ofEpochMilli(t.date).atZone(zoneId).toLocalDate();
+            int month = date.getMonthValue();
+            int day = date.getDayOfMonth();
+
+            if (!stats.containsKey(month)) {
+                stats.put(month, new HashMap<>());
+            }
+            Map<Integer, Double> monthMap = stats.get(month);
+
+            double amount = (t.type == 1) ? t.amount : -t.amount;
+            monthMap.put(day, monthMap.getOrDefault(day, 0.0) + amount);
+        }
+        return stats;
+    }
+
+    // 【新增】后台静默预加载相邻年份（上一年、下一年）
+    private void prefetchAdjacentYears(int centerYear) {
+        dbExecutor.execute(() -> {
+            if (!yearStatsCache.containsKey(centerYear - 1)) {
+                yearStatsCache.put(centerYear - 1, fetchYearStatsFromDb(centerYear - 1));
+            }
+            if (!yearStatsCache.containsKey(centerYear + 1)) {
+                yearStatsCache.put(centerYear + 1, fetchYearStatsFromDb(centerYear + 1));
+            }
+        });
+    }
+
+    // 【抽离】将数据渲染并推入屏幕的 UI 动画逻辑单独拿出来
+    private void renderData(int direction, int year, Map<Integer, Map<Integer, Double>> stats) {
+        YearCalendarAdapter adapter = new YearCalendarAdapter(year, stats, viewPool);
+        adapter.setOnMonthClickListener((y, m) -> {
+            Intent resultIntent = new Intent();
+            resultIntent.putExtra("year", y);
+            resultIntent.putExtra("month", m);
+            setResult(RESULT_OK, resultIntent);
+            finish();
+        });
+
+        rvYearList.setAdapter(adapter);
+
+        if (direction != 0) {
+            int screenWidth = rvYearList.getWidth();
+            rvYearList.setTranslationX(direction == 1 ? screenWidth : -screenWidth);
+
+            rvYearList.post(() -> {
+                rvYearList.animate()
+                        .translationX(0)
+                        .alpha(1f)
+                        .setDuration(200)
+                        .withEndAction(() -> {
+                            rvYearList.setLayerType(View.LAYER_TYPE_NONE, null);
+                            isAnimating = false;
+                        })
+                        .start();
+            });
+        } else {
+            isAnimating = false;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Activity 销毁时释放线程池资源
+        if (!dbExecutor.isShutdown()) {
+            dbExecutor.shutdownNow();
+        }
     }
 }
