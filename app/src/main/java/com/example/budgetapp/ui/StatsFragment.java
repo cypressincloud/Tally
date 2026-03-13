@@ -121,6 +121,8 @@ public class StatsFragment extends Fragment {
     private View currentDetailHsvSubCategories;
     private List<Transaction> currentDetailBaseList;
 
+    // --- 新增：用于显示分类/二级分类的汇总金额 ---
+    private TextView currentDetailSummaryTextView;
     private View dividerIncome;
     private TextView tvIncomeSummaryTitle;
     private TextView tvIncomeSummaryContent;
@@ -206,6 +208,9 @@ public class StatsFragment extends Fragment {
 
         currentCategoryDetailDialog = dialog;
 
+        // --- 新增：绑定汇总 TextView ---
+        currentDetailSummaryTextView = dialogView.findViewById(R.id.tv_dialog_summary);
+
         TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
         String typeStr = (type == 1) ? "收入" : "消费";
         tvTitle.setText(dateRangeStr + " " + category + " - " + typeStr + "清单");
@@ -244,6 +249,9 @@ public class StatsFragment extends Fragment {
             currentDetailChipGroup = null;
             currentDetailHsvSubCategories = null;
             currentDetailBaseList = null;
+
+            // --- 新增：清空引用 ---
+            currentDetailSummaryTextView = null;
         });
 
         dialog.show();
@@ -392,6 +400,39 @@ public class StatsFragment extends Fragment {
         }
 
         currentCategoryDetailAdapter.setTransactions(filteredList);
+
+        // ================= 新增：动态计算并更新汇总金额 =================
+        if (currentDetailSummaryTextView != null) {
+            double totalAmount = 0;
+            for (Transaction t : filteredList) {
+                totalAmount += t.amount;
+            }
+
+            if (filteredList.isEmpty() && totalAmount == 0) {
+                currentDetailSummaryTextView.setVisibility(View.GONE);
+            } else {
+                currentDetailSummaryTextView.setVisibility(View.VISIBLE);
+                SpannableStringBuilder ssb = new SpannableStringBuilder();
+
+                if (currentDetailType == 0) { // 支出
+                    int colorExpense = ContextCompat.getColor(requireContext(), R.color.expense_green);
+                    String expStr = String.format(Locale.CHINA, "支出: %.2f", totalAmount);
+                    int start = ssb.length();
+                    ssb.append(expStr);
+                    ssb.setSpan(new ForegroundColorSpan(colorExpense), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                } else { // 收入
+                    int colorIncome = ContextCompat.getColor(requireContext(), R.color.income_red);
+                    String incStr = String.format(Locale.CHINA, "收入: %.2f", totalAmount);
+                    int start = ssb.length();
+                    ssb.append(incStr);
+                    ssb.setSpan(new ForegroundColorSpan(colorIncome), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
+
+                currentDetailSummaryTextView.setText(ssb);
+            }
+        }
+        // ==========================================================
+
     }
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
         if (getContext() == null) return;
@@ -741,6 +782,19 @@ public class StatsFragment extends Fragment {
                 dialog.dismiss();
             }
         });
+
+        // ========== 新增：弹窗关闭时强制回收软键盘 ==========
+        dialog.setOnDismissListener(d -> {
+            if (getContext() != null) {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                // 确保视图和 Token 不为空，执行强制隐藏
+                if (imm != null && dialogView != null && dialogView.getWindowToken() != null) {
+                    imm.hideSoftInputFromWindow(dialogView.getWindowToken(), 0);
+                }
+            }
+        });
+        // ===================================================
+
         dialog.show();
     }
 

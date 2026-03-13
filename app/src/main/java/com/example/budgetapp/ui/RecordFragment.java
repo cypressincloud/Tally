@@ -19,12 +19,13 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.NumberPicker;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
@@ -34,12 +35,10 @@ import android.widget.Toast;
 import com.example.budgetapp.database.RenewalItem;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import android.view.ContextThemeWrapper;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
@@ -56,9 +55,6 @@ import com.example.budgetapp.util.CategoryManager;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.datepicker.MaterialDatePicker;
-import com.google.android.material.timepicker.MaterialTimePicker;
-import com.google.android.material.timepicker.TimeFormat;
 
 import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
@@ -70,7 +66,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -88,6 +83,9 @@ public class RecordFragment extends Fragment {
 
     private TextView tvIncome, tvExpense, tvBalance, tvOvertime;
     private LinearLayout layoutIncome, layoutExpense, layoutBalance, layoutOvertime;
+
+    // 提取全局 RecyclerView 以便执行动画
+    private RecyclerView calendarRecycler;
 
     private List<AssetAccount> cachedAssets = new ArrayList<>();
     private TransactionListAdapter currentDetailAdapter;
@@ -113,7 +111,7 @@ public class RecordFragment extends Fragment {
                         int month = result.getData().getIntExtra("month", -1);
                         if (year != -1 && month != -1) {
                             currentMonth = YearMonth.of(year, month);
-                            updateCalendar();
+                            updateCalendar(0);
                         }
                     }
                 }
@@ -124,7 +122,7 @@ public class RecordFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_record, container, false);
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
-        assistantConfig = new AssistantConfig(requireContext()); // 初始化配置类
+        assistantConfig = new AssistantConfig(requireContext());
 
         if (currentMonth == null) {
             currentMonth = YearMonth.now();
@@ -159,30 +157,24 @@ public class RecordFragment extends Fragment {
         FloatingActionButton btnQuickRecord = view.findViewById(R.id.btn_quick_record);
         if (btnQuickRecord != null) {
             btnQuickRecord.setOnClickListener(v -> {
-                // 修改为清脆的 KEYBOARD_TAP
                 v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
-
-                // 读取用户设置的快捷按钮模式
                 SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
                 int quickMode = prefs.getInt("quick_record_mode", 0);
-
                 if (quickMode == 1) {
-                    // 模式 1：直接进入“记一笔”页面 (传入 null 代表新建账单，LocalDate.now() 为当天)
                     showAddOrEditDialog(null, LocalDate.now());
                 } else {
-                    // 模式 0：进入账单详情列表 (默认)
                     showDateDetailDialog(LocalDate.now());
                 }
             });
         }
 
-        RecyclerView recyclerView = view.findViewById(R.id.calendar_recycler);
+        calendarRecycler = view.findViewById(R.id.calendar_recycler);
         GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 7) {
             @Override
             public boolean canScrollVertically() { return false; }
         };
-        recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        calendarRecycler.setLayoutManager(layoutManager);
+        calendarRecycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         adapter = new CalendarAdapter(date -> {
             if (date.equals(selectedDate)) {
@@ -192,15 +184,13 @@ public class RecordFragment extends Fragment {
                 adapter.setSelectedDate(date);
             }
         });
-        recyclerView.setAdapter(adapter);
+        calendarRecycler.setAdapter(adapter);
 
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         int defaultMode = prefs.getInt("default_record_mode", 0);
         switchFilterMode(defaultMode);
 
-        // 使用 addOnItemTouchListener 拦截事件，确保滑动事件优先被手势检测器捕获
-        // 并且如果判断为滑动，可以拦截掉点击事件，防止误触日期
-        recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+        calendarRecycler.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
             @Override
             public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
                 return gestureDetector.onTouchEvent(e);
@@ -225,26 +215,22 @@ public class RecordFragment extends Fragment {
         layoutOvertime.setOnClickListener(v -> switchFilterMode(3));
 
         tvMonthTitle.setOnClickListener(v -> {
-            // 修改为清脆的 KEYBOARD_TAP
             v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
             showCustomDatePicker();
         });
 
+        // 按钮切换年份，并加入动画方向
         view.findViewById(R.id.btn_prev_month).setOnClickListener(v -> {
             currentMonth = currentMonth.minusYears(1);
-            updateCalendar();
+            updateCalendar(-1);
         });
         view.findViewById(R.id.btn_next_month).setOnClickListener(v -> {
             currentMonth = currentMonth.plusYears(1);
-            updateCalendar();
+            updateCalendar(1);
         });
 
-        // 确保实时观察所有交易记录，包含自动生成的账单
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
-            // 强制刷新日历统计
-            updateCalendar();
-
-            // 如果当前打开了详情对话框，需要实时刷新对话框内部的列表适配器和顶部统计文本
+            updateCalendar(0); // 数据刷新不播放滑动动画
             if (currentDetailDialog != null && currentDetailDialog.isShowing() && selectedDate != null) {
                 updateDetailDialogData(selectedDate);
             }
@@ -259,9 +245,10 @@ public class RecordFragment extends Fragment {
             }
         });
 
-        updateCalendar();
+        updateCalendar(0);
         return view;
     }
+
     @Override
     public void onResume() {
         super.onResume();
@@ -274,23 +261,20 @@ public class RecordFragment extends Fragment {
                 btnSettings.setVisibility(isMinimalist ? View.GONE : View.VISIBLE);
             }
         }
-        // 检查并执行自动扣费
         checkAutoRenewalDeduction();
     }
 
     private void checkAutoRenewalDeduction() {
-        List<RenewalItem> renewalList = assistantConfig.getRenewalList(); // 获取多项续费列表
+        List<RenewalItem> renewalList = assistantConfig.getRenewalList();
         if (renewalList.isEmpty()) return;
 
         LocalDate today = LocalDate.now();
         String todayStr = today.toString();
         String lastCheckDate = assistantConfig.getLastRenewalDate();
 
-        // 防止当日重复执行
         if (todayStr.equals(lastCheckDate)) return;
 
         int defaultAssetId = assistantConfig.getDefaultAssetId();
-        boolean hasExecuted = false;
 
         for (RenewalItem item : renewalList) {
             boolean shouldDeduct = false;
@@ -302,11 +286,9 @@ public class RecordFragment extends Fragment {
 
             if (shouldDeduct) {
                 executeAutoDeduction(item, defaultAssetId, todayStr);
-                hasExecuted = true;
             }
         }
 
-        // 标记今日已完成扣费检查
         assistantConfig.setLastRenewalDate(todayStr);
     }
 
@@ -320,7 +302,6 @@ public class RecordFragment extends Fragment {
 
         viewModel.addTransaction(t);
 
-        // 如果关联了资产，更新资产/负债余额
         if (t.assetId != 0) {
             viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
                 if (assets != null) {
@@ -328,7 +309,7 @@ public class RecordFragment extends Fragment {
                         if (a.id == t.assetId) {
                             if (a.type == 0) {
                                 a.amount -= amount;
-                            } else if (a.type == 1) { // 若关联信用卡等负债，自动扣费属于支出，负债增加
+                            } else if (a.type == 1) {
                                 a.amount += amount;
                             }
                             viewModel.updateAsset(a);
@@ -338,7 +319,6 @@ public class RecordFragment extends Fragment {
                 }
             });
         }
-
         Toast.makeText(getContext(), "已自动扣除: " + object, Toast.LENGTH_SHORT).show();
     }
 
@@ -384,9 +364,7 @@ public class RecordFragment extends Fragment {
         npDay.setValue(curDay);
 
         NumberPicker.OnValueChangeListener dateChangeListener = (picker, oldVal, newVal) -> {
-            // 新增：在数值发生变化（即滚动）时触发清脆的滴答振动
             picker.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
-
             int y = npYear.getValue();
             int m = npMonth.getValue();
             int newMaxDays = YearMonth.of(y, m).lengthOfMonth();
@@ -414,15 +392,15 @@ public class RecordFragment extends Fragment {
 
             currentMonth = YearMonth.of(year, month);
             selectedDate = LocalDate.of(year, month, day);
-            updateCalendar();
+            updateCalendar(0);
 
             adapter.setSelectedDate(selectedDate);
-
             dialog.dismiss();
         });
 
         dialog.show();
     }
+
     private void updatePreviewText(TextView tv, int year, int month, int day) {
         if (tv == null) return;
         try {
@@ -452,10 +430,11 @@ public class RecordFragment extends Fragment {
 
                     if (diffX > 0) {
                         currentMonth = currentMonth.minusMonths(1);
+                        updateCalendar(-1); // 从左侧滑入
                     } else {
                         currentMonth = currentMonth.plusMonths(1);
+                        updateCalendar(1);  // 从右侧滑入
                     }
-                    updateCalendar();
                     return true;
                 }
                 return false;
@@ -467,7 +446,8 @@ public class RecordFragment extends Fragment {
         adapter.setFilterMode(mode);
     }
 
-    private void updateCalendar() {
+    // 更新日历，带有方向参数：-1 左滑入，1 右滑入，0 不执行动画
+    private void updateCalendar(int direction) {
         tvMonthTitle.setText(currentMonth.format(DateTimeFormatter.ofPattern("yyyy")));
         if (tvMonthLabel != null) {
             tvMonthLabel.setText(currentMonth.getMonthValue() + "月");
@@ -491,9 +471,7 @@ public class RecordFragment extends Fragment {
         List<Transaction> allList = viewModel.getAllTransactions().getValue();
         List<Transaction> currentList = allList != null ? allList : new ArrayList<>();
 
-        // 核心修改：将续费项目列表同步给日历适配器，用于渲染红框标识
         adapter.setRenewalItems(assistantConfig.getRenewalList());
-
         adapter.setCurrentMonth(currentMonth);
         adapter.updateData(days, currentList);
 
@@ -502,6 +480,17 @@ public class RecordFragment extends Fragment {
         }
 
         calculateMonthTotals(currentList);
+
+        // 执行平滑动画
+        if (getContext() != null && calendarRecycler != null) {
+            if (direction == 1) {
+                Animation anim = AnimationUtils.loadAnimation(getContext(), R.anim.slide_in_right);
+                calendarRecycler.startAnimation(anim);
+            } else if (direction == -1) {
+                Animation anim = AnimationUtils.loadAnimation(getContext(), R.anim.slide_in_left);
+                calendarRecycler.startAnimation(anim);
+            }
+        }
     }
 
     private void calculateMonthTotals(List<Transaction> transactions) {
@@ -539,7 +528,6 @@ public class RecordFragment extends Fragment {
         AlertDialog dialog = builder.create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 
-        // 保存当前的 Dialog 实例
         currentDetailDialog = dialog;
 
         TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
@@ -547,14 +535,12 @@ public class RecordFragment extends Fragment {
             tvTitle.setText(date.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.CHINA)));
         }
 
-        // 缓存当前的 Summary TextView
         currentDetailSummaryTextView = dialogView.findViewById(R.id.tv_dialog_summary);
 
         RecyclerView rvList = dialogView.findViewById(R.id.rv_detail_list);
         rvList.setLayoutManager(new LinearLayoutManager(getContext()));
 
         TransactionListAdapter listAdapter = new TransactionListAdapter(transaction -> {
-            // 如果是预览账单，点击提示不可编辑
             if ("PREVIEW_BILL".equals(transaction.remark)) {
                 Toast.makeText(getContext(), "待扣费账单：到达日期后将自动执行", Toast.LENGTH_SHORT).show();
                 return;
@@ -567,7 +553,6 @@ public class RecordFragment extends Fragment {
         currentDetailAdapter = listAdapter;
         rvList.setAdapter(listAdapter);
 
-        // 调用新抽离的方法，首次加载数据
         updateDetailDialogData(date);
 
         dialogView.findViewById(R.id.btn_add_transaction).setOnClickListener(v -> showAddOrEditDialog(null, date));
@@ -581,7 +566,6 @@ public class RecordFragment extends Fragment {
         dialog.show();
     }
 
-    // 新增：专用于刷新弹窗内部列表与汇总文字的方法
     private void updateDetailDialogData(LocalDate date) {
         if (currentDetailAdapter == null) return;
         List<Transaction> all = viewModel.getAllTransactions().getValue();
@@ -670,6 +654,7 @@ public class RecordFragment extends Fragment {
         }
         currentDetailAdapter.setTransactions(dayList);
     }
+
     private void showOvertimeDialog(LocalDate date) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View view = getLayoutInflater().inflate(R.layout.dialog_add_overtime, null);
@@ -683,7 +668,6 @@ public class RecordFragment extends Fragment {
         Button btnSave = view.findViewById(R.id.btn_save_overtime);
         Button btnCancel = view.findViewById(R.id.btn_cancel_overtime);
 
-        // 自动填充时薪
         AssistantConfig config = new AssistantConfig(requireContext());
         float defaultRate = 0f;
         DayOfWeek day = date.getDayOfWeek();
@@ -729,6 +713,16 @@ public class RecordFragment extends Fragment {
         });
 
         btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.setOnDismissListener(d -> {
+            if (getContext() != null) {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null && view != null && view.getWindowToken() != null) {
+                    imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                }
+            }
+        });
+
         dialog.show();
     }
 
@@ -748,7 +742,6 @@ public class RecordFragment extends Fragment {
         }
     }
 
-    // 覆写 showAddOrEditDialog 方法
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
         if (getContext() == null) return;
 
@@ -887,15 +880,11 @@ public class RecordFragment extends Fragment {
         List<String> expenseCategories = CategoryManager.getExpenseCategories(getContext());
         List<String> incomeCategories = CategoryManager.getIncomeCategories(getContext());
 
-        // 动态判断：如果是详细分类，则使用弹性流式布局；否则恢复 5 列网格布局
         boolean isDetailed = com.example.budgetapp.util.CategoryManager.isDetailedCategoryEnabled(getContext());
         if (isDetailed) {
             com.google.android.flexbox.FlexboxLayoutManager flexboxLayoutManager = new com.google.android.flexbox.FlexboxLayoutManager(getContext());
-            // 设置自然换行
             flexboxLayoutManager.setFlexWrap(com.google.android.flexbox.FlexWrap.WRAP);
-            // 设置主轴方向为水平
             flexboxLayoutManager.setFlexDirection(com.google.android.flexbox.FlexDirection.ROW);
-            // 设置左对齐
             flexboxLayoutManager.setJustifyContent(com.google.android.flexbox.JustifyContent.FLEX_START);
 
             rvCategory.setLayoutManager(flexboxLayoutManager);
@@ -1009,7 +998,7 @@ public class RecordFragment extends Fragment {
         boolean isAssetEnabled = config.isAssetsEnabled();
 
         List<AssetAccount> assetList = new ArrayList<>();
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner_dropdown);
+        ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner_dropdown);
 
         if (isAssetEnabled) {
             spAsset.setVisibility(View.VISIBLE);
@@ -1017,24 +1006,23 @@ public class RecordFragment extends Fragment {
             noAsset.id = 0;
             assetList.add(noAsset);
 
-            adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
-            spAsset.setAdapter(adapter);
+            arrayAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+            spAsset.setAdapter(arrayAdapter);
 
             viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
                 assetList.clear();
                 assetList.add(noAsset);
                 if (assets != null) {
                     for (AssetAccount a : assets) {
-                        // 【修改】包含资产(0)和负债(1)
                         if (a.type == 0 || a.type == 1) {
                             assetList.add(a);
                         }
                     }
                 }
                 List<String> names = assetList.stream().map(a -> a.name).collect(Collectors.toList());
-                adapter.clear();
-                adapter.addAll(names);
-                adapter.notifyDataSetChanged();
+                arrayAdapter.clear();
+                arrayAdapter.addAll(names);
+                arrayAdapter.notifyDataSetChanged();
 
                 if (existingTransaction != null && existingTransaction.assetId != 0) {
                     for (int i = 0; i < assetList.size(); i++) {
@@ -1197,13 +1185,12 @@ public class RecordFragment extends Fragment {
                     if (selectedAssetId != 0) {
                         for (AssetAccount asset : assetList) {
                             if (asset.id == selectedAssetId) {
-                                // 【修改】处理资产与负债的增减逻辑
-                                if (asset.type == 0) { // 资产
+                                if (asset.type == 0) {
                                     if (type == 1) asset.amount += amount;
                                     else asset.amount -= amount;
-                                } else if (asset.type == 1) { // 负债
-                                    if (type == 1) asset.amount -= amount; // 收入还款，负债降低
-                                    else asset.amount += amount; // 支出刷卡，负债增加
+                                } else if (asset.type == 1) {
+                                    if (type == 1) asset.amount -= amount;
+                                    else asset.amount += amount;
                                 }
                                 viewModel.updateAsset(asset);
                                 break;
@@ -1222,9 +1209,19 @@ public class RecordFragment extends Fragment {
                 dialog.dismiss();
             }
         });
+
+        dialog.setOnDismissListener(d -> {
+            if (getContext() != null) {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null && dialogView != null && dialogView.getWindowToken() != null) {
+                    imm.hideSoftInputFromWindow(dialogView.getWindowToken(), 0);
+                }
+            }
+        });
+
         dialog.show();
     }
-    // 新增：显示大图的 Dialog
+
     private void showPhotoDialog(String uriStr) {
         if (getContext() == null || uriStr == null) return;
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
@@ -1239,9 +1236,8 @@ public class RecordFragment extends Fragment {
             Toast.makeText(getContext(), "无法加载图片", Toast.LENGTH_SHORT).show();
         }
     }
-    // 在 showCurrencySelectDialog 方法中，直接调用工具类：
+
     private void showCurrencySelectDialog(Button btn) {
-        // 传入 false，因为 Fragment 依附于 Activity，不是 Overlay
         com.example.budgetapp.util.CurrencyUtils.showCurrencyDialog(getContext(), btn, false);
     }
 
@@ -1260,25 +1256,24 @@ public class RecordFragment extends Fragment {
         AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
         noAsset.id = 0;
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), R.layout.item_spinner_dropdown);
-        adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
-        spRevokeAsset.setAdapter(adapter);
+        ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(requireContext(), R.layout.item_spinner_dropdown);
+        arrayAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spRevokeAsset.setAdapter(arrayAdapter);
 
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             assetList.clear();
             assetList.add(noAsset);
             if (assets != null) {
                 for (AssetAccount a : assets) {
-                    // 【修改】同时包含资产和负债
                     if (a.type == 0 || a.type == 1) {
                         assetList.add(a);
                     }
                 }
             }
             List<String> names = assetList.stream().map(a -> a.name).collect(Collectors.toList());
-            adapter.clear();
-            adapter.addAll(names);
-            adapter.notifyDataSetChanged();
+            arrayAdapter.clear();
+            arrayAdapter.addAll(names);
+            arrayAdapter.notifyDataSetChanged();
 
             int targetIndex = 0;
             if (transaction.assetId != 0) {
@@ -1299,19 +1294,14 @@ public class RecordFragment extends Fragment {
             if (selectedPos >= 0 && selectedPos < assetList.size()) {
                 AssetAccount selectedAsset = assetList.get(selectedPos);
 
-                // 1. 执行数据库撤回操作
                 viewModel.revokeTransaction(transaction, selectedAsset.id);
 
-                // 2. 如果有照片，删除物理文件
                 if (transaction.photoPath != null && !transaction.photoPath.isEmpty()) {
                     try {
                         Uri uri = Uri.parse(transaction.photoPath);
                         DocumentFile file = DocumentFile.fromSingleUri(requireContext(), uri);
                         if (file != null && file.exists()) {
-                            boolean deleted = file.delete();
-                            if (!deleted) {
-                                // 如果删除失败，可以打日志
-                            }
+                            file.delete();
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -1329,6 +1319,7 @@ public class RecordFragment extends Fragment {
 
         revokeDialog.show();
     }
+
     private static class DecimalDigitsInputFilter implements InputFilter {
         private final Pattern mPattern;
         public DecimalDigitsInputFilter(int digitsAfterZero) {
