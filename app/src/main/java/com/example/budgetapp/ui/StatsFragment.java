@@ -979,8 +979,30 @@ public class StatsFragment extends Fragment {
         if (currentMode == 0) selectedDate = selectedDate.plusYears(offset);
         else if (currentMode == 1) selectedDate = selectedDate.plusMonths(offset);
         else selectedDate = selectedDate.plusWeeks(offset);
+
+        // 先同步更新顶部文字和下方图表数据
         updateDateRangeDisplay();
         refreshData();
+
+        // ================= 新增：仅对数据区块执行平滑动画 =================
+        if (getContext() != null) {
+            // 判断动画滑入方向
+            int animResId = (offset == 1) ? R.anim.slide_in_right : R.anim.slide_in_left;
+            android.view.animation.Animation anim = android.view.animation.AnimationUtils.loadAnimation(getContext(), animResId);
+
+            // 分别对三大块数据区域（折线图区、饼图区、文字总结区）应用动画
+            // 这样不管你的 scrollView 结构如何，顶部的年月日控件都绝对不会跟着滑动
+            if (layoutTrend != null && layoutTrend.getVisibility() == View.VISIBLE) {
+                layoutTrend.startAnimation(anim);
+            }
+            if (layoutExpense != null && layoutExpense.getVisibility() == View.VISIBLE) {
+                layoutExpense.startAnimation(anim);
+            }
+            if (layoutSummary != null && layoutSummary.getVisibility() == View.VISIBLE) {
+                layoutSummary.startAnimation(anim);
+            }
+        }
+        // ==============================================================================
     }
 
     private void updateDateRangeDisplay() {
