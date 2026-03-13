@@ -68,6 +68,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import android.widget.NumberPicker;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+
 public class DetailsFragment extends Fragment {
 
     private FinanceViewModel viewModel; // 统一名称以对齐记账模块
@@ -101,6 +104,13 @@ public class DetailsFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_details, container, false);
 
         tvDateRange = view.findViewById(R.id.tv_current_date_range);
+
+        // 🌟 新增：绑定点击事件，唤出自定义日期选择器
+        tvDateRange.setOnClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            showCustomDatePicker();
+        });
+
         RadioGroup rgTimeMode = view.findViewById(R.id.rg_time_mode);
         ImageButton btnPrev = view.findViewById(R.id.btn_prev);
         ImageButton btnNext = view.findViewById(R.id.btn_next);
@@ -207,19 +217,136 @@ public class DetailsFragment extends Fragment {
         }
     }
 
+    /**
+     * 唤出底部日期选择器
+     */
+    private void showCustomDatePicker() {
+        if (getContext() == null) return;
+
+        final BottomSheetDialog dialog = new BottomSheetDialog(getContext());
+        dialog.setContentView(R.layout.dialog_bottom_date_picker);
+
+        // 设置透明背景以显示圆角
+        dialog.setOnShowListener(dialogInterface -> {
+            BottomSheetDialog bottomSheetDialog = (BottomSheetDialog) dialogInterface;
+            View bottomSheet = bottomSheetDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                bottomSheet.setBackgroundResource(android.R.color.transparent);
+            }
+        });
+
+        NumberPicker npYear = dialog.findViewById(R.id.np_year);
+        NumberPicker npMonth = dialog.findViewById(R.id.np_month);
+        NumberPicker npDay = dialog.findViewById(R.id.np_day);
+        TextView tvPreview = dialog.findViewById(R.id.tv_date_preview);
+        Button btnCancel = dialog.findViewById(R.id.btn_cancel);
+        Button btnConfirm = dialog.findViewById(R.id.btn_confirm);
+
+        if (npYear == null || npMonth == null || npDay == null || btnConfirm == null || btnCancel == null) return;
+
+        int curYear = selectedDate.getYear();
+        int curMonth = selectedDate.getMonthValue();
+        int curDay = selectedDate.getDayOfMonth();
+
+        npYear.setMinValue(2000);
+        npYear.setMaxValue(2050);
+        npYear.setValue(curYear);
+
+        npMonth.setMinValue(1);
+        npMonth.setMaxValue(12);
+        npMonth.setValue(curMonth);
+
+        npDay.setMinValue(1);
+        int maxDays = java.time.YearMonth.of(curYear, curMonth).lengthOfMonth();
+        npDay.setMaxValue(maxDays);
+        npDay.setValue(curDay);
+
+        NumberPicker.OnValueChangeListener dateChangeListener = (picker, oldVal, newVal) -> {
+            picker.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            int y = npYear.getValue();
+            int m = npMonth.getValue();
+            int newMaxDays = java.time.YearMonth.of(y, m).lengthOfMonth();
+            if (npDay.getMaxValue() != newMaxDays) {
+                int currentD = npDay.getValue();
+                npDay.setMaxValue(newMaxDays);
+                if (currentD > newMaxDays) npDay.setValue(newMaxDays);
+            }
+            updatePreviewText(tvPreview, y, m, npDay.getValue());
+        };
+
+        npYear.setOnValueChangedListener(dateChangeListener);
+        npMonth.setOnValueChangedListener(dateChangeListener);
+        npDay.setOnValueChangedListener(dateChangeListener);
+
+        updatePreviewText(tvPreview, curYear, curMonth, curDay);
+
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnConfirm.setOnClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            int year = npYear.getValue();
+            int month = npMonth.getValue();
+            int day = npDay.getValue();
+
+            // 🌟 确认后更新当前选中的日期，并刷新数据
+            selectedDate = LocalDate.of(year, month, day);
+            updateDateRangeDisplay();
+            processAndDisplayData(0);
+
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    /**
+     * 更新日期选择器的预览文本
+     */
+    private void updatePreviewText(TextView tv, int year, int month, int day) {
+        if (tv == null) return;
+        try {
+            LocalDate date = LocalDate.of(year, month, day);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.CHINA);
+            tv.setText(date.format(formatter));
+        } catch (Exception e) {
+            tv.setText(year + "年" + month + "月" + day + "日");
+        }
+    }
+
     private void processAndDisplayData(int direction) {
         if (allTransactions == null) return;
         long[] range = getTimeRange();
 
         List<Transaction> filtered = allTransactions.stream().filter(t -> {
+            // 1. 时间范围筛选
             if (t.date < range[0] || t.date > range[1]) return false;
+            // 2. 金额范围筛选
             if (currentFilter.minAmount != null && t.amount < currentFilter.minAmount) return false;
             if (currentFilter.maxAmount != null && t.amount > currentFilter.maxAmount) return false;
-            if (!TextUtils.isEmpty(currentFilter.category) && !t.category.contains(currentFilter.category)) return false;
-            if (!TextUtils.isEmpty(currentFilter.assetName) && (t.remark == null || !t.remark.contains(currentFilter.assetName))) return false;
+            // 🌟 3. 分类筛选 (修改这里：同时匹配一级和二级分类)
+            if (!TextUtils.isEmpty(currentFilter.category)) {
+                String searchKeyword = currentFilter.category;
+                boolean matchMainCategory = t.category != null && t.category.contains(searchKeyword);
+                boolean matchSubCategory = t.subCategory != null && t.subCategory.contains(searchKeyword);
+
+                // 如果一级分类和二级分类都没有包含关键字，则过滤掉
+                if (!matchMainCategory && !matchSubCategory) {
+                    return false;
+                }
+            }
+            // 🌟 4. 备注与记录标识筛选 (修改这部分)
+            // currentFilter.assetName 变量存储的是"备注包含"输入框的关键字
+            if (!TextUtils.isEmpty(currentFilter.assetName)) {
+                boolean matchRemark = t.remark != null && t.remark.contains(currentFilter.assetName);
+                boolean matchNote = t.note != null && t.note.contains(currentFilter.assetName);
+                // 如果备注和记录标识都没有包含该关键字，则过滤掉该账单
+                if (!matchRemark && !matchNote) {
+                    return false;
+                }
+            }
+
             return true;
         }).collect(Collectors.toList());
-
         Map<String, List<Transaction>> grouped = new TreeMap<>(Collections.reverseOrder());
         for (Transaction t : filtered) {
             String key = dateFormat.format(new Date(t.date));
@@ -759,17 +886,51 @@ public class DetailsFragment extends Fragment {
         View v = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_details_filter, null);
         AlertDialog dialog = new AlertDialog.Builder(getContext()).setView(v).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+
+        // 1. 获取输入框引用
+        EditText etMin = v.findViewById(R.id.et_min_amount);
+        EditText etMax = v.findViewById(R.id.et_max_amount);
+        EditText etCategory = v.findViewById(R.id.et_category);
+        EditText etAsset = v.findViewById(R.id.et_asset);
+
+        // 2. 🌟 数据回显逻辑：如果之前有筛选条件，重新打开弹窗时将其回填
+        if (currentFilter.minAmount != null) {
+            // 如果小数是 .0 结尾的，可以格式化一下更美观，或者直接转 String
+            etMin.setText(String.valueOf(currentFilter.minAmount).replaceAll("\\.0$", ""));
+        }
+        if (currentFilter.maxAmount != null) {
+            etMax.setText(String.valueOf(currentFilter.maxAmount).replaceAll("\\.0$", ""));
+        }
+        if (!TextUtils.isEmpty(currentFilter.category)) {
+            etCategory.setText(currentFilter.category);
+            // 将光标移到末尾
+            etCategory.setSelection(currentFilter.category.length());
+        }
+        if (!TextUtils.isEmpty(currentFilter.assetName)) {
+            etAsset.setText(currentFilter.assetName);
+        }
+
+        // 3. 确认按钮逻辑：保存条件并刷新数据
         v.findViewById(R.id.btn_apply).setOnClickListener(view -> {
-            String min = ((EditText)v.findViewById(R.id.et_min_amount)).getText().toString();
-            String max = ((EditText)v.findViewById(R.id.et_max_amount)).getText().toString();
-            currentFilter.minAmount = min.isEmpty() ? null : Float.parseFloat(min);
-            currentFilter.maxAmount = max.isEmpty() ? null : Float.parseFloat(max);
-            currentFilter.category = ((EditText)v.findViewById(R.id.et_category)).getText().toString();
-            currentFilter.assetName = ((EditText)v.findViewById(R.id.et_asset)).getText().toString();
+            String minStr = etMin.getText().toString();
+            String maxStr = etMax.getText().toString();
+
+            currentFilter.minAmount = minStr.isEmpty() ? null : Float.parseFloat(minStr);
+            currentFilter.maxAmount = maxStr.isEmpty() ? null : Float.parseFloat(maxStr);
+            currentFilter.category = etCategory.getText().toString().trim();
+            currentFilter.assetName = etAsset.getText().toString().trim();
+
             processAndDisplayData(0);
             dialog.dismiss();
         });
-        v.findViewById(R.id.btn_reset).setOnClickListener(view -> { currentFilter.clear(); processAndDisplayData(0); dialog.dismiss(); });
+
+        // 4. 重置按钮逻辑：清空条件并刷新数据
+        v.findViewById(R.id.btn_reset).setOnClickListener(view -> {
+            currentFilter.clear();
+            processAndDisplayData(0);
+            dialog.dismiss();
+        });
+
         dialog.show();
     }
 

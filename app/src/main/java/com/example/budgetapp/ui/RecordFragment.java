@@ -336,7 +336,7 @@ public class RecordFragment extends Fragment {
             }
         });
 
-        LocalDate baseDate = selectedDate != null ? selectedDate : currentMonth.atDay(1);
+        LocalDate baseDate = selectedDate != null ? selectedDate : LocalDate.now();
         int curYear = baseDate.getYear();
         int curMonth = baseDate.getMonthValue();
         int curDay = baseDate.getDayOfMonth();
