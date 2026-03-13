@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root_layout_details"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bar_background">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/bar_background"
+        android:gravity="center"
+        android:text="明细"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp">
+
+        <RadioGroup
+            android:id="@+id/rg_time_mode"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:orientation="horizontal"
+            android:background="@drawable/bg_selector_stats"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="16dp"
+            android:gravity="center">
+
+            <RadioButton
+                android:id="@+id/rb_year"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="年"
+                android:gravity="center"
+                android:button="@null"
+                android:textColor="@color/selector_text_color"
+                android:background="@drawable/selector_tab_bg"/>
+
+            <RadioButton
+                android:id="@+id/rb_month"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="月"
+                android:gravity="center"
+                android:button="@null"
+                android:textColor="@color/selector_text_color"
+                android:background="@drawable/selector_tab_bg"/>
+
+            <RadioButton
+                android:id="@+id/rb_week"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="周"
+                android:gravity="center"
+                android:button="@null"
+                android:textColor="@color/selector_text_color"
+                android:background="@drawable/selector_tab_bg"/>
+        </RadioGroup>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <ImageButton
+                android:id="@+id/btn_prev"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_arrow_left"
+                android:background="@null"
+                app:tint="@color/text_primary" />
+
+            <TextView
+                android:id="@+id/tv_current_date_range"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="2026年3月 第3周"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
+
+            <ImageButton
+                android:id="@+id/btn_next"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_arrow_right"
+                android:background="@null"
+                app:tint="@color/text_primary" />
+
+            <ImageButton
+                android:id="@+id/btn_filter"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="4dp"
+                android:src="@drawable/ic_filter"
+                android:background="@null"
+                app:tint="@color/text_primary" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_details"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="0dp"
+        android:background="@color/bar_background"/> </LinearLayout>

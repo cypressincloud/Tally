@@ -212,4 +212,13 @@ public class AssistantConfig {
     public void setLastRenewalDate(String date) {
         prefs.edit().putString(KEY_LAST_RENEWAL_DATE, date).apply();
     }
+
+    public boolean isDetailsEnabled() {
+        return prefs.getBoolean("enable_details_module", true); // 默认开启或关闭，视您的需求而定
+    }
+
+    public void setDetailsEnabled(boolean enabled) {
+        prefs.edit().putBoolean("enable_details_module", enabled).apply();
+    }
+
 }

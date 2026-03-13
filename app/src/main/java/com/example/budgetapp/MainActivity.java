@@ -153,7 +153,10 @@ public class MainActivity extends AppCompatActivity {
 
         AssistantConfig config = new AssistantConfig(this);
         boolean showAssets = config.isAssetsEnabled();
+        boolean showDetails = config.isDetailsEnabled(); // 新增
+
         bottomNav.getMenu().findItem(R.id.nav_assets).setVisible(showAssets);
+        bottomNav.getMenu().findItem(R.id.nav_details).setVisible(showDetails); // 新增
 
         NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.nav_host_fragment);
@@ -199,6 +202,12 @@ public class MainActivity extends AppCompatActivity {
                 if (assetsTab != null) {
                     assetsTab.setOnLongClickListener(v -> true);
                 }
+
+                // 4. 明细: 屏蔽默认长按提示
+                View detailsTab = bottomNav.findViewById(R.id.nav_details);
+                if (detailsTab != null) {
+                    detailsTab.setOnLongClickListener(v -> true);
+                }
             });
 
             // 【新增】拦截返回手势逻辑
@@ -207,11 +216,11 @@ public class MainActivity extends AppCompatActivity {
                 public void handleOnBackPressed() {
                     if (navController.getCurrentDestination() != null) {
                         int currentId = navController.getCurrentDestination().getId();
-                        // 如果当前处在记账、资产、统计这三个主模块之一，直接退出应用
-                        if (currentId == R.id.nav_record || currentId == R.id.nav_assets || currentId == R.id.nav_stats) {
+                        // 新增 R.id.nav_details
+                        if (currentId == R.id.nav_record || currentId == R.id.nav_assets ||
+                                currentId == R.id.nav_stats || currentId == R.id.nav_details) {
                             finish();
                         } else {
-                            // 如果在其他较深的子页面中，则执行正常的返回上一页操作
                             if (!navController.popBackStack()) {
                                 finish();
                             }

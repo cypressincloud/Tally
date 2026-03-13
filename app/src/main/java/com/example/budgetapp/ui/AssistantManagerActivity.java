@@ -54,6 +54,9 @@ public class AssistantManagerActivity extends AppCompatActivity {
     
     private RecyclerView rvKeywords;
     private KeywordAdapter adapter;
+
+    // 声明变量
+    private SwitchCompat switchDetails;
     private List<KeywordItem> dataList = new ArrayList<>();
 
     private static class KeywordItem implements Comparable<KeywordItem> {
@@ -136,6 +139,9 @@ public class AssistantManagerActivity extends AppCompatActivity {
         switchAutoTrack = findViewById(R.id.switchAutoTrack);
 //        switchRefundMonitor = findViewById(R.id.switchRefundMonitor);
         switchAssets = findViewById(R.id.switchAssets);
+        switchDetails = findViewById(R.id.switchDetails); // 新增
+
+        switchDetails.setChecked(config.isDetailsEnabled()); // 新增
 
         switchAutoTrack.setChecked(config.isEnabled());
 //        switchRefundMonitor.setChecked(config.isRefundEnabled());
@@ -147,6 +153,12 @@ public class AssistantManagerActivity extends AppCompatActivity {
                 checkAccessibilityPermission();
                 Toast.makeText(this, "已开启屏幕自动记账", Toast.LENGTH_SHORT).show();
             }
+        });
+
+        // 新增开关监听
+        switchDetails.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            config.setDetailsEnabled(isChecked);
+            Toast.makeText(this, "已" + (isChecked ? "开启" : "关闭") + "明细功能，重启应用后生效", Toast.LENGTH_LONG).show();
         });
 
 //        switchRefundMonitor.setOnCheckedChangeListener((buttonView, isChecked) -> {

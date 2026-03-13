@@ -23,6 +23,11 @@
         android:label="资产" />
 
     <fragment
+        android:id="@+id/nav_details"
+        android:name="com.example.budgetapp.ui.DetailsFragment"
+        android:label="明细" />
+
+    <fragment
         android:id="@+id/nav_stats"
         android:name="com.example.budgetapp.ui.StatsFragment"
         android:label="统计">

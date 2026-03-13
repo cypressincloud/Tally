@@ -126,7 +126,7 @@
         android:layout_marginTop="32dp"
         android:text="保存设置"
         android:backgroundTint="@color/app_yellow"
-        android:textColor="@color/white"
+        android:textColor="@color/real_white"
         android:textStyle="bold"
         app:cornerRadius="16dp"
         android:elevation="0dp"

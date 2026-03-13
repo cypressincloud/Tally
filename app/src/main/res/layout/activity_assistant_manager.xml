@@ -151,8 +151,49 @@
                     android:background="@null"/>
             </LinearLayout>
 
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1F888888" android:layout_marginHorizontal="20dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="20dp">
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="开启明细功能"
+                        android:textSize="16sp"
+                        android:textColor="?android:attr/textColorPrimary"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="在底部导航栏显示“明细”模块"
+                        android:textSize="12sp"
+                        android:textColor="#888888"
+                        android:layout_marginTop="4dp"/>
+                </LinearLayout>
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchDetails"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:thumb="@drawable/switch_thumb_custom"
+                    app:track="@drawable/switch_track_custom"
+                    app:showText="false"
+                    app:thumbTint="@null"
+                    app:trackTint="@null"
+                    android:background="@null"/>
+            </LinearLayout>
+
         </LinearLayout>
     </androidx.cardview.widget.CardView>
+
+
 
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"

@@ -14,6 +14,8 @@
     <color name="fixed_yellow">#FFD700</color>
     <color name="tab_unselected">#90A4AE</color>
 
+    <color name="divider_color">#2C2C2C</color>
+
     <color name="calendar_lunar_text">#6b6d6d</color>
 
     <color name="bottom_selected">@color/app_yellow</color>
