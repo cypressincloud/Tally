@@ -197,7 +197,18 @@ public class QuickAddTileService extends TileService {
             List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
             List<String> incomeCategories = CategoryManager.getIncomeCategories(this);
 
-            rvCategory.setLayoutManager(new GridLayoutManager(themeContext, 5));
+// 动态判断：如果是详细分类，则使用弹性流式布局；否则恢复 5 列网格布局
+            boolean isDetailed = com.example.budgetapp.util.CategoryManager.isDetailedCategoryEnabled(this);
+            if (isDetailed) {
+                com.google.android.flexbox.FlexboxLayoutManager flexboxLayoutManager = new com.google.android.flexbox.FlexboxLayoutManager(themeContext);
+                flexboxLayoutManager.setFlexWrap(com.google.android.flexbox.FlexWrap.WRAP);
+                flexboxLayoutManager.setFlexDirection(com.google.android.flexbox.FlexDirection.ROW);
+                flexboxLayoutManager.setJustifyContent(com.google.android.flexbox.JustifyContent.FLEX_START);
+                rvCategory.setLayoutManager(flexboxLayoutManager);
+            } else {
+                rvCategory.setLayoutManager(new GridLayoutManager(themeContext, 5));
+            }
+
             final String[] selectedCategory = {expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0)};
 
             CategoryAdapter categoryAdapter = new CategoryAdapter(themeContext, expenseCategories, selectedCategory[0], cat -> {

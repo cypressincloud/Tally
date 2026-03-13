@@ -10,8 +10,8 @@ android {
         applicationId = "com.example.budgetapp"
         minSdk = 26
         targetSdk = 36
-        versionCode = 45
-        versionName = "3.2.4"
+        versionCode = 46
+        versionName = "3.2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -73,5 +73,9 @@ dependencies {
     implementation("org.apache.poi:poi-ooxml:5.2.3")
 
     implementation("androidx.biometric:biometric:1.1.0")
+
+    implementation("cn.6tail:lunar:1.3.15")
+
+    implementation("com.google.android.flexbox:flexbox:3.0.0")
 
 }

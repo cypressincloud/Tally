@@ -22,12 +22,10 @@
         android:id="@+id/tv_net_amount"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="10sp"
-        android:textColor="@color/expense_green"
-        android:layout_marginTop="2dp"
+        android:textSize="11sp"   android:layout_marginTop="2dp"
         android:maxLines="1"
         android:textStyle="bold"
         android:ellipsize="end"
-        tools:text="-200.00" />
+        tools:text="初二" />
 
 </LinearLayout>

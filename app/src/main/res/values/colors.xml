@@ -26,6 +26,8 @@
 
     <color name="bottom_selected">#1677FF</color>
 
+    <color name="calendar_lunar_text">#666666</color>
+
     <color name="pie_food">#FFF59D</color>
     <color name="pie_fun">#A5D6A7</color>
     <color name="pie_edu">#90CAF9</color>

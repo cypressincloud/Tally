@@ -70,4 +70,20 @@ public class CategoryManager {
         String joinedString = TextUtils.join(",", list);
         prefs.edit().putString(key, joinedString).apply();
     }
+
+    // 在类的顶部常量定义区增加：
+    private static final String KEY_ENABLE_DETAILED_CATEGORY = "enable_detailed_category";
+
+    // 在类中增加以下两个方法：
+    // 【新增】详细分类开关状态
+    public static boolean isDetailedCategoryEnabled(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        return prefs.getBoolean(KEY_ENABLE_DETAILED_CATEGORY, false);
+    }
+
+    public static void setDetailedCategoryEnabled(Context context, boolean enabled) {
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putBoolean(KEY_ENABLE_DETAILED_CATEGORY, enabled).apply();
+    }
+
 }

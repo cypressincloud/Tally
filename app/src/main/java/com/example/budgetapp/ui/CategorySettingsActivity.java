@@ -33,6 +33,7 @@ public class CategorySettingsActivity extends AppCompatActivity {
     private SwitchCompat switchSubCategory;
     private List<String> expenseList;
     private List<String> incomeList;
+    private SwitchCompat switchDetailedCategory; // 【新增】
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,15 +58,33 @@ public class CategorySettingsActivity extends AppCompatActivity {
         chipGroupIncome = findViewById(R.id.chip_group_income);
         switchSubCategory = findViewById(R.id.switch_sub_category);
 
+        // 【新增】初始化详细分类开关
+        switchDetailedCategory = findViewById(R.id.switch_detailed_category);
+
         findViewById(R.id.btn_add_expense).setOnClickListener(v -> showAddDialog(true));
         findViewById(R.id.btn_add_income).setOnClickListener(v -> showAddDialog(false));
 
-        boolean isEnabled = CategoryManager.isSubCategoryEnabled(this);
-        switchSubCategory.setChecked(isEnabled);
-        switchSubCategory.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            CategoryManager.setSubCategoryEnabled(this, isChecked);
-            loadData();
-        });
+        // 二级分类开关绑定（增加判空保护）
+        if (switchSubCategory != null) {
+            boolean isEnabled = CategoryManager.isSubCategoryEnabled(this);
+            switchSubCategory.setChecked(isEnabled);
+            switchSubCategory.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                CategoryManager.setSubCategoryEnabled(this, isChecked);
+                loadData();
+            });
+        }
+
+        // 【新增】详细分类开关绑定（增加判空保护，防止找不到布局时闪退）
+        if (switchDetailedCategory != null) {
+            boolean isDetailedEnabled = CategoryManager.isDetailedCategoryEnabled(this);
+            switchDetailedCategory.setChecked(isDetailedEnabled);
+            switchDetailedCategory.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                CategoryManager.setDetailedCategoryEnabled(this, isChecked);
+            });
+        } else {
+            // 如果走到这里，说明 XML 布局文件没有生效（多半是因为深色模式加载了旧布局）
+            android.util.Log.e("CategorySettings", "未找到 switch_detailed_category 控件，请检查布局文件！");
+        }
     }
 
     private void loadData() {

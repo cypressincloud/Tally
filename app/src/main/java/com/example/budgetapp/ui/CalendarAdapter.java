@@ -155,7 +155,10 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
 
         int defaultNetColor = 0;
         String netText = "";
+
+        // 判断是否有收支数据
         if (Math.abs(dailySum) > 0.001) {
+            // === 有收支数据，按原逻辑显示金额 ===
             netText = String.format("%.2f", dailySum);
             if (filterMode == 2) {
                 defaultNetColor = expenseGreen;
@@ -164,8 +167,41 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             } else {
                 defaultNetColor = dailySum > 0 ? incomeRed : expenseGreen;
             }
-        }
+        } else {
+            // === 无收支数据，显示农历或节假日 ===
+            try {
+                com.nlf.calendar.Solar solar = com.nlf.calendar.Solar.fromYmd(date.getYear(), date.getMonthValue(), date.getDayOfMonth());
+                com.nlf.calendar.Lunar lunar = solar.getLunar();
 
+                String festival = "";
+
+                // 依次优先级：农历节日 -> 阳历节日 -> 节气
+                if (lunar.getFestivals() != null && !lunar.getFestivals().isEmpty()) {
+                    festival = lunar.getFestivals().get(0);
+                } else if (solar.getFestivals() != null && !solar.getFestivals().isEmpty()) {
+                    festival = solar.getFestivals().get(0);
+                } else if (lunar.getJieQi() != null && !lunar.getJieQi().isEmpty()) {
+                    festival = lunar.getJieQi();
+                }
+
+                // 确定显示的文字
+                if (festival != null && !festival.isEmpty()) {
+                    netText = festival;
+                } else {
+                    if (lunar.getDay() == 1) {
+                        netText = lunar.getMonthInChinese() + "月";
+                    } else {
+                        netText = lunar.getDayInChinese();
+                    }
+                }
+
+                // 【修改这里】：动态获取系统当前模式下的颜色 (日间#666666，夜间#6b6d6d)
+                defaultNetColor = context.getColor(R.color.calendar_lunar_text);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         // 3. 样式应用逻辑核心
         boolean isToday = date.equals(LocalDate.now());
         boolean isSelected = date.equals(selectedDate);

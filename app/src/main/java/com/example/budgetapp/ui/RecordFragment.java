@@ -887,7 +887,21 @@ public class RecordFragment extends Fragment {
         List<String> expenseCategories = CategoryManager.getExpenseCategories(getContext());
         List<String> incomeCategories = CategoryManager.getIncomeCategories(getContext());
 
-        rvCategory.setLayoutManager(new GridLayoutManager(getContext(), 5));
+        // 动态判断：如果是详细分类，则使用弹性流式布局；否则恢复 5 列网格布局
+        boolean isDetailed = com.example.budgetapp.util.CategoryManager.isDetailedCategoryEnabled(getContext());
+        if (isDetailed) {
+            com.google.android.flexbox.FlexboxLayoutManager flexboxLayoutManager = new com.google.android.flexbox.FlexboxLayoutManager(getContext());
+            // 设置自然换行
+            flexboxLayoutManager.setFlexWrap(com.google.android.flexbox.FlexWrap.WRAP);
+            // 设置主轴方向为水平
+            flexboxLayoutManager.setFlexDirection(com.google.android.flexbox.FlexDirection.ROW);
+            // 设置左对齐
+            flexboxLayoutManager.setJustifyContent(com.google.android.flexbox.JustifyContent.FLEX_START);
+
+            rvCategory.setLayoutManager(flexboxLayoutManager);
+        } else {
+            rvCategory.setLayoutManager(new GridLayoutManager(getContext(), 5));
+        }
 
         final boolean[] isExpense = {true};
         final String[] selectedCategory = {expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0)};
