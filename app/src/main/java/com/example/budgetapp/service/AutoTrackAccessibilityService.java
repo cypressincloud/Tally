@@ -91,7 +91,7 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
     private final Pattern quantityPattern = Pattern.compile("\\[?\\d+\\s*[件个笔条单]\\s*\\]?");
 
     // 更新金额匹配正则：捕获金额前的1-3位非数字符号
-    private final Pattern amountWithSymbolPattern = Pattern.compile("([^0-9\\s]{1,3})?\\s*(\\d+(\\.\\d{1,2})?)");
+    private final Pattern amountWithSymbolPattern = Pattern.compile("([^0-9\\s]{1,3})?\\s*([0-9,]+(\\.\\d{1,2})?)");
 
     // 内部类，用于同时记录数值和识别到的符号
     private final Runnable scanRunnable = new Runnable() {
@@ -185,11 +185,47 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
     private void findAmountRecursive(AccessibilityNodeInfo root, int type, String defaultCategory, int matchedAssetId) {
         if (root == null) return;
         List<AmountResult> candidates = new ArrayList<>();
-        collectAllNumbers(root, candidates);
+
+        // 1. 获取全屏拼接文本（解决整数和小数被拆分到不同节点的问题）
+        String fullText = getAllTextFromNode(root);
+
+        if (fullText != null && !fullText.isEmpty()) {
+            // 2. 预处理：去掉常见的时间格式(如 12:34 或 12:34:56)，防止其被误认为金额
+            fullText = fullText.replaceAll("\\d{1,2}:\\d{2}(:\\d{2})?", "");
+            // 去掉件数/笔数等干扰
+            String cleanText = quantityPattern.matcher(fullText).replaceAll("");
+
+            // 3. 全局匹配金额
+            Matcher matcher = amountWithSymbolPattern.matcher(cleanText);
+            while (matcher.find()) {
+                try {
+                    String capturedSymbol = matcher.group(1);
+                    // 移除千分位逗号，确保 Double.parseDouble 能正常解析
+                    String numStr = matcher.group(2).replace(",", "");
+                    double val = Double.parseDouble(numStr);
+
+                    // 过滤掉异常数值和年份（如 2023.0 不会被记为金额）
+                    if (val > 0 && val < 200000 && !(val >= 2020 && val <= 2035 && val % 1 == 0)) {
+                        String validSymbol = null;
+                        if (capturedSymbol != null) {
+                            for (String s : com.example.budgetapp.util.CurrencyUtils.CURRENCY_SYMBOLS) {
+                                if (capturedSymbol.trim().contains(s)) {
+                                    validSymbol = s;
+                                    break;
+                                }
+                            }
+                        }
+                        candidates.add(new AmountResult(val, validSymbol));
+                    }
+                } catch (Exception e) {
+                    // 忽略格式解析异常，继续匹配下一个
+                }
+            }
+        }
 
         AmountResult bestResult = null;
         for (AmountResult res : candidates) {
-            // 优先选择带小数点且不是整除格式的金额
+            // 优先选择带小数点且不是整除格式的金额（这能更准确命中实际交易金额）
             if (String.valueOf(res.value).contains(".") && !String.valueOf(res.value).endsWith(".0")) {
                 bestResult = res;
                 break;
@@ -200,14 +236,12 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
         }
 
         if (bestResult != null) {
-            // 确定最终使用的符号
             String detectedSymbol = bestResult.symbol;
             if (detectedSymbol == null) {
                 SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                 detectedSymbol = prefs.getString("default_currency_symbol", "¥");
             }
 
-            // --- 核心修复：声明为 final 变量以供 Lambda 引用 ---
             final double finalAmount = bestResult.value;
             final String finalCurrency = detectedSymbol;
             final int finalType = type;
@@ -215,7 +249,6 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             final int finalAssetId = matchedAssetId;
 
             long now = System.currentTimeMillis();
-            // 防抖动逻辑：2.5秒内重复触发则忽略
             if (now - lastWindowDismissTime < 2500) return;
 
             String signature = finalAmount + "-" + finalType;
@@ -227,9 +260,24 @@ public class AutoTrackAccessibilityService extends AccessibilityService {
             SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
             final String timeNote = sdf.format(new Date(now)) + " auto";
 
-            // 通过 Handler 发送到主线程显示悬浮窗
             handler.post(() -> showConfirmWindow(finalAmount, finalType, finalCategory, timeNote, finalAssetId, finalCurrency));
         }
+    }
+
+    // 新增：递归遍历节点树，并将所有文本无缝拼接成一整句话
+    private String getAllTextFromNode(AccessibilityNodeInfo node) {
+        if (node == null) return "";
+        StringBuilder sb = new StringBuilder();
+        String text = getTextOrDescription(node);
+        if (text != null && !text.isEmpty()) {
+            // 去除头尾空格后拼接，确保 "12" 和 ".34" 拼装成 "12.34"
+            sb.append(text.trim());
+        }
+        int count = node.getChildCount();
+        for (int i = 0; i < count; i++) {
+            sb.append(getAllTextFromNode(node.getChild(i)));
+        }
+        return sb.toString();
     }
     private void collectAllNumbers(AccessibilityNodeInfo node, List<AmountResult> list) {
         if (node == null) return;
