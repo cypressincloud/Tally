@@ -26,6 +26,25 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="账单类型"
+            android:textSize="14sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/sp_filter_type"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_input_field"
+            android:popupBackground="@drawable/bg_input_field"
+            android:paddingHorizontal="16dp"
+            android:layout_marginBottom="16dp"
+            android:spinnerMode="dropdown"
+            android:dropDownVerticalOffset="52dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="金额区间"
             android:textSize="14sp"
             android:textColor="?android:attr/textColorSecondary"

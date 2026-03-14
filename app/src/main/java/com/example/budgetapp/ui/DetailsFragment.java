@@ -94,7 +94,14 @@ public class DetailsFragment extends Fragment {
     private static class FilterCriteria {
         Float minAmount, maxAmount;
         String category, assetName;
-        void clear() { minAmount = null; maxAmount = null; category = null; assetName = null; }
+        Integer type; // 新增：null表示全部，0表示支出，1表示收入，2表示加班
+        void clear() {
+            minAmount = null;
+            maxAmount = null;
+            category = null;
+            assetName = null;
+            type = null; // 清空类型
+        }
     }
     private final FilterCriteria currentFilter = new FilterCriteria();
 
@@ -323,6 +330,12 @@ public class DetailsFragment extends Fragment {
             // 2. 金额范围筛选
             if (currentFilter.minAmount != null && t.amount < currentFilter.minAmount) return false;
             if (currentFilter.maxAmount != null && t.amount > currentFilter.maxAmount) return false;
+
+            // 🌟 新增：账单类型筛选
+            if (currentFilter.type != null && t.type != currentFilter.type) {
+                return false;
+            }
+
             // 🌟 3. 分类筛选 (修改这里：同时匹配一级和二级分类)
             if (!TextUtils.isEmpty(currentFilter.category)) {
                 String searchKeyword = currentFilter.category;
@@ -893,9 +906,15 @@ public class DetailsFragment extends Fragment {
         EditText etCategory = v.findViewById(R.id.et_category);
         EditText etAsset = v.findViewById(R.id.et_asset);
 
+        // 🌟 新增：获取类型下拉框并设置适配器
+        Spinner spType = v.findViewById(R.id.sp_filter_type);
+        String[] types = {"全部", "支出", "收入", "加班"};
+        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(requireContext(), R.layout.item_spinner_dropdown, types);
+        typeAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spType.setAdapter(typeAdapter);
+
         // 2. 🌟 数据回显逻辑：如果之前有筛选条件，重新打开弹窗时将其回填
         if (currentFilter.minAmount != null) {
-            // 如果小数是 .0 结尾的，可以格式化一下更美观，或者直接转 String
             etMin.setText(String.valueOf(currentFilter.minAmount).replaceAll("\\.0$", ""));
         }
         if (currentFilter.maxAmount != null) {
@@ -903,11 +922,21 @@ public class DetailsFragment extends Fragment {
         }
         if (!TextUtils.isEmpty(currentFilter.category)) {
             etCategory.setText(currentFilter.category);
-            // 将光标移到末尾
             etCategory.setSelection(currentFilter.category.length());
         }
         if (!TextUtils.isEmpty(currentFilter.assetName)) {
             etAsset.setText(currentFilter.assetName);
+        }
+
+        // 🌟 新增：回显账单类型 (0:全部, 1:支出, 2:收入, 3:加班)
+        if (currentFilter.type == null) {
+            spType.setSelection(0);
+        } else if (currentFilter.type == 0) {
+            spType.setSelection(1);
+        } else if (currentFilter.type == 1) {
+            spType.setSelection(2);
+        } else if (currentFilter.type == 2) {
+            spType.setSelection(3);
         }
 
         // 3. 确认按钮逻辑：保存条件并刷新数据
@@ -919,6 +948,18 @@ public class DetailsFragment extends Fragment {
             currentFilter.maxAmount = maxStr.isEmpty() ? null : Float.parseFloat(maxStr);
             currentFilter.category = etCategory.getText().toString().trim();
             currentFilter.assetName = etAsset.getText().toString().trim();
+
+            // 🌟 新增：获取选中的账单类型
+            int selectedPos = spType.getSelectedItemPosition();
+            if (selectedPos == 1) {
+                currentFilter.type = 0; // 支出
+            } else if (selectedPos == 2) {
+                currentFilter.type = 1; // 收入
+            } else if (selectedPos == 3) {
+                currentFilter.type = 2; // 加班
+            } else {
+                currentFilter.type = null; // 全部
+            }
 
             processAndDisplayData(0);
             dialog.dismiss();

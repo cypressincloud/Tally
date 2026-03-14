@@ -127,6 +127,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
 
         // 2. 统计金额及颜色处理
         double dailySum = 0;
+        double dailyHours = 0; // 新增：统计每日工时
         long start = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
         long end = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 
@@ -146,8 +147,22 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                     case 2: // 支出
                         if (t.type == 0) dailySum += t.amount;
                         break;
-                    case 3: // 加班
+                    case 3: // 加班工资
                         if ("加班".equals(t.category)) dailySum += t.amount;
+                        break;
+                    case 4: // 加班工时
+                        if ("加班".equals(t.category)) {
+                            if (t.note != null) {
+                                java.util.regex.Matcher m = java.util.regex.Pattern.compile("时长:\\s*([0-9.]+)\\s*小时").matcher(t.note);
+                                if (m.find()) {
+                                    try {
+                                        dailyHours += Double.parseDouble(m.group(1));
+                                    } catch (NumberFormatException ignored) {}
+                                }
+                            }
+                            // 赋值 dailySum 让底部判断有数据
+                            dailySum += t.amount;
+                        }
                         break;
                 }
             }
@@ -156,16 +171,21 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         int defaultNetColor = 0;
         String netText = "";
 
-        // 判断是否有收支数据
-        if (Math.abs(dailySum) > 0.001) {
+        // 判断是否有收支数据 (增加对工时的判断)
+        if (Math.abs(dailySum) > 0.001 || dailyHours > 0) {
             // === 有收支数据，按原逻辑显示金额 ===
-            netText = String.format("%.2f", dailySum);
-            if (filterMode == 2) {
-                defaultNetColor = expenseGreen;
-            } else if (filterMode == 3) {
-                defaultNetColor = Color.parseColor("#FF9800");
+            if (filterMode == 4) {
+                netText = String.format("%.1fh", dailyHours); // 显示工时，例如 2.0h
+                defaultNetColor = Color.parseColor("#2196F3"); // 给工时换个颜色 (蓝色) 用来区分
             } else {
-                defaultNetColor = dailySum > 0 ? incomeRed : expenseGreen;
+                netText = String.format("%.2f", dailySum);
+                if (filterMode == 2) {
+                    defaultNetColor = expenseGreen;
+                } else if (filterMode == 3) {
+                    defaultNetColor = Color.parseColor("#FF9800"); // 加班工资使用橘色
+                } else {
+                    defaultNetColor = dailySum > 0 ? incomeRed : expenseGreen;
+                }
             }
         } else {
             // === 无收支数据，显示农历或节假日 ===

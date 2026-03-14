@@ -100,6 +100,9 @@ public class RecordFragment extends Fragment {
     private AlertDialog currentDetailDialog;
     private TextView currentDetailSummaryTextView;
 
+    // 新增：记录当前的过滤模式
+    private int currentFilterMode = 0;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -188,6 +191,11 @@ public class RecordFragment extends Fragment {
 
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         int defaultMode = prefs.getInt("default_record_mode", 0);
+
+        // 新增：如果当前默认模式是加班，则读取用户上次记忆的是工资(3)还是工时(4)
+        if (defaultMode == 3 || defaultMode == 4) {
+            defaultMode = prefs.getInt("overtime_display_mode", 3);
+        }
         switchFilterMode(defaultMode);
 
         calendarRecycler.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
@@ -212,7 +220,23 @@ public class RecordFragment extends Fragment {
         layoutBalance.setOnClickListener(v -> switchFilterMode(0));
         layoutIncome.setOnClickListener(v -> switchFilterMode(1));
         layoutExpense.setOnClickListener(v -> switchFilterMode(2));
-        layoutOvertime.setOnClickListener(v -> switchFilterMode(3));
+
+        // 新增：带有持久化记忆功能的加班切换逻辑
+        layoutOvertime.setOnClickListener(v -> {
+            SharedPreferences prefsEdit = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+
+            if (currentFilterMode == 3 || currentFilterMode == 4) {
+                // 1. 如果当前已经在加班标签下，互相切换并保存记忆
+                int newMode = (currentFilterMode == 3) ? 4 : 3;
+                switchFilterMode(newMode);
+                prefsEdit.edit().putInt("overtime_display_mode", newMode).apply(); // 保存记忆
+                Toast.makeText(getContext(), newMode == 4 ? "已切换为显示加班工时" : "已切换为显示加班工资", Toast.LENGTH_SHORT).show();
+            } else {
+                // 2. 如果是从其他标签（结余/收入/支出）切换过来，读取上次记忆的模式
+                int savedMode = prefsEdit.getInt("overtime_display_mode", 3);
+                switchFilterMode(savedMode);
+            }
+        });
 
         tvMonthTitle.setOnClickListener(v -> {
             v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
@@ -443,7 +467,13 @@ public class RecordFragment extends Fragment {
     }
 
     private void switchFilterMode(int mode) {
+        currentFilterMode = mode;
         adapter.setFilterMode(mode);
+        // 重新计算并刷新顶部统计数据和日历显示
+        List<Transaction> currentList = viewModel.getAllTransactions().getValue();
+        if (currentList != null) {
+            calculateMonthTotals(currentList);
+        }
     }
 
     // 更新日历，带有方向参数：-1 左滑入，1 右滑入，0 不执行动画
@@ -496,15 +526,26 @@ public class RecordFragment extends Fragment {
     private void calculateMonthTotals(List<Transaction> transactions) {
         double totalIncome = 0;
         double totalExpense = 0;
-        double totalOvertime = 0;
+        double totalOvertimeAmount = 0;
+        double totalOvertimeHours = 0; // 新增：计算加班总工时
         int year = currentMonth.getYear();
         int month = currentMonth.getMonthValue();
+
         for (Transaction t : transactions) {
             LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
             if (date.getYear() == year && date.getMonthValue() == month) {
                 if (t.type == 1) {
                     if ("加班".equals(t.category)) {
-                        totalOvertime += t.amount;
+                        totalOvertimeAmount += t.amount;
+                        // 提取工时数据
+                        if (t.note != null) {
+                            Matcher m = Pattern.compile("时长:\\s*([0-9.]+)\\s*小时").matcher(t.note);
+                            if (m.find()) {
+                                try {
+                                    totalOvertimeHours += Double.parseDouble(m.group(1));
+                                } catch (NumberFormatException ignored) {}
+                            }
+                        }
                     } else {
                         totalIncome += t.amount;
                     }
@@ -516,7 +557,14 @@ public class RecordFragment extends Fragment {
         double balance = totalIncome - totalExpense;
         tvIncome.setText(String.format("+%.2f", totalIncome));
         tvExpense.setText(String.format("-%.2f", totalExpense));
-        tvOvertime.setText(String.format("+%.2f", totalOvertime));
+
+        // 根据当前的模式决定顶部面板显示加班工资还是加班工时
+        if (currentFilterMode == 4) {
+            tvOvertime.setText(String.format("%.1fh", totalOvertimeHours));
+        } else {
+            tvOvertime.setText(String.format("+%.2f", totalOvertimeAmount));
+        }
+
         String sign = balance >= 0 ? "+" : "";
         tvBalance.setText(String.format("%s%.2f", sign, balance));
     }
