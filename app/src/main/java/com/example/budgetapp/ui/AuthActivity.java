@@ -31,19 +31,34 @@ public class AuthActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 【新增 1】允许内容延伸到系统栏
+        // 允许内容延伸到系统栏
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarColor(Color.TRANSPARENT);
 
         setContentView(R.layout.activity_auth);
 
-        // 【新增 2】处理内边距，防止密码输入框/按钮被状态栏或小白条遮挡
-        View rootView = findViewById(android.R.id.content);
+        // 1. 获取 XML 中的根布局
+        View rootView = findViewById(R.id.root_layout);
+
+        // 2. 提前记录 XML 中配置的初始 Padding (即 32dp 转换后的 px 值)
+        final int initialPaddingLeft = rootView.getPaddingLeft();
+        final int initialPaddingTop = rootView.getPaddingTop();
+        final int initialPaddingRight = rootView.getPaddingRight();
+        final int initialPaddingBottom = rootView.getPaddingBottom();
+
+        // 3. 处理内边距，叠加系统栏高度
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, windowInsets) -> {
             androidx.core.graphics.Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-            return WindowInsetsCompat.CONSUMED;
+
+            // 将系统栏的高度加上初始的边距
+            v.setPadding(
+                    initialPaddingLeft + insets.left,
+                    initialPaddingTop + insets.top,
+                    initialPaddingRight + insets.right,
+                    initialPaddingBottom + insets.bottom
+            );
+            return windowInsets; // 建议返回原始 windowInsets 保证正常传递
         });
 
         prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
