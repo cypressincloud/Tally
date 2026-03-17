@@ -129,8 +129,9 @@ public class AssetsFragment extends Fragment {
             double totalLiability = 0;
             double totalLent = 0;
 
+            // 在 updateUI() 的单币种逻辑中：
             for (AssetAccount acc : allAccounts) {
-                if (acc.type == 0) totalAsset += acc.amount;
+                if (acc.type == 0 || acc.type == 3) totalAsset += acc.amount; // 资产和理财本金都算入总资产
                 else if (acc.type == 1) totalLiability += acc.amount;
                 else if (acc.type == 2) totalLent += acc.amount;
             }
@@ -148,7 +149,8 @@ public class AssetsFragment extends Fragment {
 
             for (AssetAccount acc : allAccounts) {
                 String symbol = (acc.currencySymbol != null && !acc.currencySymbol.isEmpty()) ? acc.currencySymbol : "¥";
-                if (acc.type == 0) {
+                // 多币种逻辑同理：
+                if (acc.type == 0 || acc.type == 3) {
                     assetMap.put(symbol, assetMap.getOrDefault(symbol, 0.0) + acc.amount);
                 } else if (acc.type == 1) {
                     liabilityMap.put(symbol, liabilityMap.getOrDefault(symbol, 0.0) + acc.amount);
@@ -185,9 +187,23 @@ public class AssetsFragment extends Fragment {
     private void refreshList() {
         List<AssetAccount> filteredList = new ArrayList<>();
         for (AssetAccount acc : allAccounts) {
-            if (acc.type == currentType) {
+            // 当选中资产(0)时，同时显示普通资产(0)和理财(3)
+            if (currentType == 0 && (acc.type == 0 || acc.type == 3)) {
+                filteredList.add(acc);
+            } else if (acc.type == currentType) {
                 filteredList.add(acc);
             }
+        }
+
+        // 【新增排序逻辑】
+        // 当处于“我的资产”页面时，将理财(type=3)沉底，普通资产(type=0)置顶
+        if (currentType == 0) {
+            java.util.Collections.sort(filteredList, new java.util.Comparator<AssetAccount>() {
+                @Override
+                public int compare(AssetAccount o1, AssetAccount o2) {
+                    return Integer.compare(o1.type, o2.type);
+                }
+            });
         }
 
         adapter.setDefaultId(config.getDefaultAssetId());
@@ -200,6 +216,67 @@ public class AssetsFragment extends Fragment {
         } else {
             tvListTitle.setText("我的借出");
         }
+    }
+
+    private void showDatePickerDialog(long currentDateMillis, java.util.function.Consumer<Long> onDateSelected) {
+        if (getContext() == null) return;
+        com.google.android.material.bottomsheet.BottomSheetDialog dialog = new com.google.android.material.bottomsheet.BottomSheetDialog(getContext());
+        dialog.setContentView(R.layout.dialog_bottom_date_picker);
+
+        dialog.setOnShowListener(d -> {
+            View bottomSheet = ((com.google.android.material.bottomsheet.BottomSheetDialog) d).findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) bottomSheet.setBackgroundResource(android.R.color.transparent);
+        });
+
+        java.time.LocalDate baseDate = java.time.Instant.ofEpochMilli(currentDateMillis).atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+
+        android.widget.NumberPicker npYear = dialog.findViewById(R.id.np_year);
+        android.widget.NumberPicker npMonth = dialog.findViewById(R.id.np_month);
+        android.widget.NumberPicker npDay = dialog.findViewById(R.id.np_day);
+        TextView tvPreview = dialog.findViewById(R.id.tv_date_preview);
+        Button btnCancel = dialog.findViewById(R.id.btn_cancel);
+        Button btnConfirm = dialog.findViewById(R.id.btn_confirm);
+
+        npYear.setMinValue(2000);
+        npYear.setMaxValue(2050);
+        npYear.setValue(baseDate.getYear());
+
+        npMonth.setMinValue(1);
+        npMonth.setMaxValue(12);
+        npMonth.setValue(baseDate.getMonthValue());
+
+        npDay.setMinValue(1);
+        npDay.setMaxValue(java.time.YearMonth.of(baseDate.getYear(), baseDate.getMonthValue()).lengthOfMonth());
+        npDay.setValue(baseDate.getDayOfMonth());
+
+        android.widget.NumberPicker.OnValueChangeListener listener = (picker, oldVal, newVal) -> {
+            int maxDays = java.time.YearMonth.of(npYear.getValue(), npMonth.getValue()).lengthOfMonth();
+            if (npDay.getMaxValue() != maxDays) {
+                npDay.setMaxValue(maxDays);
+                if (npDay.getValue() > maxDays) npDay.setValue(maxDays);
+            }
+            try {
+                java.time.LocalDate d = java.time.LocalDate.of(npYear.getValue(), npMonth.getValue(), npDay.getValue());
+                tvPreview.setText(d.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", java.util.Locale.CHINA)));
+            } catch (Exception ignored) {}
+        };
+
+        npYear.setOnValueChangedListener(listener);
+        npMonth.setOnValueChangedListener(listener);
+        npDay.setOnValueChangedListener(listener);
+
+        try {
+            tvPreview.setText(baseDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", java.util.Locale.CHINA)));
+        } catch (Exception ignored) {}
+
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        btnConfirm.setOnClickListener(v -> {
+            java.time.LocalDate selected = java.time.LocalDate.of(npYear.getValue(), npMonth.getValue(), npDay.getValue());
+            long millis = selected.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+            onDateSelected.accept(millis);
+            dialog.dismiss();
+        });
+        dialog.show();
     }
 
     private void showAddOrEditDialog(AssetAccount existing, int initType) {
@@ -218,6 +295,32 @@ public class AssetsFragment extends Fragment {
         Button btnSave = view.findViewById(R.id.btn_save);
         Button btnDelete = view.findViewById(R.id.btn_delete);
 
+        // 理财专用的控件 (更新为 Spinner 和 EditText)
+        LinearLayout layoutInvestment = view.findViewById(R.id.layout_investment_details);
+        android.widget.Spinner spinnerDepositType = view.findViewById(R.id.spinner_deposit_type);
+        android.widget.Spinner spinnerInterestType = view.findViewById(R.id.spinner_interest_type);
+        EditText etDuration = view.findViewById(R.id.et_duration);
+        EditText etRate = view.findViewById(R.id.et_interest_rate);
+        EditText etDepositDate = view.findViewById(R.id.et_deposit_date); // 新增存入时间控件
+        EditText etExpected = view.findViewById(R.id.et_expected_total);
+
+        // 初始化下拉框的数据 (应用统一的下拉样式 R.layout.item_spinner_dropdown)
+        android.widget.ArrayAdapter<String> depositAdapter = new android.widget.ArrayAdapter<>(
+                getContext(),
+                R.layout.item_spinner_dropdown,
+                new String[]{"定期", "活期"}
+        );
+        depositAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spinnerDepositType.setAdapter(depositAdapter);
+
+        android.widget.ArrayAdapter<String> interestAdapter = new android.widget.ArrayAdapter<>(
+                getContext(),
+                R.layout.item_spinner_dropdown,
+                new String[]{"单利", "复利"}
+        );
+        interestAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spinnerInterestType.setAdapter(interestAdapter);
+
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
 
@@ -233,35 +336,126 @@ public class AssetsFragment extends Fragment {
             btnCurrency.setVisibility(View.GONE);
         }
 
+        // 处理存入时间的逻辑
+        final long[] currentDepositMillis = {System.currentTimeMillis()};
+        java.text.SimpleDateFormat sdfDate = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA);
+
+        // 初始化已有数据
         if (existing != null) {
             etName.setText(existing.name);
             etAmount.setText(String.valueOf(existing.amount));
             btnCancel.setVisibility(View.GONE);
             btnDelete.setVisibility(View.VISIBLE);
+
+            // 回显理财数据
+            if (existing.type == 3) {
+                spinnerDepositType.setSelection(existing.isFixedTerm ? 0 : 1);
+                spinnerInterestType.setSelection(existing.isCompoundInterest ? 1 : 0);
+                etDuration.setText(String.valueOf(existing.durationMonths));
+                etRate.setText(String.valueOf(existing.interestRate));
+                if (existing.depositDate > 0) {
+                    currentDepositMillis[0] = existing.depositDate;
+                }
+                etExpected.setText(String.format("预计结算资产: %.2f", existing.expectedReturn));
+            }
         } else {
             btnCancel.setVisibility(View.VISIBLE);
             btnDelete.setVisibility(View.GONE);
         }
 
+        // 无论新增还是修改，初始化显示存入时间
+        etDepositDate.setText("存入时间: " + sdfDate.format(new java.util.Date(currentDepositMillis[0])));
+
+        // 呼出日期选择器
+        etDepositDate.setOnClickListener(v -> {
+            showDatePickerDialog(currentDepositMillis[0], newMillis -> {
+                currentDepositMillis[0] = newMillis;
+                etDepositDate.setText("存入时间: " + sdfDate.format(new java.util.Date(currentDepositMillis[0])));
+            });
+        });
+
+        // 动态计算理财预期收益的逻辑
+        Runnable calculateExpected = () -> {
+            try {
+                String amountStr = etAmount.getText().toString().trim();
+                String durationStr = etDuration.getText().toString().trim();
+                String rateStr = etRate.getText().toString().trim();
+
+                if (!amountStr.isEmpty() && !durationStr.isEmpty() && !rateStr.isEmpty()) {
+                    double principal = Double.parseDouble(amountStr);
+                    double annualRate = Double.parseDouble(rateStr) / 100.0;
+                    int months = Integer.parseInt(durationStr);
+
+                    double expected = 0;
+                    // 判断是否选择复利（1 为复利，0 为单利）
+                    if (spinnerInterestType.getSelectedItemPosition() == 1) {
+                        expected = principal * Math.pow(1 + (annualRate / 12.0), months);
+                    } else {
+                        expected = principal + (principal * annualRate * (months / 12.0));
+                    }
+
+                    etExpected.setText(String.format("预计结算资产: %.2f", expected));
+                } else {
+                    etExpected.setText("预计结算资产: 0.00");
+                }
+            } catch (Exception e) {
+                etExpected.setText("预计结算资产: 0.00");
+            }
+        };
+
+        // 监听本金、时长、利率的输入变化
+        android.text.TextWatcher watcher = new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(android.text.Editable s) { calculateExpected.run(); }
+        };
+        etAmount.addTextChangedListener(watcher);
+        etDuration.addTextChangedListener(watcher);
+        etRate.addTextChangedListener(watcher);
+
+        // 监听下拉框选项变化
+        android.widget.AdapterView.OnItemSelectedListener spinnerListener = new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                calculateExpected.run();
+            }
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        };
+        spinnerDepositType.setOnItemSelectedListener(spinnerListener);
+        spinnerInterestType.setOnItemSelectedListener(spinnerListener);
+
+        // 切换资产类型时的 UI 更新
         Runnable updateLabels = () -> {
             int selectedId = rgType.getCheckedRadioButtonId();
             String titleSuffix = "";
             String nameHint = "";
+            String amountHint = ""; // 动态控制金额提示词
+            layoutInvestment.setVisibility(View.GONE);
 
             if (selectedId == R.id.rb_asset) {
                 titleSuffix = "资产";
                 nameHint = "资产名称";
+                amountHint = "资产金额";
             } else if (selectedId == R.id.rb_liability) {
                 titleSuffix = "负债";
                 nameHint = "负债对象";
+                amountHint = "负债金额";
             } else if (selectedId == R.id.rb_lent) {
                 titleSuffix = "借出";
                 nameHint = "借款对象";
+                amountHint = "借出金额";
+            } else if (selectedId == R.id.rb_investment) {
+                titleSuffix = "理财";
+                nameHint = "理财产品或银行名称";
+                amountHint = "理财本金";
+                layoutInvestment.setVisibility(View.VISIBLE);
+                calculateExpected.run();
             }
 
             tvTitle.setText((existing == null ? "添加" : "修改") + titleSuffix);
             etName.setHint(nameHint);
-            etAmount.setHint(titleSuffix + "金额");
+            etAmount.setHint(amountHint);
         };
 
         rgType.setOnCheckedChangeListener((group, checkedId) -> updateLabels.run());
@@ -269,6 +463,7 @@ public class AssetsFragment extends Fragment {
         int targetType = (existing != null) ? existing.type : initType;
         if (targetType == 1) rgType.check(R.id.rb_liability);
         else if (targetType == 2) rgType.check(R.id.rb_lent);
+        else if (targetType == 3) rgType.check(R.id.rb_investment);
         else rgType.check(R.id.rb_asset);
 
         updateLabels.run();
@@ -276,29 +471,23 @@ public class AssetsFragment extends Fragment {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnDelete.setOnClickListener(v -> {
-            // --- 修改开始: 使用自定义弹窗 ---
             AlertDialog.Builder delBuilder = new AlertDialog.Builder(getContext());
             View delView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_confirm_delete, null);
             delBuilder.setView(delView);
             AlertDialog delDialog = delBuilder.create();
-
-            // 设置背景透明
-            if (delDialog.getWindow() != null) {
-                delDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            }
+            if (delDialog.getWindow() != null) delDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 
             TextView tvMsg = delView.findViewById(R.id.tv_dialog_message);
-            tvMsg.setText("确定要删除资产 “" + existing.name + "” 吗？\n相关记录可能无法正确显示。");
+            tvMsg.setText("确定要删除记录 “" + existing.name + "” 吗？\n相关记录可能无法正确显示。");
 
             delView.findViewById(R.id.btn_dialog_cancel).setOnClickListener(dv -> delDialog.dismiss());
             delView.findViewById(R.id.btn_dialog_confirm).setOnClickListener(dv -> {
                 viewModel.deleteAsset(existing);
                 delDialog.dismiss();
-                dialog.dismiss(); // 关闭外层编辑弹窗
+                dialog.dismiss();
             });
 
             delDialog.show();
-            // --- 修改结束 ---
         });
 
         btnSave.setOnClickListener(v -> {
@@ -307,37 +496,59 @@ public class AssetsFragment extends Fragment {
             if (name.isEmpty() || amountStr.isEmpty()) return;
 
             double amount = 0;
-            try {
-                amount = Double.parseDouble(amountStr);
-            } catch (NumberFormatException e) { return; }
+            try { amount = Double.parseDouble(amountStr); } catch (NumberFormatException e) { return; }
 
             int finalType = 0;
             int selectedId = rgType.getCheckedRadioButtonId();
             if (selectedId == R.id.rb_liability) finalType = 1;
             else if (selectedId == R.id.rb_lent) finalType = 2;
+            else if (selectedId == R.id.rb_investment) finalType = 3;
 
             String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
-            if (existing == null) {
-                AssetAccount newAcc = new AssetAccount(name, amount, finalType);
-                newAcc.currencySymbol = symbol;
-                viewModel.addAsset(newAcc);
-            } else {
-                existing.name = name;
-                existing.amount = amount;
-                existing.type = finalType;
-                existing.currencySymbol = symbol;
-                existing.updateTime = System.currentTimeMillis();
-                viewModel.updateAsset(existing);
+            AssetAccount accountToSave = (existing == null) ? new AssetAccount(name, amount, finalType) : existing;
+            accountToSave.name = name;
+            accountToSave.amount = amount;
+            accountToSave.type = finalType;
+            accountToSave.currencySymbol = symbol;
+            accountToSave.updateTime = System.currentTimeMillis();
+
+            if (finalType == 3) {
+                // 读取 Spinner 状态
+                accountToSave.isFixedTerm = spinnerDepositType.getSelectedItemPosition() == 0;
+                accountToSave.isCompoundInterest = spinnerInterestType.getSelectedItemPosition() == 1;
+                accountToSave.depositDate = currentDepositMillis[0]; // 保存存入时间
+
+                try {
+                    accountToSave.durationMonths = Integer.parseInt(etDuration.getText().toString().trim());
+                    double annualRate = Double.parseDouble(etRate.getText().toString().trim());
+                    accountToSave.interestRate = annualRate;
+
+                    if (accountToSave.isCompoundInterest) {
+                        accountToSave.expectedReturn = amount * Math.pow(1 + ((annualRate / 100.0) / 12.0), accountToSave.durationMonths);
+                    } else {
+                        accountToSave.expectedReturn = amount + (amount * (annualRate / 100.0) * (accountToSave.durationMonths / 12.0));
+                    }
+                } catch (Exception e) {
+                    accountToSave.durationMonths = 0;
+                    accountToSave.interestRate = 0.0;
+                    accountToSave.expectedReturn = amount;
+                }
             }
+
+            if (existing == null) viewModel.addAsset(accountToSave);
+            else viewModel.updateAsset(accountToSave);
+
             dialog.dismiss();
         });
 
         dialog.show();
     }
-
     // --- Adapter ---
-    private static class AssetAdapter extends RecyclerView.Adapter<AssetAdapter.VH> {
+    private static class AssetAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+        private static final int TYPE_NORMAL = 0;
+        private static final int TYPE_INVESTMENT = 3;
+
         private List<AssetAccount> data = new ArrayList<>();
         private final OnItemClickListener listener;
         private final OnItemLongClickListener longListener;
@@ -366,55 +577,92 @@ public class AssetsFragment extends Fragment {
             notifyDataSetChanged();
         }
 
-        @NonNull @Override
-        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_asset_detail, parent, false);
-            return new VH(v);
+        @Override
+        public int getItemViewType(int position) {
+            return data.get(position).type == 3 ? TYPE_INVESTMENT : TYPE_NORMAL;
+        }
+
+        @NonNull
+        @Override
+        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            if (viewType == TYPE_INVESTMENT) {
+                View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_asset_investment, parent, false);
+                return new InvestmentVH(v);
+            } else {
+                View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_asset_detail, parent, false);
+                return new NormalVH(v);
+            }
         }
 
         @Override
-        public void onBindViewHolder(@NonNull VH holder, int position) {
+        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
             AssetAccount item = data.get(position);
-            holder.tvName.setText(item.name);
-
             Context context = holder.itemView.getContext();
             SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
             boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
-
             String symbol = (item.currencySymbol != null && !item.currencySymbol.isEmpty()) ? item.currencySymbol : "¥";
-            String amountStr = String.format("%.2f", item.amount);
-            
-            if (isCurrencyEnabled) {
-                holder.tvAmount.setText(symbol + amountStr);
-            } else {
-                holder.tvAmount.setText(amountStr);
-            }
 
-            boolean isDefault = (item.id == defaultAssetId);
+            if (holder instanceof NormalVH) {
+                NormalVH normalHolder = (NormalVH) holder;
+                normalHolder.tvName.setText(item.name);
 
-            holder.itemView.setSelected(isDefault);
-
-            if (isDefault) {
-                holder.tvName.setTextColor(Color.WHITE);
-                holder.tvAmount.setTextColor(Color.WHITE);
-            } else {
-                try {
-                    holder.tvName.setTextColor(context.getColor(R.color.text_primary));
-                } catch (Exception e) {
-                    holder.tvName.setTextColor(Color.BLACK);
-                }
-
-                if (item.type == 0) {
-                    holder.tvAmount.setTextColor(context.getColor(R.color.app_yellow));
-                } else if (item.type == 1) {
-                    holder.tvAmount.setTextColor(context.getColor(R.color.expense_green));
+                String amountStr = String.format("%.2f", item.amount);
+                if (isCurrencyEnabled) {
+                    normalHolder.tvAmount.setText(symbol + amountStr);
                 } else {
-                    holder.tvAmount.setTextColor(context.getColor(R.color.income_red));
+                    normalHolder.tvAmount.setText(amountStr);
                 }
+
+                boolean isDefault = (item.id == defaultAssetId);
+                normalHolder.itemView.setSelected(isDefault);
+
+                if (isDefault) {
+                    normalHolder.tvName.setTextColor(Color.WHITE);
+                    normalHolder.tvAmount.setTextColor(Color.WHITE);
+                } else {
+                    try {
+                        normalHolder.tvName.setTextColor(context.getColor(R.color.text_primary));
+                    } catch (Exception e) {
+                        normalHolder.tvName.setTextColor(Color.BLACK);
+                    }
+
+                    if (item.type == 0) {
+                        normalHolder.tvAmount.setTextColor(context.getColor(R.color.app_yellow));
+                    } else if (item.type == 1) {
+                        normalHolder.tvAmount.setTextColor(context.getColor(R.color.expense_green));
+                    } else {
+                        normalHolder.tvAmount.setTextColor(context.getColor(R.color.income_red));
+                    }
+                }
+                normalHolder.tvNote.setVisibility(View.GONE);
+            }
+            else if (holder instanceof InvestmentVH) {
+                InvestmentVH invHolder = (InvestmentVH) holder;
+                String typeStr = item.isFixedTerm ? "定期" : "活期";
+                String interestModeStr = item.isCompoundInterest ? "复利" : "单利";
+
+                // 【新增：计算并格式化存入时间与结算时间】
+                String depositStr = "--";
+                String settlementStr = "--";
+                if (item.depositDate > 0) {
+                    java.time.LocalDate dDate = java.time.Instant.ofEpochMilli(item.depositDate).atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+                    depositStr = dDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    // 结算时间 = 存入时间 + 存储月数
+                    java.time.LocalDate sDate = dDate.plusMonths(item.durationMonths);
+                    settlementStr = sDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                }
+
+                // 重新拼接理财卡片的显示信息
+                String info = String.format("%s (%s | %s)\n本金: %s%.2f\n存入: %s | 结算: %s\n周期: %d个月 | 年化: %.2f%%\n预计结算: %s%.2f",
+                        item.name, typeStr, interestModeStr, symbol, item.amount, depositStr, settlementStr, item.durationMonths, item.interestRate, symbol, item.expectedReturn);
+
+                invHolder.tvInfo.setText(info);
+
+                boolean isDefault = (item.id == defaultAssetId);
+                invHolder.itemView.setSelected(isDefault);
             }
 
-            holder.tvNote.setVisibility(View.GONE);
-
+            // 绑定点击和长按事件
             holder.itemView.setOnClickListener(v -> listener.onClick(item));
             holder.itemView.setOnLongClickListener(v -> {
                 longListener.onLongClick(item);
@@ -422,15 +670,29 @@ public class AssetsFragment extends Fragment {
             });
         }
 
-        @Override public int getItemCount() { return data.size(); }
+        @Override
+        public int getItemCount() {
+            return data.size();
+        }
 
-        static class VH extends RecyclerView.ViewHolder {
+        // 普通资产/负债/借出 ViewHolder
+        static class NormalVH extends RecyclerView.ViewHolder {
             TextView tvName, tvAmount, tvNote;
-            VH(View v) {
+            NormalVH(View v) {
                 super(v);
                 tvName = v.findViewById(R.id.tv_detail_date);
                 tvAmount = v.findViewById(R.id.tv_detail_amount);
                 tvNote = v.findViewById(R.id.tv_detail_note);
+            }
+        }
+
+        // 理财卡片 ViewHolder
+        static class InvestmentVH extends RecyclerView.ViewHolder {
+            TextView tvInfo;
+            InvestmentVH(View v) {
+                super(v);
+                // 对应 item_asset_investment.xml 中的 TextView ID
+                tvInfo = v.findViewById(R.id.tv_investment_info);
             }
         }
     }
