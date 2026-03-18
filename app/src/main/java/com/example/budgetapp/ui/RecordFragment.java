@@ -103,6 +103,10 @@ public class RecordFragment extends Fragment {
     // 新增：记录当前的过滤模式
     private int currentFilterMode = 0;
 
+    private androidx.cardview.widget.CardView cardBudgetStatus;
+    private TextView tvBudgetText;
+    private android.widget.ProgressBar pbBudget;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -157,6 +161,11 @@ public class RecordFragment extends Fragment {
         layoutBalance = view.findViewById(R.id.layout_stat_balance);
         layoutOvertime = view.findViewById(R.id.layout_stat_overtime);
 
+        // 在 onCreateView 中绑定视图
+        cardBudgetStatus = view.findViewById(R.id.card_budget_status);
+        tvBudgetText = view.findViewById(R.id.tv_budget_text);
+        pbBudget = view.findViewById(R.id.pb_budget);
+
         FloatingActionButton btnQuickRecord = view.findViewById(R.id.btn_quick_record);
         if (btnQuickRecord != null) {
             btnQuickRecord.setOnClickListener(v -> {
@@ -185,6 +194,11 @@ public class RecordFragment extends Fragment {
             } else {
                 selectedDate = date;
                 adapter.setSelectedDate(date);
+                // 新增：选中新日期后，立即刷新预算卡片
+                List<Transaction> currentList = viewModel.getAllTransactions().getValue();
+                if (currentList != null) {
+                    updateBudgetCard(currentList);
+                }
             }
         });
         calendarRecycler.setAdapter(adapter);
@@ -271,6 +285,69 @@ public class RecordFragment extends Fragment {
 
         updateCalendar(0);
         return view;
+    }
+
+    private void updateBudgetCard(List<Transaction> transactions) {
+        if (transactions == null || getContext() == null) return;
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isBudgetEnabled = prefs.getBoolean("is_budget_enabled", false);
+        float monthlyBudget = prefs.getFloat("monthly_budget", 0f);
+
+        if (isBudgetEnabled && monthlyBudget > 0) {
+            cardBudgetStatus.setVisibility(View.VISIBLE);
+
+            // 获取需要计算的日期（如果没有选定日期，默认用今天）
+            LocalDate targetDate = selectedDate != null ? selectedDate : LocalDate.now();
+
+            // 使用目标日期所在月的天数来计算平均预算，保证精准
+            int daysInMonth = targetDate.lengthOfMonth();
+            double dailyBudget = monthlyBudget / daysInMonth;
+
+            // 计算目标日期的总支出
+            double targetExpense = 0;
+            long startOfDay = targetDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+            long endOfDay = targetDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+
+            for (Transaction t : transactions) {
+                if (t.date >= startOfDay && t.date < endOfDay && t.type == 0) { // type 0 为支出
+                    targetExpense += t.amount;
+                }
+            }
+
+            // 更新金额和进度条
+            tvBudgetText.setText(String.format("%.2f / %.2f", targetExpense, dailyBudget));
+            int progress = (int) ((targetExpense / dailyBudget) * 100);
+            pbBudget.setProgress(Math.min(progress, 100)); // 最大到100防越界
+
+            // 超出预算进度条变红
+            if (targetExpense > dailyBudget) {
+                pbBudget.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.budget_progress_exceed)));
+                tvBudgetText.setTextColor(ContextCompat.getColor(requireContext(), R.color.budget_progress_exceed));
+            } else {
+                pbBudget.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.budget_progress_safe)));
+                tvBudgetText.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary));
+            }
+
+            // 动态修改卡片标题，如果是今天显示"今日预算"，否则显示"X月X日预算"
+            try {
+                LinearLayout budgetTextContainer = (LinearLayout) tvBudgetText.getParent();
+                TextView tvBudgetTitle = (TextView) budgetTextContainer.getChildAt(0); // 巧妙获取前一个TextView
+                if (targetDate.equals(LocalDate.now())) {
+                    tvBudgetTitle.setText("今日预算");
+                } else {
+                    tvBudgetTitle.setText(targetDate.format(DateTimeFormatter.ofPattern("M月d日预算")));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        } else {
+            cardBudgetStatus.setVisibility(View.GONE);
+        }
+
+        // 把预算配置传给日历适配器处理背景色
+        adapter.setBudgetConfig(isBudgetEnabled, monthlyBudget);
     }
 
     @Override
@@ -567,6 +644,53 @@ public class RecordFragment extends Fragment {
 
         String sign = balance >= 0 ? "+" : "";
         tvBalance.setText(String.format("%s%.2f", sign, balance));
+
+        // 用刚才新增的独立方法替换掉原来长长的一段计算今天预算的代码
+        updateBudgetCard(transactions);
+
+        // ===== 新增预算处理逻辑 =====
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isBudgetEnabled = prefs.getBoolean("is_budget_enabled", false);
+        float monthlyBudget = prefs.getFloat("monthly_budget", 0f);
+
+        if (isBudgetEnabled && monthlyBudget > 0) {
+            cardBudgetStatus.setVisibility(View.VISIBLE);
+
+            int daysInMonth = currentMonth.lengthOfMonth();
+            double dailyBudget = monthlyBudget / daysInMonth;
+
+            // 计算今天的总支出
+            double todayExpense = 0;
+            long startOfToday = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+            long endOfToday = LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+
+            for (Transaction t : transactions) {
+                if (t.date >= startOfToday && t.date < endOfToday && t.type == 0) { // type 0 为支出
+                    todayExpense += t.amount;
+                }
+            }
+
+            // 更新 UI
+            tvBudgetText.setText(String.format("%.2f / %.2f", todayExpense, dailyBudget));
+            int progress = (int) ((todayExpense / dailyBudget) * 100);
+            pbBudget.setProgress(Math.min(progress, 100)); // 最大到100防越界
+
+            // 超出预算进度条变红
+            if (todayExpense > dailyBudget) {
+                pbBudget.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.budget_progress_exceed)));
+                tvBudgetText.setTextColor(ContextCompat.getColor(requireContext(), R.color.budget_progress_exceed));
+            } else {
+                pbBudget.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.budget_progress_safe)));
+                tvBudgetText.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary));
+            }
+        } else {
+            cardBudgetStatus.setVisibility(View.GONE);
+        }
+
+        // 把预算配置传给日历适配器处理背景色
+        adapter.setBudgetConfig(isBudgetEnabled, monthlyBudget);
+        // ===========================
+
     }
 
     private void showDateDetailDialog(LocalDate date) {

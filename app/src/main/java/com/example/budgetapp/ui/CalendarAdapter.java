@@ -33,6 +33,16 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
     private int filterMode = 0;
     private YearMonth currentMonth;
 
+    private boolean isBudgetEnabled = false;
+    private float monthlyBudget = 0f;
+
+    // 增加一个公开方法用于接收配置
+    public void setBudgetConfig(boolean enabled, float budget) {
+        this.isBudgetEnabled = enabled;
+        this.monthlyBudget = budget;
+        notifyDataSetChanged();
+    }
+
     public interface OnDateClickListener {
         void onDateClick(LocalDate date);
     }
@@ -128,11 +138,18 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         // 2. 统计金额及颜色处理
         double dailySum = 0;
         double dailyHours = 0; // 新增：统计每日工时
+        double dailyExpenseForBudget = 0; // <--- 1. 新增这行，定义每日支出变量
         long start = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
         long end = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 
         for (Transaction t : transactions) {
             if (t.date >= start && t.date < end) {
+
+                // <--- 2. 新增这块：只要是支出(type==0)，就累加到预算统计里 --->
+                if (t.type == 0) {
+                    dailyExpenseForBudget += t.amount;
+                }
+
                 switch (filterMode) {
                     case 0: // 结余
                         if (t.type == 1) {
@@ -226,6 +243,12 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         boolean isToday = date.equals(LocalDate.now());
         boolean isSelected = date.equals(selectedDate);
 
+        // --- 在判断背景色之前，先保存 View 原本的 Padding ---
+        int padLeft = holder.itemView.getPaddingLeft();
+        int padTop = holder.itemView.getPaddingTop();
+        int padRight = holder.itemView.getPaddingRight();
+        int padBottom = holder.itemView.getPaddingBottom();
+
         // --- 核心优化：检测多项自动续费日期 ---
         boolean isRenewalDay = false;
         for (RenewalItem item : renewalItems) {
@@ -272,12 +295,29 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             holder.tvDay.setTextColor(defaultDayColor);
             holder.itemView.setSelected(false);
 
+        } else if (isBudgetEnabled && monthlyBudget > 0 && isCurrentMonth && !date.isAfter(LocalDate.now())) {
+
+            // [新增：预算状态] 开启预算且是当月日期，并且“不是未来的日期”才显示预算背景
+            int daysInMonth = date.lengthOfMonth();
+            double dailyBudget = monthlyBudget / daysInMonth;
+            if (dailyExpenseForBudget > dailyBudget) {
+                holder.itemView.setBackgroundResource(R.drawable.bg_budget_exceed);
+            } else {
+                holder.itemView.setBackgroundResource(R.drawable.bg_budget_safe);
+            }
+            holder.tvDay.setTextColor(defaultDayColor);
+            holder.itemView.setSelected(false);
+
         } else {
             // [普通状态]
             holder.itemView.setBackgroundResource(0);
             holder.tvDay.setTextColor(defaultDayColor);
             holder.itemView.setSelected(false);
         }
+
+        // --- 新增：背景设置完毕后，强行恢复原本的 Padding ---
+        holder.itemView.setPadding(padLeft, padTop, padRight, padBottom);
+        // ----------------------------------------------------
 
         // 设置下方金额文字
         holder.tvNet.setText(netText);

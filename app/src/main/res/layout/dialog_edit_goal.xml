@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="320dp"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="32dp"
+    app:cardElevation="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="编辑存储目标"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:gravity="center" />
+
+        <EditText
+            android:id="@+id/et_edit_goal_name"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_input_field"
+            android:hint="目标名称"
+            android:paddingHorizontal="16dp" />
+
+        <EditText
+            android:id="@+id/et_edit_target_amount"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_input_field"
+            android:hint="实现金额"
+            android:inputType="numberDecimal"
+            android:paddingHorizontal="16dp" />
+
+        <EditText
+            android:id="@+id/et_edit_saved_amount"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_input_field"
+            android:hint="手动调整已存金额 (基础值)"
+            android:inputType="numberDecimal"
+            android:paddingHorizontal="16dp" />
+
+        <CheckBox
+            android:id="@+id/cb_is_priority"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="设为优先目标"
+            android:buttonTint="@color/app_yellow"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="24dp">
+
+            <Button
+                android:id="@+id/btn_delete_goal"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="删 除"
+                android:textColor="#FF5252"
+                android:backgroundTint="@color/input_bg"
+                android:layout_marginEnd="8dp"
+                android:textStyle="bold"
+                app:cornerRadius="16dp"/>
+
+            <Button
+                android:id="@+id/btn_update_goal"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="保 存"
+                android:backgroundTint="@color/app_yellow"
+                app:cornerRadius="16dp"/>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

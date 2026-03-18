@@ -6,6 +6,11 @@
         android:icon="@drawable/ic_nav_record"/>
 
     <item
+        android:id="@+id/nav_budget"
+        android:icon="@drawable/ic_nav_budget"
+        android:title="预算" />
+
+    <item
         android:id="@+id/nav_assets"
         android:title="资产"
         android:icon="@drawable/ic_nav_assets"/>

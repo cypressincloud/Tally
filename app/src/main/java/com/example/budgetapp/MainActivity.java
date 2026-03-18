@@ -344,4 +344,22 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .show();
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // 动态控制"预算"菜单栏是否显示
+        BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
+        if (bottomNav != null) {
+            SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+            boolean isBudgetEnabled = prefs.getBoolean("is_budget_enabled", false);
+
+            // 如果菜单里找到了 nav_budget，就根据开关状态决定它的隐藏/显示
+            if (bottomNav.getMenu().findItem(R.id.nav_budget) != null) {
+                bottomNav.getMenu().findItem(R.id.nav_budget).setVisible(isBudgetEnabled);
+            }
+        }
+    }
+
 }

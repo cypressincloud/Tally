@@ -69,6 +69,12 @@
             android:screenOrientation="portrait"/>
 
         <activity
+            android:name=".ui.BudgetManagementActivity"
+            android:label="预算管理设置"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
+        <activity
             android:name=".ui.CategorySettingsActivity"
             android:label="分类预设管理"
             android:theme="@style/Theme.BudgetApp"

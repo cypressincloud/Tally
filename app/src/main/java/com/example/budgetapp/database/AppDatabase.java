@@ -11,11 +11,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 // 【修改 1】版本号升级为 10
-@Database(entities = {Transaction.class, AssetAccount.class}, version = 12, exportSchema = false)
+@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 14, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract TransactionDao transactionDao();
     public abstract AssetAccountDao assetAccountDao();
+
+    public abstract GoalDao goalDao();
 
     private static volatile AppDatabase INSTANCE;
     private static final int NUMBER_OF_THREADS = 4;
@@ -76,6 +78,28 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    // 【全新增加】12 -> 13 的迁移逻辑：新建 goals 表
+    static final Migration MIGRATION_12_13 = new Migration(12, 13) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            // boolean 在 SQLite 中用 INTEGER 存储，所以 isPriority 是 INTEGER
+            database.execSQL("CREATE TABLE IF NOT EXISTS `goals` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT, " +
+                    "`targetAmount` REAL NOT NULL, " +
+                    "`savedAmount` REAL NOT NULL, " +
+                    "`isPriority` INTEGER NOT NULL)");
+        }
+    };
+
+    static final Migration MIGRATION_13_14 = new Migration(13, 14) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            // 为 goals 表增加 createdAt 字段
+            database.execSQL("ALTER TABLE goals ADD COLUMN createdAt INTEGER NOT NULL DEFAULT 0");
+        }
+    };
+
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
@@ -87,7 +111,7 @@ public abstract class AppDatabase extends RoomDatabase {
                                     MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                                     MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                                     MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                                    MIGRATION_11_12
+                                    MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14
                             )
                             .fallbackToDestructiveMigration()
                             .build();

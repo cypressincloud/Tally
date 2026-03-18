@@ -270,6 +270,10 @@ public class SettingsActivity extends AppCompatActivity {
         financeViewModel.getAllAssets().observe(this, list -> allAssets = list);
 
         findViewById(R.id.btn_category_setting).setOnClickListener(v -> startActivity(new Intent(this, CategorySettingsActivity.class)));
+
+        // 新增：跳转到预算管理页面
+        findViewById(R.id.btn_budget_management).setOnClickListener(v -> startActivity(new Intent(this, BudgetManagementActivity.class)));
+
         findViewById(R.id.btn_backup_restore).setOnClickListener(v -> showBackupOptions());
         findViewById(R.id.btn_auto_asset).setOnClickListener(v -> startActivity(new Intent(this, AutoAssetActivity.class)));
         findViewById(R.id.btn_toggle_night_mode).setOnClickListener(v -> showThemeSettingDialog());

@@ -2,6 +2,7 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/nav_graph"
+    xmlns:tools="http://schemas.android.com/tools"
     app:startDestination="@id/nav_record">
 
     <fragment
@@ -21,6 +22,12 @@
         android:id="@+id/nav_assets"
         android:name="com.example.budgetapp.ui.AssetsFragment"
         android:label="资产" />
+
+    <fragment
+        android:id="@+id/nav_budget"
+        android:name="com.example.budgetapp.ui.BudgetFragment"
+        android:label="预算"
+        tools:layout="@layout/fragment_budget" />
 
     <fragment
         android:id="@+id/nav_details"
