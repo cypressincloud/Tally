@@ -2,6 +2,7 @@ package com.example.budgetapp.ui;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -28,6 +29,7 @@ import com.example.budgetapp.database.Goal;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -51,6 +53,10 @@ public class BudgetFragment extends Fragment {
         // 1. 绑定概览视图
         tvTotalSurplus = view.findViewById(R.id.tv_total_surplus);
         tvHeaderMonthlyBudget = view.findViewById(R.id.tv_header_monthly_budget);
+
+        // 新增：点击月总预算可单独设置当月预算
+        tvHeaderMonthlyBudget.setOnClickListener(v -> showSetMonthBudgetDialog());
+
         tvHeaderDailyAvailable = view.findViewById(R.id.tv_header_daily_available);
 
         // 2. 初始化列表
@@ -68,6 +74,10 @@ public class BudgetFragment extends Fragment {
             adapter.setTransactions(transactions);
         });
 
+        view.findViewById(R.id.btn_budget_history).setOnClickListener(v -> {
+            startActivity(new Intent(getContext(), BudgetHistoryActivity.class));
+        });
+
         viewModel.getAllGoals().observe(getViewLifecycleOwner(), goals -> {
             if (goals != null) adapter.setGoals(goals);
         });
@@ -76,12 +86,71 @@ public class BudgetFragment extends Fragment {
     }
 
     /**
+     * 新增：设置独立月份预算的弹窗
+     */
+    private void showSetMonthBudgetDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_set_month_budget, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+        TextView tvTitle = view.findViewById(R.id.tv_dialog_title);
+        EditText etBudget = view.findViewById(R.id.et_month_budget);
+
+        LocalDate today = LocalDate.now();
+        tvTitle.setText("设置 " + today.getYear() + "年" + today.getMonthValue() + "月 预算");
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        float defaultBudget = prefs.getFloat("monthly_budget", 0f);
+        String monthKey = "budget_" + today.getYear() + "_" + today.getMonthValue();
+        float currentMonthBudget = prefs.getFloat(monthKey, defaultBudget);
+        etBudget.setText(currentMonthBudget > 0 ? String.valueOf(currentMonthBudget) : "");
+
+        view.findViewById(R.id.btn_save).setOnClickListener(v -> {
+            try {
+                float newBudget = Float.parseFloat(etBudget.getText().toString());
+                prefs.edit().putFloat(monthKey, newBudget).apply();
+
+                // 记录首次使用预算功能的时间
+                if (prefs.getLong("budget_start_time", 0) == 0) {
+                    prefs.edit().putLong("budget_start_time", System.currentTimeMillis()).apply();
+                }
+
+                // 手动触发一次刷新
+                if (viewModel.getAllTransactions().getValue() != null) {
+                    calculateMonthHeader(viewModel.getAllTransactions().getValue());
+                    adapter.setTransactions(viewModel.getAllTransactions().getValue());
+                }
+                dialog.dismiss();
+            } catch (Exception e) {
+                Toast.makeText(getContext(), "请输入有效的金额", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        view.findViewById(R.id.btn_cancel).setOnClickListener(v -> dialog.dismiss());
+        dialog.show();
+    }
+
+    /**
      * 计算顶部概览卡片的数据
+     */
+    /**
+     * 修改 calculateMonthHeader，支持动态读取当月预算
      */
     private void calculateMonthHeader(List<Transaction> transactions) {
         if (getContext() == null) return;
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
-        float monthlyBudget = prefs.getFloat("monthly_budget", 0f);
+        float defaultBudget = prefs.getFloat("monthly_budget", 0f);
+
+        LocalDate today = LocalDate.now();
+        String monthKey = "budget_" + today.getYear() + "_" + today.getMonthValue();
+        float monthlyBudget = prefs.getFloat(monthKey, defaultBudget); // 优先读取当月独立预算
+
+        // 记录首次开启功能的时间
+        if (monthlyBudget > 0 && prefs.getLong("budget_start_time", 0) == 0) {
+            prefs.edit().putLong("budget_start_time", System.currentTimeMillis()).apply();
+        }
 
         tvHeaderMonthlyBudget.setText(String.format("%.2f", monthlyBudget));
 
@@ -92,13 +161,9 @@ public class BudgetFragment extends Fragment {
             return;
         }
 
-        LocalDate today = LocalDate.now();
         double dailyBudget = (double) monthlyBudget / today.lengthOfMonth();
-
-        // 计算月初到现在应花的预算
         double expectedExpenseSoFar = today.getDayOfMonth() * dailyBudget;
-
-        // 计算月初到现在实际的支出
+        // ... 其余逻辑保持不变 (actualExpenseSoFar的计算等) ...
         double actualExpenseSoFar = 0;
         long startOfMonth = today.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
         long endOfNow = System.currentTimeMillis();
@@ -117,7 +182,6 @@ public class BudgetFragment extends Fragment {
         tvTotalSurplus.setTextColor(ContextCompat.getColor(requireContext(),
                 currentMonthSurplus >= 0 ? R.color.app_yellow : R.color.budget_progress_exceed));
 
-        // 今日可用 = 今日单日预算 + 历史累积结余
         tvHeaderDailyAvailable.setText(String.format("%.2f", dailyBudget + currentMonthSurplus));
     }
 
@@ -313,23 +377,35 @@ public class BudgetFragment extends Fragment {
             }
         }
 
-        private double calculateTotalPool(long startDate) {
+        // 在 GoalAdapter 内部
+        private double calculateTotalPool(long earliestGoalDate) {
             SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
-            float monthlyBudget = prefs.getFloat("monthly_budget", 0f);
-            if (monthlyBudget <= 0) return 0;
+            float defaultBudget = prefs.getFloat("monthly_budget", 0f);
 
-            LocalDate start = java.time.Instant.ofEpochMilli(startDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            // 使用系统首次记录的预算时间，如果没记录，使用目标创建时间兜底
+            long startTs = prefs.getLong("budget_start_time", earliestGoalDate);
+            LocalDate start = Instant.ofEpochMilli(startTs).atZone(ZoneId.systemDefault()).toLocalDate();
+            // 规定：资金池从那个月的1号开始算起
+            start = start.withDayOfMonth(1);
+
             LocalDate today = LocalDate.now();
             if (!today.isAfter(start)) return 0;
 
-            long closedDays = ChronoUnit.DAYS.between(start, today);
-            double dailyBudget = (double) monthlyBudget / today.lengthOfMonth();
-            double totalExpected = closedDays * dailyBudget;
+            // 1. 逐日计算应有的预算结余总额（因为每个月预算可能不同）
+            double totalExpected = 0;
+            for (LocalDate d = start; d.isBefore(today); d = d.plusDays(1)) {
+                String key = "budget_" + d.getYear() + "_" + d.getMonthValue();
+                float monthBudget = prefs.getFloat(key, defaultBudget);
+                totalExpected += (double) monthBudget / d.lengthOfMonth();
+            }
 
+            // 2. 统计这段期间内的总支出
             double actualExpense = 0;
+            long startOfCalculation = start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
             long startOfToday = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+
             for (Transaction t : allTransactions) {
-                if (t.date >= startDate && t.date < startOfToday && t.type == 0) {
+                if (t.date >= startOfCalculation && t.date < startOfToday && t.type == 0) {
                     actualExpense += t.amount;
                 }
             }

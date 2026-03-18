@@ -68,13 +68,9 @@
             android:id="@+id/pb_goal"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="6dp"
-            android:layout_marginTop="10dp"
-            android:max="100"
-            android:progress="0"
-            android:progressTint="@color/app_yellow"
-            android:progressBackgroundTint="#1A000000"
-            android:progressDrawable="@drawable/layer_budget_progress" />
-
+            android:layout_height="8dp"
+            android:layout_marginTop="8dp"
+            android:progressDrawable="@drawable/layer_budget_progress"
+            android:progressTint="@color/budget_progress_safe" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>

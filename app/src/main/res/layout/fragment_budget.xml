@@ -55,8 +55,8 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="#0D000000"
-                    android:layout_marginVertical="16dp"/>
+                    android:background="@color/divider"
+                    android:layout_marginVertical="12dp"/>
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -127,21 +127,45 @@
             android:paddingHorizontal="4dp"/>
     </LinearLayout>
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/btn_add_goal"
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:layout_alignParentBottom="true"
         android:layout_alignParentEnd="true"
         android:layout_margin="20dp"
-        android:src="@android:drawable/ic_input_add"
-        app:tint="@android:color/white"
-        android:contentDescription="添加目标"
-        app:backgroundTint="@color/app_yellow"
+        android:gravity="center_horizontal">
 
-        app:elevation="0dp"
-        app:pressedTranslationZ="0dp"
-        app:borderWidth="0dp"
-        android:stateListAnimator="@null"/>
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/btn_budget_history"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:src="@drawable/ic_history"
+            android:contentDescription="历史记录"
+
+            app:backgroundTint="@color/white"
+
+            app:tint="@color/app_yellow"
+            app:fabSize="mini"
+            app:elevation="0dp"
+            app:pressedTranslationZ="0dp"
+            app:borderWidth="0dp"
+            android:stateListAnimator="@null" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/btn_add_goal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@android:drawable/ic_input_add"
+            android:contentDescription="添加目标"
+            app:tint="@android:color/white"
+            app:backgroundTint="@color/app_yellow"
+
+            app:elevation="0dp"
+            app:pressedTranslationZ="0dp"
+            app:borderWidth="0dp"
+            android:stateListAnimator="@null" />
+    </LinearLayout>
 
 </RelativeLayout>

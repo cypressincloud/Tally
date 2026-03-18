@@ -14,8 +14,10 @@
     <color name="fixed_yellow">#FFD700</color>
     <color name="tab_unselected">#90A4AE</color>
 
-    <color name="budget_safe_bg">#E8F5E9</color> <color name="budget_exceed_bg">#FFEBEE</color> <color name="budget_progress_safe">#4CAF50</color>
-    <color name="budget_progress_exceed">#FF5252</color>
+    <color name="budget_safe_bg">#1A3320</color>
+    <color name="budget_exceed_bg">#3B1919</color>
+    <color name="budget_progress_safe">#A5D6A7</color>
+    <color name="budget_progress_exceed">#EF6565</color>
 
     <color name="divider_color">#2C2C2C</color>
 
@@ -23,7 +25,7 @@
 
     <color name="bottom_selected">@color/app_yellow</color>
 
-    <color name="divider">#2C2C2C</color>
+    <color name="divider">#767676</color>
     <color name="income_red">#EF6565</color>
     <color name="expense_green">#A5D6A7</color>
     <color name="pie_food">#FFF59D</color>
