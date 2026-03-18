@@ -25,7 +25,7 @@
 
     <color name="bottom_selected">@color/app_yellow</color>
 
-    <color name="divider">#767676</color>
+    <color name="divider">#1F888888</color>
     <color name="income_red">#EF6565</color>
     <color name="expense_green">#A5D6A7</color>
     <color name="pie_food">#FFF59D</color>
