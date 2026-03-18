@@ -63,7 +63,7 @@
         android:id="@+id/btn_cancel"
         android:layout_width="match_parent"
         android:layout_height="46dp"
-        android:text="取消"
+        android:text="取 消"
         android:textColor="?android:attr/textColorSecondary"
         android:backgroundTint="@color/input_bg"
         app:cornerRadius="16dp"

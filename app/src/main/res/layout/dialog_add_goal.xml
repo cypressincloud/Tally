@@ -71,7 +71,7 @@
                 android:layout_width="0dp"
                 android:layout_height="56dp"
                 android:layout_weight="1"
-                android:text="确  认"
+                android:text="确 认"
                 android:textStyle="bold"
                 android:textColor="@color/text_white"
                 android:backgroundTint="@color/app_yellow"

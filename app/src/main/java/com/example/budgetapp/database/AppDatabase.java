@@ -11,7 +11,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 // 【修改 1】版本号升级为 10
-@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 14, exportSchema = false)
+@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 15, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract TransactionDao transactionDao();
@@ -100,6 +100,15 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    // 2. 增加 14 -> 15 的迁移逻辑
+    static final Migration MIGRATION_14_15 = new Migration(14, 15) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE goals ADD COLUMN isFinished INTEGER NOT NULL DEFAULT 0");
+            database.execSQL("ALTER TABLE goals ADD COLUMN finishedDate INTEGER NOT NULL DEFAULT 0");
+        }
+    };
+
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
@@ -111,7 +120,8 @@ public abstract class AppDatabase extends RoomDatabase {
                                     MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                                     MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                                     MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                                    MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14
+                                    MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
+                                    MIGRATION_14_15
                             )
                             .fallbackToDestructiveMigration()
                             .build();

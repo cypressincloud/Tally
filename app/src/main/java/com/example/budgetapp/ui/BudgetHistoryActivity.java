@@ -38,6 +38,8 @@ public class BudgetHistoryActivity extends AppCompatActivity {
     private RecyclerView rvTimeline;
     private TimelineAdapter adapter;
 
+    private FinanceViewModel viewModel; // 【新增】全局 ViewModel 变量
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -55,13 +57,13 @@ public class BudgetHistoryActivity extends AppCompatActivity {
         rvTimeline = findViewById(R.id.rv_timeline);
         rvTimeline.setLayoutManager(new LinearLayoutManager(this));
 
-        FinanceViewModel viewModel = new ViewModelProvider(this).get(FinanceViewModel.class);
-        
-        // 观察数据并生成时间轴
+        // 【修改这里】：将原本的局部变量改为全局变量
+        viewModel = new ViewModelProvider(this).get(FinanceViewModel.class);
+
         viewModel.getAllTransactions().observe(this, transactions -> {
             viewModel.getAllGoals().observe(this, goals -> {
-                generateTimeline(transactions != null ? transactions : new ArrayList<>(), 
-                                 goals != null ? goals : new ArrayList<>());
+                generateTimeline(transactions != null ? transactions : new ArrayList<>(),
+                        goals != null ? goals : new ArrayList<>());
             });
         });
     }
@@ -73,7 +75,7 @@ public class BudgetHistoryActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         float defaultBudget = prefs.getFloat("monthly_budget", 0f);
 
-        // 获取首次开启预算的记录时间
+        // 1. 获取首次开启预算的记录时间
         long startTs = prefs.getLong("budget_start_time", 0);
         if (startTs == 0) {
             // 兜底逻辑：如果是老用户第一次进这个页面，以最早的目标创建时间作为起点
@@ -89,6 +91,8 @@ public class BudgetHistoryActivity extends AppCompatActivity {
 
         List<TimelineItem> timeline = new ArrayList<>();
         List<Goal> pendingGoals = new ArrayList<>(goals);
+
+        // 按优先级和时间排序
         pendingGoals.sort((g1, g2) -> {
             if (g1.isPriority && !g2.isPriority) return -1;
             if (!g1.isPriority && g2.isPriority) return 1;
@@ -97,6 +101,10 @@ public class BudgetHistoryActivity extends AppCompatActivity {
 
         double pool = 0;
         LocalDate today = LocalDate.now();
+
+        // 如果起点晚于今天，说明数据异常，直接返回
+        if (earliestDate.isAfter(today)) return;
+
         YearMonth currentProcessingMonth = YearMonth.from(earliestDate);
         double currentMonthExpense = 0;
 
@@ -119,7 +127,7 @@ public class BudgetHistoryActivity extends AppCompatActivity {
                 currentMonthExpense = 0;
             }
 
-            double dailyBudget = (double) activeMonthBudget / d.lengthOfMonth();
+            double dailyBudget = (activeMonthBudget > 0) ? ((double) activeMonthBudget / d.lengthOfMonth()) : 0;
             double expenseToday = 0;
             long startOfDay = d.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
             long endOfDay = d.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
@@ -131,38 +139,106 @@ public class BudgetHistoryActivity extends AppCompatActivity {
             }
 
             currentMonthExpense += expenseToday;
-            pool += (dailyBudget - expenseToday);
 
+            // 【新增修复】：判断这一天是否存在尚未完成的目标
+            boolean hasActiveGoal = false;
+            for (Goal g : pendingGoals) {
+                LocalDate createDate = Instant.ofEpochMilli(g.createdAt).atZone(ZoneId.systemDefault()).toLocalDate();
+                if (!d.isBefore(createDate)) {
+                    hasActiveGoal = true;
+                    break;
+                }
+            }
+
+            // 只有存在激活目标时，才把当天的净余存入资金池
+            if (hasActiveGoal) {
+                pool += (dailyBudget - expenseToday);
+            } else {
+                pool = 0; // 防止历史结余变成死水，瞬间填满未来的新目标
+            }
+
+            // 检查目标是否达成
             java.util.Iterator<Goal> it = pendingGoals.iterator();
             while (it.hasNext()) {
                 Goal g = it.next();
                 LocalDate goalCreateDate = Instant.ofEpochMilli(g.createdAt).atZone(ZoneId.systemDefault()).toLocalDate();
                 if (d.isBefore(goalCreateDate)) continue;
 
+                // 劫持手动完成的目标
+                if (g.isFinished) {
+                    LocalDate finishDate = Instant.ofEpochMilli(g.finishedDate).atZone(ZoneId.systemDefault()).toLocalDate();
+                    if (!d.isBefore(finishDate)) { // 当推演到用户点击完成的那一天
+                        long ts = d.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                        timeline.add(new GoalItem(ts, g.name, d, g)); // 【修改】：加上参数 g
+                        it.remove();
+                        continue; // 手动完成的不消耗资金池
+                    }
+                }
+
+                // 计算是否自动达标
                 double needed = Math.max(0, g.targetAmount - g.savedAmount);
                 if (needed <= 0) {
+                    // 仅靠基础资金就完成了
                     long ts = d.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                    timeline.add(new GoalItem(ts, g.name, d));
+                    timeline.add(new GoalItem(ts, g.name, d, g)); // 【修改】：加上参数 g
                     it.remove();
                 } else if (pool >= needed) {
+                    // 资金池填满了目标
                     pool -= needed;
                     long ts = d.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                    timeline.add(new GoalItem(ts, g.name, d));
+                    timeline.add(new GoalItem(ts, g.name, d, g)); // 【修改】：加上参数 g
                     it.remove();
                 } else {
-                    break;
+                    break; // 资金不够填目前的最高优目标，停止当天的顺延分配
                 }
             }
         }
 
+        // 添加当前进行中月份的结余
         double currentSurplus = activeMonthBudget - currentMonthExpense;
         long nowTs = System.currentTimeMillis();
         timeline.add(new MonthItem(nowTs, currentProcessingMonth.getYear(), currentProcessingMonth.getMonthValue(), currentSurplus));
 
+        // 按时间正序排列（最早的在最上面，符合你的阅读习惯）
         Collections.sort(timeline, (a, b) -> Long.compare(a.getTimestamp(), b.getTimestamp()));
 
         adapter = new TimelineAdapter(timeline);
         rvTimeline.setAdapter(adapter);
+    }
+
+    /**
+     * 弹出确认删除目标记录的对话框
+     */
+    private void showDeleteGoalDialog(Goal goal) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_confirm_delete, null);
+        builder.setView(view);
+
+        android.app.AlertDialog confirmDialog = builder.create();
+        if (confirmDialog.getWindow() != null) {
+            confirmDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        }
+
+        TextView tvMessage = view.findViewById(R.id.tv_dialog_message);
+        if (tvMessage != null) {
+            tvMessage.setText("确定要删除历史记录中的“" + goal.name + "”吗？\n删除后将无法恢复。");
+        }
+
+        View btnConfirm = view.findViewById(R.id.btn_dialog_confirm);
+        if (btnConfirm != null) {
+            btnConfirm.setOnClickListener(v -> {
+                viewModel.deleteGoal(goal);
+                confirmDialog.dismiss();
+                android.widget.Toast.makeText(this, "已删除目标记录", android.widget.Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        View btnCancel = view.findViewById(R.id.btn_dialog_cancel);
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> confirmDialog.dismiss());
+        }
+
+        confirmDialog.show();
     }
 
     // --- 适配器结构 ---
@@ -180,10 +256,23 @@ public class BudgetHistoryActivity extends AppCompatActivity {
     }
 
     static class GoalItem implements TimelineItem {
-        long timestamp; String goalName; LocalDate achievedDate;
-        GoalItem(long ts, String name, LocalDate date) { timestamp = ts; goalName = name; achievedDate = date; }
-        @Override public long getTimestamp() { return timestamp; }
-        @Override public int getType() { return 1; }
+        long timestamp;
+        String goalName;
+        LocalDate achievedDate;
+        Goal goal; // 【新增】：保存目标对象本身
+
+        GoalItem(long ts, String name, LocalDate date, Goal goal) {
+            timestamp = ts;
+            goalName = name;
+            achievedDate = date;
+            this.goal = goal; // 【新增】
+        }
+        @Override public long getTimestamp() {
+            return timestamp;
+        }
+        @Override public int getType() {
+            return 1;
+        }
     }
 
     // ... TimelineItem 接口和实体类保持不变 ...
@@ -231,6 +320,9 @@ public class BudgetHistoryActivity extends AppCompatActivity {
 
                 tvName.setText("🎉 实现了目标：" + gItem.goalName);
                 tvDate.setText(gItem.achievedDate.toString());
+
+                // 【新增】：给目标卡片绑定点击事件
+                holder.itemView.setOnClickListener(v -> showDeleteGoalDialog(gItem.goal));
             }
         }
         @Override public int getItemCount() { return items.size(); }

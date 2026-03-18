@@ -255,6 +255,16 @@ public class BudgetFragment extends Fragment {
             }
         });
 
+        // 新增：完成目标的点击事件
+        view.findViewById(R.id.btn_finish_goal).setOnClickListener(v -> {
+            goal.isFinished = true;
+            goal.finishedDate = System.currentTimeMillis();
+            goal.isPriority = false; // 完成后自动取消优先占用
+            viewModel.updateGoal(goal);
+            dialog.dismiss();
+            Toast.makeText(getContext(), "🎉 目标已完成！已归档至历史记录", Toast.LENGTH_SHORT).show();
+        });
+
         view.findViewById(R.id.btn_delete_goal).setOnClickListener(v -> {
             showConfirmDeleteGoalDialog(goal, dialog);
         });
@@ -315,7 +325,14 @@ public class BudgetFragment extends Fragment {
         private java.util.Map<Integer, Double> surplusAllocationMap = new java.util.HashMap<>();
 
         public void setGoals(List<Goal> goals) {
-            this.goals = goals;
+            // 过滤：只将没完成的(isFinished == false)卡片显示在主页
+            List<Goal> activeGoals = new ArrayList<>();
+            for (Goal g : goals) {
+                if (!g.isFinished) {
+                    activeGoals.add(g);
+                }
+            }
+            this.goals = activeGoals;
             calculateAndDistributeSurplus(); // 重新分配资金
             notifyDataSetChanged();
         }
@@ -327,52 +344,91 @@ public class BudgetFragment extends Fragment {
         }
 
         /**
-         * 资金池顺延分配算法
+         * 资金池顺延分配算法 (按日精确推演)
          */
         private void calculateAndDistributeSurplus() {
             surplusAllocationMap.clear();
             if (goals.isEmpty()) return;
 
-            // 1. 确定计算起点：所有目标中最晚（新）创建的时间，作为结余积攒的开始
-            // (注：也可以用最早创建时间，取决于你想让用户从哪天开始“攒钱”)
-            long earliestStart = Long.MAX_VALUE;
+            // 1. 初始化每个目标的分配金额为 0
             for (Goal g : goals) {
-                if (g.createdAt < earliestStart) earliestStart = g.createdAt;
+                surplusAllocationMap.put(g.id, 0.0);
             }
-            if (earliestStart == Long.MAX_VALUE) return;
 
-            // 2. 计算从起点到昨天的总结余池 (Total Surplus Pool)
-            double totalPool = calculateTotalPool(earliestStart);
-            if (totalPool <= 0) return;
+            // 2. 将目标排序：优先目标在前，同级按创建时间早的在前
+            List<Goal> sortedGoals = new ArrayList<>(goals);
+            sortedGoals.sort((g1, g2) -> {
+                if (g1.isPriority && !g2.isPriority) return -1;
+                if (!g1.isPriority && g2.isPriority) return 1;
+                return Long.compare(g1.createdAt, g2.createdAt);
+            });
 
-            // 3. 第一顺位：分配给“优先目标”
-            Goal priorityGoal = null;
+            SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+            float defaultBudget = prefs.getFloat("monthly_budget", 0f);
+
+            // 确定起点
+            long earliestGoal = Long.MAX_VALUE;
             for (Goal g : goals) {
-                if (g.isPriority) {
-                    priorityGoal = g;
-                    break;
-                }
+                if (g.createdAt < earliestGoal) earliestGoal = g.createdAt;
             }
+            long startTs = prefs.getLong("budget_start_time", earliestGoal);
+            LocalDate start = java.time.Instant.ofEpochMilli(startTs).atZone(ZoneId.systemDefault()).toLocalDate();
+            start = start.withDayOfMonth(1);
 
-            if (priorityGoal != null) {
-                double stillNeeded = Math.max(0, priorityGoal.targetAmount - priorityGoal.savedAmount);
-                double allocated = Math.min(totalPool, stillNeeded);
-                surplusAllocationMap.put(priorityGoal.id, allocated);
-                totalPool -= allocated; // 剩余资金流向下一级
-            }
+            LocalDate today = LocalDate.now();
+            if (!start.isBefore(today)) return;
 
-            // 4. 第二顺位：按顺序顺延给其他未完成的目标
-            if (totalPool > 0) {
-                for (Goal g : goals) {
-                    if (g.isPriority) continue; // 优先目标已处理
+            double pool = 0;
 
-                    double stillNeeded = Math.max(0, g.targetAmount - g.savedAmount);
-                    if (stillNeeded > 0) {
-                        double allocated = Math.min(totalPool, stillNeeded);
-                        surplusAllocationMap.put(g.id, allocated);
-                        totalPool -= allocated;
+            for (LocalDate d = start; d.isBefore(today); d = d.plusDays(1)) {
+                String key = "budget_" + d.getYear() + "_" + d.getMonthValue();
+                float monthBudget = prefs.getFloat(key, defaultBudget);
+                double dailyBudget = (monthBudget > 0) ? ((double) monthBudget / d.lengthOfMonth()) : 0;
+
+                double expenseToday = 0;
+                long startOfDay = d.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                long endOfDay = d.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                for (Transaction t : allTransactions) {
+                    if (t.date >= startOfDay && t.date < endOfDay && t.type == 0) {
+                        expenseToday += t.amount;
                     }
-                    if (totalPool <= 0) break; // 没钱了，停止分配
+                }
+
+                // 【核心修复】：判断这一天是否有"已创建且未完成"的目标
+                // 如果当天没有目标，历史结余就直接截断归零，绝对不会流向未来的新目标
+                boolean hasActiveGoal = false;
+                for (Goal g : sortedGoals) {
+                    if (g.isFinished) continue;
+                    LocalDate createDate = java.time.Instant.ofEpochMilli(g.createdAt).atZone(ZoneId.systemDefault()).toLocalDate();
+                    if (!d.isBefore(createDate)) {
+                        hasActiveGoal = true;
+                        break;
+                    }
+                }
+
+                if (hasActiveGoal) {
+                    pool += (dailyBudget - expenseToday);
+
+                    if (pool > 0) {
+                        for (Goal g : sortedGoals) {
+                            if (g.isFinished) continue;
+                            LocalDate createDate = java.time.Instant.ofEpochMilli(g.createdAt).atZone(ZoneId.systemDefault()).toLocalDate();
+                            // 目标在这一天还没创建，跳过不分钱
+                            if (d.isBefore(createDate)) continue;
+
+                            double allocated = surplusAllocationMap.get(g.id);
+                            double needed = g.targetAmount - g.savedAmount - allocated;
+                            if (needed > 0) {
+                                double take = Math.min(pool, needed);
+                                surplusAllocationMap.put(g.id, allocated + take);
+                                pool -= take;
+                            }
+                            if (pool <= 0) break;
+                        }
+                    }
+                } else {
+                    // 当天无有效目标，直接清空资金池
+                    pool = 0;
                 }
             }
         }

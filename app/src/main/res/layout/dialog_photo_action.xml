@@ -84,7 +84,7 @@
             android:id="@+id/btn_action_cancel"
             android:layout_width="match_parent"
             android:layout_height="46dp"
-            android:text="取消"
+            android:text="取 消"
             android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="?android:attr/textColorPrimary"

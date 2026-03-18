@@ -48,7 +48,7 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
                 android:backgroundTint="@color/input_bg"
-                android:text="取消"
+                android:text="取 消"
                 android:textColor="@color/text_primary"
                 app:cornerRadius="16dp"
                 app:elevation="0dp" />

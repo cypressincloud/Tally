@@ -95,5 +95,17 @@
                 android:backgroundTint="@color/app_yellow"
                 app:cornerRadius="16dp"/>
         </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_finish_goal"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="16dp"
+            android:text="完成目标"
+            android:textStyle="bold"
+            android:textColor="@color/text_white"
+            android:backgroundTint="@color/app_yellow"
+            app:cornerRadius="16dp"/>
+
     </LinearLayout>
 </androidx.cardview.widget.CardView>

@@ -200,7 +200,7 @@ public class SecuritySettingsActivity extends AppCompatActivity {
         BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
                 .setTitle("验证指纹")
                 .setSubtitle("请验证以开启生物识别登录功能")
-                .setNegativeButtonText("取消")
+                .setNegativeButtonText("取 消")
                 .build();
 
         biometricPrompt.authenticate(promptInfo);

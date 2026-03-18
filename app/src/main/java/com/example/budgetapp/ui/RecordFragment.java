@@ -1284,7 +1284,7 @@ public class RecordFragment extends Fragment {
             tvRevoke.setVisibility(View.VISIBLE);
             tvRevoke.setOnClickListener(v -> showRevokeDialog(existingTransaction, dialog));
         } else {
-            btnSave.setText("保存");
+            btnSave.setText("保 存");
             btnDelete.setVisibility(View.GONE);
             tvRevoke.setVisibility(View.GONE);
             SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA);

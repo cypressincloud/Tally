@@ -712,7 +712,7 @@ public class StatsFragment extends Fragment {
                 new AlertDialog.Builder(getContext()).setTitle("确认删除").setMessage("确定要删除这条记录吗？").setPositiveButton("删除", (d, w) -> {
                     viewModel.deleteTransaction(existingTransaction);
                     dialog.dismiss();
-                }).setNegativeButton("取消", null).show();
+                }).setNegativeButton("取 消", null).show();
             });
 
             tvRevoke.setVisibility(View.VISIBLE);
@@ -721,7 +721,7 @@ public class StatsFragment extends Fragment {
             });
 
         } else {
-            btnSave.setText("保存");
+            btnSave.setText("保 存");
             btnDelete.setVisibility(View.GONE);
             tvRevoke.setVisibility(View.GONE);
             SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA);
