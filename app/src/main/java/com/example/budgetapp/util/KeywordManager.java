@@ -127,15 +127,15 @@ public class KeywordManager {
         SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         
         if (prefs.getAll().isEmpty()) {
-            // --- 微信 ---
-            // 支出
-            addKeyword(context, PKG_WECHAT, TYPE_EXPENSE, "付款方式");
-            // 收入 (包含收款和退款)
-            addKeyword(context, PKG_WECHAT, TYPE_INCOME, "已存入零钱"); 
-
-            // --- 支付宝 ---
-            // 支出
-            addKeyword(context, PKG_ALIPAY, TYPE_EXPENSE, "支付成功");
+//            // --- 微信 ---
+//            // 支出
+//            addKeyword(context, PKG_WECHAT, TYPE_EXPENSE, "付款方式");
+//            // 收入 (包含收款和退款)
+//            addKeyword(context, PKG_WECHAT, TYPE_INCOME, "已存入零钱");
+//
+//            // --- 支付宝 ---
+//            // 支出
+//            addKeyword(context, PKG_ALIPAY, TYPE_EXPENSE, "支付成功");
         }
     }
 }

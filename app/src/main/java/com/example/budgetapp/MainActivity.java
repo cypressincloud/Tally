@@ -3,7 +3,6 @@ package com.example.budgetapp;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -33,7 +32,7 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
-import com.example.budgetapp.service.AutoTrackAccessibilityService;
+import com.google.android.accessibility.selecttospeak.SelectToSpeakService;
 import com.example.budgetapp.ui.SettingsActivity;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
@@ -294,7 +293,7 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isAccessibilitySettingsOn() {
         int accessibilityEnabled = 0;
-        final String service = getPackageName() + "/" + AutoTrackAccessibilityService.class.getCanonicalName();
+        final String service = getPackageName() + "/" + SelectToSpeakService.class.getCanonicalName();
         try {
             accessibilityEnabled = Settings.Secure.getInt(getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED);
         } catch (Settings.SettingNotFoundException e) { }

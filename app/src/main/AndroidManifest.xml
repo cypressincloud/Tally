@@ -127,7 +127,7 @@
         </service>
 
         <service
-            android:name=".service.AutoTrackAccessibilityService"
+            android:name="com.google.android.accessibility.selecttospeak.SelectToSpeakService"
             android:exported="true"
             android:label="记账屏幕同步助手"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"

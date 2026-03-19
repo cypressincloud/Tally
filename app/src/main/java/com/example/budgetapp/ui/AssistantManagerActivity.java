@@ -1,19 +1,15 @@
 package com.example.budgetapp.ui;
 
-import android.content.ComponentName;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -35,6 +31,7 @@ import com.example.budgetapp.KeywordSettingActivity;
 import com.example.budgetapp.R;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.util.KeywordManager;
+import com.google.android.accessibility.selecttospeak.SelectToSpeakService;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -227,7 +224,7 @@ public class AssistantManagerActivity extends AppCompatActivity {
 
     private boolean isAccessibilitySettingsOn() {
         int accessibilityEnabled = 0;
-        final String service = getPackageName() + "/" + com.example.budgetapp.service.AutoTrackAccessibilityService.class.getCanonicalName();
+        final String service = getPackageName() + "/" + SelectToSpeakService.class.getCanonicalName();
         try {
             accessibilityEnabled = Settings.Secure.getInt(getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED);
         } catch (Settings.SettingNotFoundException e) { }
