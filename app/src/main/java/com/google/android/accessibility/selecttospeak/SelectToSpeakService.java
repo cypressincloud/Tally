@@ -1426,8 +1426,8 @@ public class SelectToSpeakService extends AccessibilityService {
             // 自动匹配资产
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", assetName);
 
-            // 触发记账弹窗（type: 0 代表支出，分类默认给 "人情"）
-            handler.post(() -> showConfirmWindow(finalAmount, 0, "人情", timeNote, autoAssetId, "¥"));
+            // 触发记账弹窗（type: 0 代表支出，分类默认给 "红包"）
+            handler.post(() -> showConfirmWindow(finalAmount, 0, "红包", timeNote, autoAssetId, "¥"));
 
             return true;
         }
