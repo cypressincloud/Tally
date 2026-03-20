@@ -105,20 +105,20 @@ public class SelectToSpeakService extends AccessibilityService {
                 String packageName = rootNode.getPackageName() != null ? rootNode.getPackageName().toString() : "";
 
 
-                // ==========================================
-                // 【测试阶段临时添加】如果是微信，则打印整棵节点树
-                if ("com.tencent.mm".equals(packageName)) {
-                    debugWeChatNodeTree(rootNode);
-                }
-                // ==========================================
-
-                // ======= 支付宝调试入口 =======
-                if ("com.eg.android.AlipayGphone".equals(packageName)) {
-                    debugAlipayNodeTree(rootNode);
-                    // 如果已经写好了支付宝的特定适配方法，也可以在这里调用
-                    // if (handleAlipaySpecificPage(rootNode)) return;
-                }
-                // ============================
+//                // ==========================================
+//                // 【测试阶段临时添加】如果是微信，则打印整棵节点树
+//                if ("com.tencent.mm".equals(packageName)) {
+//                    debugWeChatNodeTree(rootNode);
+//                }
+//                // ==========================================
+//
+//                // ======= 支付宝调试入口 =======
+//                if ("com.eg.android.AlipayGphone".equals(packageName)) {
+//                    debugAlipayNodeTree(rootNode);
+//                    // 如果已经写好了支付宝的特定适配方法，也可以在这里调用
+//                    // if (handleAlipaySpecificPage(rootNode)) return;
+//                }
+//                // ============================
 
                 // ======= 支付宝专属逻辑 =======
                 if ("com.eg.android.AlipayGphone".equals(packageName)) {

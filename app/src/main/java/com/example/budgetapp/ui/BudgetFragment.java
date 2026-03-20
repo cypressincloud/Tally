@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -13,6 +14,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -23,16 +25,19 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.Goal;
 import com.example.budgetapp.database.Transaction;
+import com.example.budgetapp.util.CategoryManager;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
+import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,8 +45,14 @@ public class BudgetFragment extends Fragment {
 
     private FinanceViewModel viewModel;
     private TextView tvTotalSurplus, tvHeaderMonthlyBudget, tvHeaderDailyAvailable;
-    private RecyclerView rvGoals;
-    private GoalAdapter adapter;
+
+    // ViewPager 与 页面组件
+    private ViewPager2 viewPager;
+    private TabLayout tabLayout;
+    private GoalAdapter goalAdapter;
+    private DetailedBudgetAdapter detailedAdapter;
+    private boolean isDetailedEnabled = false;
+
     private double currentMonthSurplus = 0;
 
     @Nullable
@@ -50,45 +61,233 @@ public class BudgetFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_budget, container, false);
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
 
-        // 1. 绑定概览视图
         tvTotalSurplus = view.findViewById(R.id.tv_total_surplus);
         tvHeaderMonthlyBudget = view.findViewById(R.id.tv_header_monthly_budget);
-
-        // 新增：点击月总预算可单独设置当月预算
-        tvHeaderMonthlyBudget.setOnClickListener(v -> showSetMonthBudgetDialog());
-
         tvHeaderDailyAvailable = view.findViewById(R.id.tv_header_daily_available);
 
-        // 2. 初始化列表
-        rvGoals = view.findViewById(R.id.rv_goals);
-        rvGoals.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new GoalAdapter();
-        rvGoals.setAdapter(adapter);
-
-        // 3. 悬浮添加按钮
+        view.findViewById(R.id.layout_monthly_budget).setOnClickListener(v -> showSetMonthBudgetDialog());
         view.findViewById(R.id.btn_add_goal).setOnClickListener(v -> showAddGoalDialog());
+        view.findViewById(R.id.btn_budget_history).setOnClickListener(v -> startActivity(new Intent(getContext(), BudgetHistoryActivity.class)));
 
-        // 4. 数据观察与实时刷新
+        goalAdapter = new GoalAdapter();
+        detailedAdapter = new DetailedBudgetAdapter();
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        isDetailedEnabled = prefs.getBoolean("is_detailed_budget_enabled", false);
+
+        viewPager = view.findViewById(R.id.vp_budget);
+        tabLayout = view.findViewById(R.id.tab_layout_budget);
+        TextView tvGoalsTitle = view.findViewById(R.id.tv_goals_title); // 新增的标题
+
+        BudgetPagerAdapter pagerAdapter = new BudgetPagerAdapter(isDetailedEnabled);
+        viewPager.setAdapter(pagerAdapter);
+
+        if (isDetailedEnabled) {
+            tabLayout.setVisibility(View.VISIBLE);
+            tvGoalsTitle.setVisibility(View.GONE); // 有 TabLayout 就隐藏文本标题
+
+            new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
+                tab.setText(position == 0 ? "详细预算" : "存储目标");
+            }).attach();
+
+            int lastTab = prefs.getInt("last_budget_tab", 0);
+            viewPager.setCurrentItem(lastTab, false);
+
+            viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+                @Override
+                public void onPageSelected(int position) {
+                    prefs.edit().putInt("last_budget_tab", position).apply();
+                }
+            });
+        } else {
+            tabLayout.setVisibility(View.GONE);
+            tvGoalsTitle.setVisibility(View.VISIBLE); // 没有 TabLayout 时显示标题
+            viewPager.setCurrentItem(0, false);
+        }
+
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), transactions -> {
             calculateMonthHeader(transactions);
-            adapter.setTransactions(transactions);
-        });
-
-        view.findViewById(R.id.btn_budget_history).setOnClickListener(v -> {
-            startActivity(new Intent(getContext(), BudgetHistoryActivity.class));
+            goalAdapter.setTransactions(transactions);
+            if (isDetailedEnabled) calculateDetailedBudgets(transactions);
         });
 
         viewModel.getAllGoals().observe(getViewLifecycleOwner(), goals -> {
-            if (goals != null) adapter.setGoals(goals);
+            if (goals != null) goalAdapter.setGoals(goals);
         });
 
         return view;
     }
-
     /**
-     * 新增：设置独立月份预算的弹窗
+     * 计算详细分类预算的已用进度
      */
+    private void calculateDetailedBudgets(List<Transaction> transactions) {
+        if (getContext() == null) return;
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        List<CategoryBudgetModel> list = new ArrayList<>();
+
+        long startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        long endOfNow = System.currentTimeMillis();
+
+        List<String> expenseCategories = CategoryManager.getExpenseCategories(requireContext());
+        for (String cat : expenseCategories) {
+            float limit = prefs.getFloat("budget_cat_" + cat, 0f);
+            if (limit > 0) {
+                double spent = 0;
+                for (Transaction t : transactions) {
+                    if (t.type == 0 && t.date >= startOfMonth && t.date <= endOfNow && cat.equals(t.category)) {
+                        spent += t.amount;
+                    }
+                }
+                list.add(new CategoryBudgetModel(cat, limit, spent));
+            }
+        }
+        detailedAdapter.setData(list);
+    }
+
+    // --- 页面滑动适配器 ---
+    private class BudgetPagerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+        private boolean isDetailed;
+        public BudgetPagerAdapter(boolean detailed) { this.isDetailed = detailed; }
+
+        @NonNull
+        @Override
+        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            RecyclerView rv = new RecyclerView(parent.getContext());
+            rv.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            rv.setClipToPadding(false);
+            rv.setPadding(0, 0, 0, 300); // 留出底部悬浮按钮的空间
+            rv.setLayoutManager(new LinearLayoutManager(parent.getContext()));
+            return new RecyclerView.ViewHolder(rv) {};
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+            RecyclerView rv = (RecyclerView) holder.itemView;
+            if (isDetailed) {
+                rv.setAdapter(position == 0 ? detailedAdapter : goalAdapter);
+            } else {
+                rv.setAdapter(goalAdapter);
+            }
+        }
+
+        @Override
+        public int getItemCount() { return isDetailed ? 2 : 1; }
+    }
+
+    // --- 详细预算的数据模型与适配器 ---
+    static class CategoryBudgetModel {
+        String name; float limit; double spent;
+        CategoryBudgetModel(String n, float l, double s) { name = n; limit = l; spent = s; }
+    }
+
+    private class DetailedBudgetAdapter extends RecyclerView.Adapter<DetailedBudgetAdapter.ViewHolder> {
+        private List<CategoryBudgetModel> items = new ArrayList<>();
+        public void setData(List<CategoryBudgetModel> newItems) {
+            this.items = newItems; notifyDataSetChanged();
+        }
+
+        @NonNull @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            return new ViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_detailed_budget_card, parent, false));
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            CategoryBudgetModel item = items.get(position);
+            holder.tvName.setText(item.name);
+            holder.tvProgress.setText(String.format("已用 %.2f / %.2f", item.spent, item.limit));
+
+            int percent = (int) ((item.spent / item.limit) * 100);
+            holder.pb.setProgress(Math.min(percent, 100));
+
+            // 超出预算变红，否则为绿色
+            if (item.spent > item.limit) {
+                holder.pb.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.budget_progress_exceed)));
+                holder.tvProgress.setTextColor(ContextCompat.getColor(requireContext(), R.color.budget_progress_exceed));
+            } else {
+                holder.pb.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.budget_progress_safe)));
+                holder.tvProgress.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary));
+            }
+        }
+        @Override public int getItemCount() { return items.size(); }
+
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView tvName, tvProgress; ProgressBar pb;
+            ViewHolder(View v) {
+                super(v);
+                tvName = v.findViewById(R.id.tv_cat_name);
+                tvProgress = v.findViewById(R.id.tv_cat_progress);
+                pb = v.findViewById(R.id.pb_cat_budget);
+            }
+        }
+    }
+
+    // ================= 以下为原封不动保留的代码 =================
+
+    private void calculateMonthHeader(List<Transaction> transactions) {
+        if (getContext() == null) return;
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        LocalDate today = LocalDate.now();
+
+        float monthlyBudget = 0;
+
+        // 【核心修改】：同步月总预算
+        if (isDetailedEnabled) {
+            // 如果开启了详细预算，月总预算严格等于各个分类预算之和
+            List<String> expenseCategories = CategoryManager.getExpenseCategories(requireContext());
+            for (String cat : expenseCategories) {
+                monthlyBudget += prefs.getFloat("budget_cat_" + cat, 0f);
+            }
+        } else {
+            // 没有开启时，读取当月独立设置的预算，如果没有则使用默认预算
+            float defaultBudget = prefs.getFloat("monthly_budget", 0f);
+            String monthKey = "budget_" + today.getYear() + "_" + today.getMonthValue();
+            monthlyBudget = prefs.getFloat(monthKey, defaultBudget);
+        }
+
+        if (monthlyBudget > 0 && prefs.getLong("budget_start_time", 0) == 0) {
+            prefs.edit().putLong("budget_start_time", System.currentTimeMillis()).apply();
+        }
+
+        tvHeaderMonthlyBudget.setText(String.format("%.2f", monthlyBudget));
+
+        if (monthlyBudget <= 0) {
+            currentMonthSurplus = 0;
+            tvTotalSurplus.setText("未设置预算");
+            tvHeaderDailyAvailable.setText("0.00");
+            return;
+        }
+
+        double dailyBudget = (double) monthlyBudget / today.lengthOfMonth();
+        double expectedExpenseSoFar = today.getDayOfMonth() * dailyBudget;
+        double actualExpenseSoFar = 0;
+        long startOfMonth = today.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        long endOfNow = System.currentTimeMillis();
+
+        if (transactions != null) {
+            for (Transaction t : transactions) {
+                if (t.date >= startOfMonth && t.date <= endOfNow && t.type == 0) {
+                    actualExpenseSoFar += t.amount;
+                }
+            }
+        }
+
+        currentMonthSurplus = expectedExpenseSoFar - actualExpenseSoFar;
+        String sign = currentMonthSurplus >= 0 ? "+" : "";
+        tvTotalSurplus.setText(String.format("%s%.2f", sign, currentMonthSurplus));
+        tvTotalSurplus.setTextColor(ContextCompat.getColor(requireContext(),
+                currentMonthSurplus >= 0 ? R.color.app_yellow : R.color.budget_progress_exceed));
+
+        tvHeaderDailyAvailable.setText(String.format("%.2f", dailyBudget + currentMonthSurplus));
+    }
+
     private void showSetMonthBudgetDialog() {
+        // 【核心修改】：开启详细预算时，拦截手动修改单月总预算
+        if (isDetailedEnabled) {
+            Toast.makeText(getContext(), "开启详细预算时，请在设置中修改分类金额", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_set_month_budget, null);
         builder.setView(view);
@@ -111,83 +310,22 @@ public class BudgetFragment extends Fragment {
             try {
                 float newBudget = Float.parseFloat(etBudget.getText().toString());
                 prefs.edit().putFloat(monthKey, newBudget).apply();
-
-                // 记录首次使用预算功能的时间
                 if (prefs.getLong("budget_start_time", 0) == 0) {
                     prefs.edit().putLong("budget_start_time", System.currentTimeMillis()).apply();
                 }
-
-                // 手动触发一次刷新
                 if (viewModel.getAllTransactions().getValue() != null) {
                     calculateMonthHeader(viewModel.getAllTransactions().getValue());
-                    adapter.setTransactions(viewModel.getAllTransactions().getValue());
+                    goalAdapter.setTransactions(viewModel.getAllTransactions().getValue());
                 }
                 dialog.dismiss();
             } catch (Exception e) {
                 Toast.makeText(getContext(), "请输入有效的金额", Toast.LENGTH_SHORT).show();
             }
         });
-
         view.findViewById(R.id.btn_cancel).setOnClickListener(v -> dialog.dismiss());
         dialog.show();
     }
 
-    /**
-     * 计算顶部概览卡片的数据
-     */
-    /**
-     * 修改 calculateMonthHeader，支持动态读取当月预算
-     */
-    private void calculateMonthHeader(List<Transaction> transactions) {
-        if (getContext() == null) return;
-        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
-        float defaultBudget = prefs.getFloat("monthly_budget", 0f);
-
-        LocalDate today = LocalDate.now();
-        String monthKey = "budget_" + today.getYear() + "_" + today.getMonthValue();
-        float monthlyBudget = prefs.getFloat(monthKey, defaultBudget); // 优先读取当月独立预算
-
-        // 记录首次开启功能的时间
-        if (monthlyBudget > 0 && prefs.getLong("budget_start_time", 0) == 0) {
-            prefs.edit().putLong("budget_start_time", System.currentTimeMillis()).apply();
-        }
-
-        tvHeaderMonthlyBudget.setText(String.format("%.2f", monthlyBudget));
-
-        if (monthlyBudget <= 0) {
-            currentMonthSurplus = 0;
-            tvTotalSurplus.setText("未设置预算");
-            tvHeaderDailyAvailable.setText("0.00");
-            return;
-        }
-
-        double dailyBudget = (double) monthlyBudget / today.lengthOfMonth();
-        double expectedExpenseSoFar = today.getDayOfMonth() * dailyBudget;
-        // ... 其余逻辑保持不变 (actualExpenseSoFar的计算等) ...
-        double actualExpenseSoFar = 0;
-        long startOfMonth = today.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-        long endOfNow = System.currentTimeMillis();
-
-        if (transactions != null) {
-            for (Transaction t : transactions) {
-                if (t.date >= startOfMonth && t.date <= endOfNow && t.type == 0) {
-                    actualExpenseSoFar += t.amount;
-                }
-            }
-        }
-
-        currentMonthSurplus = expectedExpenseSoFar - actualExpenseSoFar;
-        String sign = currentMonthSurplus >= 0 ? "+" : "";
-        tvTotalSurplus.setText(String.format("%s%.2f", sign, currentMonthSurplus));
-        tvTotalSurplus.setTextColor(ContextCompat.getColor(requireContext(),
-                currentMonthSurplus >= 0 ? R.color.app_yellow : R.color.budget_progress_exceed));
-
-        tvHeaderDailyAvailable.setText(String.format("%.2f", dailyBudget + currentMonthSurplus));
-    }
-
-    /**
-     * 显示添加目标弹窗 (设置创建时间)
-     */
     private void showAddGoalDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_goal, null);
@@ -202,7 +340,6 @@ public class BudgetFragment extends Fragment {
             String name = etName.getText().toString().trim();
             String targetStr = etTarget.getText().toString().trim();
             if (!name.isEmpty() && !targetStr.isEmpty()) {
-                // 关键点：记录今日凌晨的时间戳作为起点
                 long startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 Goal goal = new Goal(name, Double.parseDouble(targetStr), 0, false, startOfDay);
                 viewModel.insertGoal(goal);
@@ -211,14 +348,10 @@ public class BudgetFragment extends Fragment {
                 Toast.makeText(getContext(), "请输入完整信息", Toast.LENGTH_SHORT).show();
             }
         });
-
         view.findViewById(R.id.btn_cancel_goal).setOnClickListener(v -> dialog.dismiss());
         dialog.show();
     }
 
-    /**
-     * 显示编辑目标弹窗 (支持修改已存基础值)
-     */
     private void showEditGoalDialog(Goal goal) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_edit_goal, null);
@@ -241,8 +374,6 @@ public class BudgetFragment extends Fragment {
                 goal.name = etName.getText().toString();
                 goal.targetAmount = Double.parseDouble(etTarget.getText().toString());
                 goal.savedAmount = Double.parseDouble(etSaved.getText().toString());
-
-                // 优化：如果勾选了优先，调用 ViewModel 里的专用方法处理单选逻辑
                 if (cbPriority.isChecked()) {
                     viewModel.setPriorityGoal(goal);
                 } else {
@@ -255,29 +386,21 @@ public class BudgetFragment extends Fragment {
             }
         });
 
-        // 新增：完成目标的点击事件
         view.findViewById(R.id.btn_finish_goal).setOnClickListener(v -> {
             goal.isFinished = true;
             goal.finishedDate = System.currentTimeMillis();
-            goal.isPriority = false; // 完成后自动取消优先占用
+            goal.isPriority = false;
             viewModel.updateGoal(goal);
             dialog.dismiss();
             Toast.makeText(getContext(), "🎉 目标已完成！已归档至历史记录", Toast.LENGTH_SHORT).show();
         });
 
-        view.findViewById(R.id.btn_delete_goal).setOnClickListener(v -> {
-            showConfirmDeleteGoalDialog(goal, dialog);
-        });
-
+        view.findViewById(R.id.btn_delete_goal).setOnClickListener(v -> showConfirmDeleteGoalDialog(goal, dialog));
         dialog.show();
     }
 
-    /**
-     * 删除目标的二次确认弹窗 - 已修正 ID 映射
-     */
     private void showConfirmDeleteGoalDialog(Goal goal, AlertDialog editDialog) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-        // 1. 使用项目现有的确认删除布局
         View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_confirm_delete, null);
         builder.setView(view);
 
@@ -286,13 +409,11 @@ public class BudgetFragment extends Fragment {
             confirmDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         }
 
-        // 2. 【关键修正】：ID 从 tv_message 改为 tv_dialog_message
         TextView tvMessage = view.findViewById(R.id.tv_dialog_message);
         if (tvMessage != null) {
             tvMessage.setText("确定要删除“" + goal.name + "”这个目标吗？\n删除后进度数据将无法找回。");
         }
 
-        // 3. 【关键修正】：ID 匹配布局中的 btn_dialog_confirm
         View btnConfirm = view.findViewById(R.id.btn_dialog_confirm);
         if (btnConfirm != null) {
             btnConfirm.setOnClickListener(v -> {
@@ -302,60 +423,36 @@ public class BudgetFragment extends Fragment {
                 Toast.makeText(getContext(), "已删除目标", Toast.LENGTH_SHORT).show();
             });
         }
-
-        // 4. 【关键修正】：ID 匹配布局中的 btn_dialog_cancel
         View btnCancel = view.findViewById(R.id.btn_dialog_cancel);
-        if (btnCancel != null) {
-            btnCancel.setOnClickListener(v -> confirmDialog.dismiss());
-        }
+        if (btnCancel != null) btnCancel.setOnClickListener(v -> confirmDialog.dismiss());
 
         confirmDialog.show();
     }
 
-    /**
-     * 内部适配器类
-     */
-    /**
-     * 完整覆写的 GoalAdapter：支持结余自动顺延逻辑
-     */
     private class GoalAdapter extends RecyclerView.Adapter<GoalAdapter.GoalViewHolder> {
         private List<Goal> goals = new ArrayList<>();
         private List<Transaction> allTransactions = new ArrayList<>();
-        // 核心缓存：存储每个目标 ID 实时分配到的“动态结余”
         private java.util.Map<Integer, Double> surplusAllocationMap = new java.util.HashMap<>();
 
         public void setGoals(List<Goal> goals) {
-            // 过滤：只将没完成的(isFinished == false)卡片显示在主页
             List<Goal> activeGoals = new ArrayList<>();
-            for (Goal g : goals) {
-                if (!g.isFinished) {
-                    activeGoals.add(g);
-                }
-            }
+            for (Goal g : goals) if (!g.isFinished) activeGoals.add(g);
             this.goals = activeGoals;
-            calculateAndDistributeSurplus(); // 重新分配资金
+            calculateAndDistributeSurplus();
             notifyDataSetChanged();
         }
 
         public void setTransactions(List<Transaction> list) {
             this.allTransactions = list;
-            calculateAndDistributeSurplus(); // 重新分配资金
+            calculateAndDistributeSurplus();
             notifyDataSetChanged();
         }
 
-        /**
-         * 资金池顺延分配算法 (按日精确推演)
-         */
         private void calculateAndDistributeSurplus() {
             surplusAllocationMap.clear();
             if (goals.isEmpty()) return;
+            for (Goal g : goals) surplusAllocationMap.put(g.id, 0.0);
 
-            // 1. 初始化每个目标的分配金额为 0
-            for (Goal g : goals) {
-                surplusAllocationMap.put(g.id, 0.0);
-            }
-
-            // 2. 将目标排序：优先目标在前，同级按创建时间早的在前
             List<Goal> sortedGoals = new ArrayList<>(goals);
             sortedGoals.sort((g1, g2) -> {
                 if (g1.isPriority && !g2.isPriority) return -1;
@@ -366,7 +463,6 @@ public class BudgetFragment extends Fragment {
             SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
             float defaultBudget = prefs.getFloat("monthly_budget", 0f);
 
-            // 确定起点
             long earliestGoal = Long.MAX_VALUE;
             for (Goal g : goals) {
                 if (g.createdAt < earliestGoal) earliestGoal = g.createdAt;
@@ -389,13 +485,9 @@ public class BudgetFragment extends Fragment {
                 long startOfDay = d.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 long endOfDay = d.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 for (Transaction t : allTransactions) {
-                    if (t.date >= startOfDay && t.date < endOfDay && t.type == 0) {
-                        expenseToday += t.amount;
-                    }
+                    if (t.date >= startOfDay && t.date < endOfDay && t.type == 0) expenseToday += t.amount;
                 }
 
-                // 【核心修复】：判断这一天是否有"已创建且未完成"的目标
-                // 如果当天没有目标，历史结余就直接截断归零，绝对不会流向未来的新目标
                 boolean hasActiveGoal = false;
                 for (Goal g : sortedGoals) {
                     if (g.isFinished) continue;
@@ -408,12 +500,10 @@ public class BudgetFragment extends Fragment {
 
                 if (hasActiveGoal) {
                     pool += (dailyBudget - expenseToday);
-
                     if (pool > 0) {
                         for (Goal g : sortedGoals) {
                             if (g.isFinished) continue;
                             LocalDate createDate = java.time.Instant.ofEpochMilli(g.createdAt).atZone(ZoneId.systemDefault()).toLocalDate();
-                            // 目标在这一天还没创建，跳过不分钱
                             if (d.isBefore(createDate)) continue;
 
                             double allocated = surplusAllocationMap.get(g.id);
@@ -427,52 +517,14 @@ public class BudgetFragment extends Fragment {
                         }
                     }
                 } else {
-                    // 当天无有效目标，直接清空资金池
                     pool = 0;
                 }
             }
         }
 
-        // 在 GoalAdapter 内部
-        private double calculateTotalPool(long earliestGoalDate) {
-            SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
-            float defaultBudget = prefs.getFloat("monthly_budget", 0f);
-
-            // 使用系统首次记录的预算时间，如果没记录，使用目标创建时间兜底
-            long startTs = prefs.getLong("budget_start_time", earliestGoalDate);
-            LocalDate start = Instant.ofEpochMilli(startTs).atZone(ZoneId.systemDefault()).toLocalDate();
-            // 规定：资金池从那个月的1号开始算起
-            start = start.withDayOfMonth(1);
-
-            LocalDate today = LocalDate.now();
-            if (!today.isAfter(start)) return 0;
-
-            // 1. 逐日计算应有的预算结余总额（因为每个月预算可能不同）
-            double totalExpected = 0;
-            for (LocalDate d = start; d.isBefore(today); d = d.plusDays(1)) {
-                String key = "budget_" + d.getYear() + "_" + d.getMonthValue();
-                float monthBudget = prefs.getFloat(key, defaultBudget);
-                totalExpected += (double) monthBudget / d.lengthOfMonth();
-            }
-
-            // 2. 统计这段期间内的总支出
-            double actualExpense = 0;
-            long startOfCalculation = start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-            long startOfToday = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-
-            for (Transaction t : allTransactions) {
-                if (t.date >= startOfCalculation && t.date < startOfToday && t.type == 0) {
-                    actualExpense += t.amount;
-                }
-            }
-            return totalExpected - actualExpense;
-        }
-
-        @NonNull
-        @Override
+        @NonNull @Override
         public GoalViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_goal_card, parent, false);
-            return new GoalViewHolder(view);
+            return new GoalViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_goal_card, parent, false));
         }
 
         @Override
@@ -480,14 +532,10 @@ public class BudgetFragment extends Fragment {
             Goal goal = goals.get(position);
             holder.tvName.setText(goal.name);
 
-            // 最终显示的已存金额 = 用户手动填写的基准值 + 系统分配的结余
             double allocatedSurplus = surplusAllocationMap.containsKey(goal.id) ? surplusAllocationMap.get(goal.id) : 0;
             double finalSaved = goal.savedAmount + allocatedSurplus;
 
-            // 优化点：使用主题色小圆点代表优先级
             holder.viewPriorityDot.setVisibility(goal.isPriority ? View.VISIBLE : View.GONE);
-
-            // 更新进度文字和进度条
             holder.tvProgressText.setText(String.format("已实现 %.2f / %.2f", finalSaved, goal.targetAmount));
             int percent = goal.targetAmount > 0 ? (int) ((finalSaved / goal.targetAmount) * 100) : 0;
             holder.tvPercent.setText(Math.max(0, percent) + "%");
@@ -495,15 +543,12 @@ public class BudgetFragment extends Fragment {
 
             holder.itemView.setOnClickListener(v -> showEditGoalDialog(goal));
         }
-
-        @Override
-        public int getItemCount() { return goals.size(); }
+        @Override public int getItemCount() { return goals.size(); }
 
         class GoalViewHolder extends RecyclerView.ViewHolder {
             TextView tvName, tvProgressText, tvPercent;
             View viewPriorityDot;
             android.widget.ProgressBar pbGoal;
-
             public GoalViewHolder(@NonNull View itemView) {
                 super(itemView);
                 tvName = itemView.findViewById(R.id.tv_goal_name);
