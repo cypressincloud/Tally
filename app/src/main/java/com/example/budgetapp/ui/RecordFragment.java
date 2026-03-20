@@ -293,24 +293,36 @@ public class RecordFragment extends Fragment {
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isBudgetEnabled = prefs.getBoolean("is_budget_enabled", false);
 
-        // 1. 检查当前浏览的月份是否在用户开启预算功能之后
+        // --- 新增：判断是否开启了详细预算 ---
+        boolean isDetailedEnabled = prefs.getBoolean("is_detailed_budget_enabled", false);
+
+        // 1. 检查当前浏览的月份是否有效
         long budgetStartTime = prefs.getLong("budget_start_time", 0);
         boolean isEffectiveMonth = true;
         if (budgetStartTime > 0) {
             YearMonth startYM = YearMonth.from(Instant.ofEpochMilli(budgetStartTime).atZone(ZoneId.systemDefault()).toLocalDate());
-            // 如果当前月份早于首次开启的月份，则判定为无效预算月
             if (currentMonth.isBefore(startYM)) {
                 isEffectiveMonth = false;
             }
         }
 
-        // 综合判定：全局开关开启 且 是在开启功能之后的月份
         boolean finalBudgetEnabled = isBudgetEnabled && isEffectiveMonth;
 
-        // 2. 读取当前月份的独立预算 (如果没设置，则 fallback 到默认预算)
-        String monthKey = "budget_" + currentMonth.getYear() + "_" + currentMonth.getMonthValue();
-        float defaultBudget = prefs.getFloat("monthly_budget", 0f);
-        float monthlyBudget = prefs.getFloat(monthKey, defaultBudget);
+        // --- 2. 核心修改：统一预算获取逻辑 ---
+        float monthlyBudget = 0;
+        if (isDetailedEnabled) {
+            // 如果开启了详细预算，月总预算等于各个分类预算之和
+            List<String> expenseCategories = CategoryManager.getExpenseCategories(requireContext());
+            for (String cat : expenseCategories) {
+                monthlyBudget += prefs.getFloat("budget_cat_" + cat, 0f);
+            }
+        } else {
+            // 普通模式：读取当月独立设置的预算
+            String monthKey = "budget_" + currentMonth.getYear() + "_" + currentMonth.getMonthValue();
+            float defaultBudget = prefs.getFloat("monthly_budget", 0f);
+            monthlyBudget = prefs.getFloat(monthKey, defaultBudget);
+        }
+        // ------------------------------------
 
         if (finalBudgetEnabled && monthlyBudget > 0) {
             cardBudgetStatus.setVisibility(View.VISIBLE);
@@ -372,6 +384,10 @@ public class RecordFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        List<Transaction> currentList = viewModel.getAllTransactions().getValue();
+        if (currentList != null) {
+            updateBudgetCard(currentList);
+        }
         View view = getView();
         if (view != null) {
             ImageButton btnSettings = view.findViewById(R.id.btn_settings_menu);

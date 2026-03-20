@@ -14,6 +14,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -82,9 +83,17 @@ public class BudgetFragment extends Fragment {
         BudgetPagerAdapter pagerAdapter = new BudgetPagerAdapter(isDetailedEnabled);
         viewPager.setAdapter(pagerAdapter);
 
+        // 获取悬浮按钮布局或具体的按钮
+        View actionButtonsLayout = view.findViewById(R.id.btn_add_goal).getParent() instanceof LinearLayout
+                ? (View) view.findViewById(R.id.btn_add_goal).getParent()
+                : null;
+// 或者直接获取两个按钮
+        View btnAddGoal = view.findViewById(R.id.btn_add_goal);
+        View btnHistory = view.findViewById(R.id.btn_budget_history);
+
         if (isDetailedEnabled) {
             tabLayout.setVisibility(View.VISIBLE);
-            tvGoalsTitle.setVisibility(View.GONE); // 有 TabLayout 就隐藏文本标题
+            tvGoalsTitle.setVisibility(View.GONE);
 
             new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
                 tab.setText(position == 0 ? "详细预算" : "存储目标");
@@ -93,16 +102,24 @@ public class BudgetFragment extends Fragment {
             int lastTab = prefs.getInt("last_budget_tab", 0);
             viewPager.setCurrentItem(lastTab, false);
 
+            // 更新按钮初始状态
+            updateActionButtonsVisibility(lastTab, btnAddGoal, btnHistory);
+
             viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
                 @Override
                 public void onPageSelected(int position) {
                     prefs.edit().putInt("last_budget_tab", position).apply();
+                    // 核心逻辑：切换页面时更新按钮可见性
+                    updateActionButtonsVisibility(position, btnAddGoal, btnHistory);
                 }
             });
         } else {
             tabLayout.setVisibility(View.GONE);
-            tvGoalsTitle.setVisibility(View.VISIBLE); // 没有 TabLayout 时显示标题
+            tvGoalsTitle.setVisibility(View.VISIBLE);
             viewPager.setCurrentItem(0, false);
+            // 未开启详细模式时，默认显示按钮
+            btnAddGoal.setVisibility(View.VISIBLE);
+            btnHistory.setVisibility(View.VISIBLE);
         }
 
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), transactions -> {
@@ -117,6 +134,22 @@ public class BudgetFragment extends Fragment {
 
         return view;
     }
+
+    /**
+     * 根据当前页面位置控制按钮显示
+     * Position 0: 详细预算 -> 隐藏按钮
+     * Position 1: 存储目标 -> 显示按钮
+     */
+    private void updateActionButtonsVisibility(int position, View btnAdd, View btnHistory) {
+        if (position == 0) {
+            btnAdd.setVisibility(View.GONE);
+            btnHistory.setVisibility(View.GONE);
+        } else {
+            btnAdd.setVisibility(View.VISIBLE);
+            btnHistory.setVisibility(View.VISIBLE);
+        }
+    }
+
     /**
      * 计算详细分类预算的已用进度
      */
@@ -174,6 +207,48 @@ public class BudgetFragment extends Fragment {
         public int getItemCount() { return isDetailed ? 2 : 1; }
     }
 
+    /**
+     * 弹出对话框修改特定分类的预算
+     */
+    private void showEditCategoryBudgetDialog(CategoryBudgetModel item) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_set_month_budget, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+        TextView tvTitle = view.findViewById(R.id.tv_dialog_title);
+        EditText etBudget = view.findViewById(R.id.et_month_budget);
+
+        tvTitle.setText("修改 " + item.name + " 预算");
+        etBudget.setText(String.valueOf(item.limit));
+
+        view.findViewById(R.id.btn_save).setOnClickListener(v -> {
+            try {
+                float newLimit = Float.parseFloat(etBudget.getText().toString());
+                if (newLimit < 0) throw new Exception();
+
+                SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+                // 保存分类预算：使用与 calculateDetailedBudgets 一致的 Key
+                prefs.edit().putFloat("budget_cat_" + item.name, newLimit).apply();
+
+                // 刷新数据
+                if (viewModel.getAllTransactions().getValue() != null) {
+                    calculateMonthHeader(viewModel.getAllTransactions().getValue());
+                    calculateDetailedBudgets(viewModel.getAllTransactions().getValue());
+                }
+
+                dialog.dismiss();
+                Toast.makeText(getContext(), "预算已更新", Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Toast.makeText(getContext(), "请输入有效的金额", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        view.findViewById(R.id.btn_cancel).setOnClickListener(v -> dialog.dismiss());
+        dialog.show();
+    }
+
     // --- 详细预算的数据模型与适配器 ---
     static class CategoryBudgetModel {
         String name; float limit; double spent;
@@ -208,6 +283,9 @@ public class BudgetFragment extends Fragment {
                 holder.pb.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.budget_progress_safe)));
                 holder.tvProgress.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary));
             }
+
+            // 添加点击监听
+            holder.itemView.setOnClickListener(v -> showEditCategoryBudgetDialog(item));
         }
         @Override public int getItemCount() { return items.size(); }
 

@@ -126,9 +126,22 @@ public class BudgetManagementActivity extends AppCompatActivity {
     /**
      * 动态生成支出一级分类的预算输入框
      */
+    /**
+     * 生成详细预算输入列表
+     */
     private void buildDetailedInputs(SharedPreferences prefs) {
+        // 清空容器和旧数据，防止重复生成
+        llDetailedBudgetContainer.removeAllViews();
+        categoryInputs.clear();
+
         List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
         for (String cat : expenseCategories) {
+
+            // 【核心修改】：如果分类名称是"自定义"，则跳过不生成输入框
+            if ("自定义".equals(cat)) {
+                continue;
+            }
+
             View row = LayoutInflater.from(this).inflate(R.layout.item_budget_category_input, llDetailedBudgetContainer, false);
             TextView tvName = row.findViewById(R.id.tv_cat_name);
             EditText etAmount = row.findViewById(R.id.et_cat_budget);

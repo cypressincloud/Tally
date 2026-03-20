@@ -69,10 +69,12 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical"
-                        android:background="?attr/selectableItemBackground"
+                        android:background="@drawable/ripple_stat_item"
                         android:clickable="true"
+                        android:focusable="true"
                         android:paddingVertical="4dp"
                         android:paddingEnd="8dp">
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -121,6 +123,7 @@
             app:tabIndicatorColor="@color/app_yellow"
             app:tabSelectedTextColor="?android:attr/textColorPrimary"
             app:tabTextColor="@color/text_secondary"
+            app:tabRippleColor="@android:color/transparent"
             android:visibility="gone"/>
 
         <TextView
