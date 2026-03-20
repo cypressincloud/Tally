@@ -10,6 +10,8 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.Map;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
@@ -88,6 +90,74 @@ public class SettingsActivity extends AppCompatActivity {
                     } catch (Exception e) {
                         e.printStackTrace();
                         Toast.makeText(this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
+    private final ActivityResultLauncher<String[]> importBeeCountLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        BackupData data = BackupManager.importFromBeeCount(this, uri, allAssets);
+
+                        int recordCount = 0;
+                        int newAssetCount = 0;
+
+                        // 添加资产
+                        List<AssetAccount> currentAssets = new ArrayList<>(allAssets);
+                        if (data.assets != null && !data.assets.isEmpty()) {
+                            for (AssetAccount a : data.assets) {
+                                if (!isDuplicateAsset(a, currentAssets)) {
+                                    a.id = 0;
+                                    financeViewModel.addAsset(a);
+                                    currentAssets.add(a);
+                                    newAssetCount++;
+                                }
+                            }
+                        }
+
+                        // 保存更新后的一级分类
+                        if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
+                            CategoryManager.saveExpenseCategories(this, data.expenseCategories);
+                        }
+                        if (data.incomeCategories != null && !data.incomeCategories.isEmpty()) {
+                            CategoryManager.saveIncomeCategories(this, data.incomeCategories);
+                        }
+                        // 保存更新后的二级分类（如果没有则自动生成后会存储到这里）
+                        if (data.subCategoryMap != null && !data.subCategoryMap.isEmpty()) {
+                            for (Map.Entry<String, List<String>> entry : data.subCategoryMap.entrySet()) {
+                                CategoryManager.saveSubCategories(this, entry.getKey(), entry.getValue());
+                            }
+                        }
+
+                        // 添加账单记录
+                        List<Transaction> currentTransactions = new ArrayList<>(allTransactions);
+                        if (data.records != null && !data.records.isEmpty()) {
+                            for (Transaction t : data.records) {
+                                if (!isDuplicateTransaction(t, currentTransactions)) {
+                                    t.id = 0;
+                                    financeViewModel.addTransaction(t);
+                                    currentTransactions.add(t);
+                                    recordCount++;
+                                }
+                            }
+                        }
+
+                        if (recordCount > 0) {
+                            String msg = "成功从蜜蜂记账导入 " + recordCount + " 条账单 (已过滤重复)";
+                            if (newAssetCount > 0) {
+                                msg += "\n自动创建了 " + newAssetCount + " 个新资产账户";
+                            }
+                            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(this, "所有账单均已存在，或未找到有效数据", Toast.LENGTH_LONG).show();
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "蜜蜂记账导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     }
                 }
             }
@@ -593,6 +663,19 @@ public class SettingsActivity extends AppCompatActivity {
             });
             dialog.dismiss();
         });
+
+        // ============ 新增 ============
+        view.findViewById(R.id.tv_import_beecount).setOnClickListener(v -> {
+            importBeeCountLauncher.launch(new String[]{
+                    "text/csv",
+                    "text/plain",
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "*/*"
+            });
+            dialog.dismiss();
+        });
+        // ==============================
 
         view.findViewById(R.id.btn_cancel_backup).setOnClickListener(v -> dialog.dismiss());
 

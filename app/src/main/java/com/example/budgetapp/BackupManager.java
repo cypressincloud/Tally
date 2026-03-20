@@ -97,6 +97,170 @@ public class BackupManager {
         }
     }
 
+
+    // ============================================================================================
+    // 蜜蜂记账账单导入 (支持 CSV)
+    // ============================================================================================
+    public static BackupData importFromBeeCount(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
+        // 先尝试 GBK 解析，失败或为空再尝试 UTF-8 编码
+        BackupData data = parseBeeCountCsvWithEncoding(context, uri, "GBK", allAssets);
+        if (data.records.isEmpty()) {
+            data = parseBeeCountCsvWithEncoding(context, uri, "UTF-8", allAssets);
+        }
+        return data;
+    }
+
+    private static BackupData parseBeeCountCsvWithEncoding(Context context, Uri uri, String charsetName, List<AssetAccount> allAssets) throws Exception {
+        List<Transaction> transactions = new ArrayList<>();
+        List<AssetAccount> newAssetsToCreate = new ArrayList<>();
+        Map<String, Integer> newAssetMap = new HashMap<>();
+
+        List<String> expCats = new ArrayList<>(CategoryManager.getExpenseCategories(context));
+        List<String> incCats = new ArrayList<>(CategoryManager.getIncomeCategories(context));
+        Map<String, List<String>> subCatMap = new HashMap<>();
+
+        for (String cat : expCats) {
+            List<String> subs = CategoryManager.getSubCategories(context, cat);
+            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
+        }
+        for (String cat : incCats) {
+            List<String> subs = CategoryManager.getSubCategories(context, cat);
+            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
+        }
+
+        int maxAssetId = 0;
+        if (allAssets != null) {
+            for (AssetAccount a : allAssets) {
+                if (a.id > maxAssetId) maxAssetId = a.id;
+            }
+        }
+
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, charsetName))) {
+
+            String line;
+            boolean isDataSection = false;
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+
+            int typeIdx = -1, catIdx = -1, subCatIdx = -1, amountIdx = -1, accountIdx = -1, remarkIdx = -1, timeIdx = -1;
+
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("\ufeff")) line = line.substring(1); // 过滤 BOM
+                if (TextUtils.isEmpty(line.trim())) continue;
+
+                // 识别表头行，蜜蜂记账一般包含这些关键字段
+                if (!isDataSection && line.contains("类型") && line.contains("分类") && line.contains("金额")) {
+                    isDataSection = true;
+                    List<String> headers = parseCsvLine(line);
+                    for (int i = 0; i < headers.size(); i++) {
+                        String h = headers.get(i).trim();
+                        if ("类型".equals(h)) typeIdx = i;
+                        else if ("分类".equals(h)) catIdx = i;
+                        else if ("二级分类".equals(h)) subCatIdx = i;
+                        else if ("金额".equals(h)) amountIdx = i;
+                        else if ("账户".equals(h)) accountIdx = i;
+                        else if ("备注".equals(h)) remarkIdx = i;
+                        else if ("时间".equals(h)) timeIdx = i;
+                    }
+                    continue;
+                }
+
+                if (!isDataSection) continue;
+
+                List<String> tokens = parseCsvLine(line);
+                int maxRequiredIdx = Math.max(Math.max(typeIdx, catIdx), Math.max(amountIdx, timeIdx));
+
+                // 列不足直接跳过
+                if (typeIdx == -1 || catIdx == -1 || amountIdx == -1 || timeIdx == -1 || tokens.size() <= maxRequiredIdx) {
+                    continue;
+                }
+
+                Transaction t = new Transaction();
+
+                // 1. 类型映射
+                String typeStr = tokens.get(typeIdx).trim();
+                if ("收入".equals(typeStr)) {
+                    t.type = 1;
+                } else if ("支出".equals(typeStr)) {
+                    t.type = 0;
+                } else {
+                    t.type = 0; // 默认或者其他状态当作支出处理
+                }
+
+                // 2. 金额映射
+                String amountStr = tokens.get(amountIdx).replace("¥", "").replace(",", "").trim();
+                t.amount = parseDoubleSafe(amountStr);
+
+                // 3. 时间与记录标识映射 (时间对应时间, 并且对应记录标识 note)
+                String timeStr = tokens.get(timeIdx).trim();
+                try {
+                    Date date = sdf.parse(timeStr);
+                    t.date = (date != null) ? date.getTime() : System.currentTimeMillis();
+                } catch (Exception e) {
+                    t.date = System.currentTimeMillis();
+                }
+                t.note = timeStr;
+
+                // 4. 备注映射
+                t.remark = (remarkIdx != -1 && remarkIdx < tokens.size()) ? tokens.get(remarkIdx).trim() : "";
+
+                // 5. 分类和二级分类映射 (不存在则自动生成)
+                String category = tokens.get(catIdx).trim();
+                String subCategory = (subCatIdx != -1 && subCatIdx < tokens.size()) ? tokens.get(subCatIdx).trim() : "";
+
+                if (TextUtils.isEmpty(category)) category = "其它";
+
+                // 分类判断并新增
+                List<String> targetList = (t.type == 1) ? incCats : expCats;
+                if (!targetList.contains(category)) {
+                    targetList.add(category);
+                }
+
+                // 二级分类判断并新增
+                if (!TextUtils.isEmpty(subCategory)) {
+                    List<String> subs = subCatMap.get(category);
+                    if (subs == null) {
+                        subs = new ArrayList<>();
+                        subCatMap.put(category, subs);
+                    }
+                    if (!subs.contains(subCategory)) {
+                        subs.add(subCategory);
+                    }
+                }
+
+                t.category = category;
+                t.subCategory = subCategory;
+
+                // 6. 账户映射 (如果不匹配则新建)
+                String accountName = (accountIdx != -1 && accountIdx < tokens.size()) ? tokens.get(accountIdx).trim() : "";
+                int matchedId = matchAssetId(accountName, allAssets);
+
+                if (matchedId == 0 && !TextUtils.isEmpty(accountName) && !"/".equals(accountName)) {
+                    if (newAssetMap.containsKey(accountName)) {
+                        t.assetId = newAssetMap.get(accountName);
+                    } else {
+                        maxAssetId++;
+                        int newId = maxAssetId;
+                        AssetAccount newAsset = new AssetAccount(accountName, 0.0, 0); // 默认为普通资产类型
+                        newAsset.id = newId;
+                        newAssetsToCreate.add(newAsset);
+                        newAssetMap.put(accountName, newId);
+                        t.assetId = newId;
+                    }
+                } else {
+                    t.assetId = matchedId;
+                }
+
+                transactions.add(t);
+            }
+        }
+
+        BackupData data = new BackupData(transactions, newAssetsToCreate);
+        data.expenseCategories = expCats;
+        data.incomeCategories = incCats;
+        data.subCategoryMap = subCatMap; // 返回带新增子分类的列表
+        return data;
+    }
     public static BackupData importFromZip(Context context, Uri uri) throws Exception {
          try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
              ZipInputStream zis = new ZipInputStream(inputStream)) {
