@@ -192,7 +192,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="20dp"
                         android:backgroundTint="@color/app_yellow"
-                        android:textColor="@color/white"
+                        android:textColor="@color/real_white"
                         android:text="保存设置"
                         app:cornerRadius="12dp"/>
                 </LinearLayout>
