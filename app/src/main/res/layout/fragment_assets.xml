@@ -11,6 +11,7 @@
         android:orientation="vertical">
 
         <TextView
+            android:id="@+id/tv_top_title"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@color/bar_background"
@@ -21,6 +22,7 @@
             android:textColor="@color/black" />
 
         <androidx.cardview.widget.CardView
+            android:id="@+id/card_assets_summary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="16dp"

@@ -1,6 +1,8 @@
 package com.example.budgetapp.ui;
 
 import android.app.AlertDialog;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -1713,7 +1715,8 @@ public class StatsFragment extends Fragment {
         chart.getDescription().setEnabled(false);
         chart.setHoleRadius(40f);
         chart.setTransparentCircleRadius(0);
-        chart.setHoleColor(holeColor);
+        // 【修改这里】：将中心圆洞完全变透明，让底层你新加的半透明卡片色透出来
+        chart.setHoleColor(Color.TRANSPARENT);
         chart.setEntryLabelColor(textColor);
         chart.setEntryLabelTextSize(10f);
         chart.setRotationEnabled(false);
@@ -1733,4 +1736,125 @@ public class StatsFragment extends Fragment {
             public void onNothingSelected() { }
         });
     }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
+        updateFragmentTransparency(isCustomBg);
+    }
+
+    private void updateFragmentTransparency(boolean isCustomBg) {
+        View view = getView();
+        if (view == null) return;
+
+        TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
+        RadioGroup rgTimeMode = view.findViewById(R.id.rg_time_scope); // 注意你xml里叫 rg_time_scope
+
+        // 【修改】获取三个图表和总结卡片
+        View chartLine = view.findViewById(R.id.chart_line);
+        View chartPie = view.findViewById(R.id.chart_pie);
+        View chartPieIncome = view.findViewById(R.id.chart_pie_income);
+        View cardSummary = view.findViewById(R.id.card_summary);
+
+        if (isCustomBg) {
+            // 1. 基础大背景全透明，完全透出底层自定义图片
+            view.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
+            // 2. 年月日切换栏：外框 90% 透明度，选中块 80% 透明度
+            if (rgTimeMode != null) {
+                if (rgTimeMode.getBackground() != null) {
+                    rgTimeMode.getBackground().mutate().setAlpha(230);
+                }
+                for (int i = 0; i < rgTimeMode.getChildCount(); i++) {
+                    View child = rgTimeMode.getChildAt(i);
+                    if (child.getBackground() != null) {
+                        child.getBackground().mutate().setAlpha(242);
+                    }
+                }
+            }
+        } else {
+            // ================= 恢复系统默认模式 =================
+            view.setBackgroundResource(R.color.bar_background);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundResource(R.color.bar_background);
+
+            if (rgTimeMode != null) {
+                if (rgTimeMode.getBackground() != null) rgTimeMode.getBackground().mutate().setAlpha(255);
+                for (int i = 0; i < rgTimeMode.getChildCount(); i++) {
+                    View child = rgTimeMode.getChildAt(i);
+                    if (child.getBackground() != null) child.getBackground().mutate().setAlpha(255);
+                }
+            }
+        }
+
+        // 3. 将这 4 个区块转化为 90% 透明度的毛玻璃卡片（或恢复默认）
+        // 传入 true，表示在普通模式下不需要背景
+        applyGlassOrSolidBackground(chartLine, isCustomBg, true);
+        applyGlassOrSolidBackground(chartPie, isCustomBg, true);
+        applyGlassOrSolidBackground(chartPieIncome, isCustomBg, true);
+
+        // 传入 false，表示这是"总结"，在普通模式下需要恢复原有的 assets_field 背景
+        applyGlassOrSolidBackground(cardSummary, isCustomBg, false);
+    }
+
+    // 【修改】动态控制卡片背景，并增加内边距 (Padding) 的处理
+    private void applyGlassOrSolidBackground(View targetView, boolean isCustomBg, boolean isChart) {
+        if (targetView == null) return;
+
+        // 将 16dp 转换为像素 (px)
+        int padding16 = (int) android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics());
+
+        if (isCustomBg) {
+            // 生成 16dp 圆角、90%透明度的浅灰背景
+            android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+            shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            float radius = android.util.TypedValue.applyDimension(
+                    android.util.TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics());
+            shape.setCornerRadius(radius);
+
+            int lightGray = android.graphics.Color.parseColor("#F5F5F5");
+            shape.setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(lightGray, 230));
+
+            targetView.setBackground(shape);
+
+            // 🌟 【新增】：开启背景时，给图表和总结卡片都加上 16dp 的内边距
+            targetView.setPadding(padding16, padding16, padding16, padding16);
+
+        } else {
+            // ================= 恢复普通模式 =================
+            if (isChart) {
+                // 如果是图表，普通模式下清除背景（保持透明）
+                targetView.setBackground(null);
+
+                // 🌟 【新增】：清除背景的同时移除内边距，让图表恢复原本撑满的尺寸
+                targetView.setPadding(0, 0, 0, 0);
+            } else {
+                // 如果是总结卡片，普通模式下恢复默认的 assets_field
+                targetView.setBackgroundResource(R.drawable.assets_field);
+
+                // 🌟 【新增】：总结卡片在普通模式下原本就需要 16dp 的内边距
+                targetView.setPadding(padding16, padding16, padding16, padding16);
+            }
+        }
+    }
+
+    private void applyThemeBackground() {
+        View view = getView();
+        if (view == null) return;
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
+
+        if (prefs.getInt("theme_mode", -1) == 3) {
+            view.setBackgroundColor(Color.TRANSPARENT);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundColor(Color.TRANSPARENT);
+        } else {
+            view.setBackgroundResource(R.color.bar_background);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundResource(R.color.bar_background);
+        }
+    }
+
 }

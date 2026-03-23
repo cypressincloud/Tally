@@ -8,6 +8,7 @@
     android:background="@color/bar_background">
 
     <TextView
+        android:id="@+id/tv_top_title"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:background="@color/bar_background"

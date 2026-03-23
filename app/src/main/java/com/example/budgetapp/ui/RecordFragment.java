@@ -39,6 +39,7 @@ import com.google.android.material.chip.ChipGroup;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.content.ContextCompat;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
@@ -398,6 +399,86 @@ public class RecordFragment extends Fragment {
             }
         }
         checkAutoRenewalDeduction();
+
+        // 【新增】：根据模式动态调整本界面透明度
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        int themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        updateFragmentTransparency(themeMode == 3);
+    }
+
+    // 【新增方法】：动态控制界面透明度，不破坏 XML 默认结构
+    // 【修改或替换】现有的 updateFragmentTransparency 方法
+    private void updateFragmentTransparency(boolean isCustomBg) {
+        View view = getView();
+        if (view == null) return;
+
+        View topBar = view.findViewById(R.id.layout_top_bar);
+        View monthLabel = view.findViewById(R.id.tv_month_label);
+        View weekHeader = view.findViewById(R.id.layout_week_header);
+
+        // 获取需要调整质感的卡片和按钮
+        androidx.cardview.widget.CardView cardStats = view.findViewById(R.id.card_stats); // 收入支出结余卡片
+        com.google.android.material.floatingactionbutton.FloatingActionButton btnQuickRecord = view.findViewById(R.id.btn_quick_record);
+
+        if (isCustomBg) {
+            // 1. 顶部基础框架全透明，让底层的图片完全透出来
+            view.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            if (topBar != null) topBar.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            if (monthLabel != null) monthLabel.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            if (weekHeader != null) weekHeader.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
+            // 2. 今日预算卡片：80%透明度 (204) + 去除阴影
+            if (cardBudgetStatus != null) {
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
+                cardBudgetStatus.setCardBackgroundColor(translucentSurface);
+                cardBudgetStatus.setCardElevation(0f);
+            }
+
+            // 3. 【新增】收支统计卡片 (收入/支出/结余/加班)：80%透明度 (204) + 去除阴影
+            if (cardStats != null) {
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
+                cardStats.setCardBackgroundColor(translucentSurface);
+                cardStats.setCardElevation(0f);
+            }
+
+            // 4. 快捷记账按钮：85%透明度 (216) + 去除阴影
+            if (btnQuickRecord != null) {
+                int fabColor = ContextCompat.getColor(requireContext(), R.color.app_yellow);
+                int translucentFab = androidx.core.graphics.ColorUtils.setAlphaComponent(fabColor, 230);
+                btnQuickRecord.setBackgroundTintList(ColorStateList.valueOf(translucentFab));
+                btnQuickRecord.setCompatElevation(0f);
+            }
+
+        } else {
+            // ================= 恢复普通系统/日间/夜间模式 =================
+            view.setBackgroundResource(R.color.bar_background);
+            if (topBar != null) topBar.setBackgroundResource(R.color.bar_background);
+            if (monthLabel != null) monthLabel.setBackgroundResource(R.color.bar_background);
+            if (weekHeader != null) weekHeader.setBackgroundResource(R.color.bar_background);
+
+            if (cardBudgetStatus != null) {
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                cardBudgetStatus.setCardBackgroundColor(surfaceColor);
+                // 【修改】：恢复为 0f，去掉普通模式下的卡片阴影
+                cardBudgetStatus.setCardElevation(0f);
+            }
+
+            if (cardStats != null) {
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                cardStats.setCardBackgroundColor(surfaceColor);
+                // 【修改】：恢复为 0f，去掉普通模式下的卡片阴影
+                cardStats.setCardElevation(0f);
+            }
+
+            if (btnQuickRecord != null) {
+                int fabColor = ContextCompat.getColor(requireContext(), R.color.app_yellow);
+                btnQuickRecord.setBackgroundTintList(ColorStateList.valueOf(fabColor));
+                // 【修改】：恢复为 0f，去掉普通模式下的按钮阴影
+                btnQuickRecord.setCompatElevation(0f);
+            }
+        }
     }
 
     private void checkAutoRenewalDeduction() {

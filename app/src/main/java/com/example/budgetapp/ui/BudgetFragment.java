@@ -204,10 +204,12 @@ public class BudgetFragment extends Fragment {
             } else {
                 rv.setAdapter(goalAdapter);
             }
+
         }
 
         @Override
         public int getItemCount() { return isDetailed ? 2 : 1; }
+
     }
 
     /**
@@ -285,6 +287,16 @@ public class BudgetFragment extends Fragment {
             } else {
                 holder.pb.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.budget_progress_safe)));
                 holder.tvProgress.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary));
+            }
+
+            // 【新增】：给详细预算子卡片增加 90% 透明度
+            SharedPreferences prefs = holder.itemView.getContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+            boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
+            if (holder.itemView instanceof androidx.cardview.widget.CardView) {
+                androidx.cardview.widget.CardView card = (androidx.cardview.widget.CardView) holder.itemView;
+                int surfaceColor = ContextCompat.getColor(holder.itemView.getContext(), R.color.white);
+                card.setCardBackgroundColor(isCustomBg ?
+                        androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230) : surfaceColor);
             }
 
             // 添加点击监听
@@ -631,6 +643,17 @@ public class BudgetFragment extends Fragment {
             holder.tvPercent.setText(Math.max(0, percent) + "%");
             holder.pbGoal.setProgress(Math.max(0, Math.min(percent, 100)));
 
+
+            // 【新增】：给存储目标子卡片增加 90% 透明度
+            SharedPreferences prefs = holder.itemView.getContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+            boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
+            if (holder.itemView instanceof androidx.cardview.widget.CardView) {
+                androidx.cardview.widget.CardView card = (androidx.cardview.widget.CardView) holder.itemView;
+                int surfaceColor = ContextCompat.getColor(holder.itemView.getContext(), R.color.white);
+                card.setCardBackgroundColor(isCustomBg ?
+                        androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230) : surfaceColor);
+            }
+
             holder.itemView.setOnClickListener(v -> showEditGoalDialog(goal));
         }
         @Override public int getItemCount() { return goals.size(); }
@@ -649,4 +672,98 @@ public class BudgetFragment extends Fragment {
             }
         }
     }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
+        updateFragmentTransparency(isCustomBg);
+    }
+
+    private void updateFragmentTransparency(boolean isCustomBg) {
+        View view = getView();
+        if (view == null) return;
+
+        // 之前让你在顶部加过的标题 ID
+        TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
+        TabLayout tabLayout = view.findViewById(R.id.tab_layout_budget);
+
+        // 获取我们需要改质感的卡片和按钮
+        androidx.cardview.widget.CardView cardMonthSummary = view.findViewById(R.id.card_month_summary);
+        com.google.android.material.floatingactionbutton.FloatingActionButton btnAddGoal = view.findViewById(R.id.btn_add_goal);
+        com.google.android.material.floatingactionbutton.FloatingActionButton btnHistory = view.findViewById(R.id.btn_budget_history);
+
+        if (isCustomBg) {
+            // 1. 基础背景全透明
+            view.setBackgroundColor(Color.TRANSPARENT);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundColor(Color.TRANSPARENT);
+            if (tabLayout != null) tabLayout.setBackgroundColor(Color.TRANSPARENT);
+
+            // 2. 顶部总计卡片：90%透明度 (230)
+            if (cardMonthSummary != null) {
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
+                cardMonthSummary.setCardBackgroundColor(translucentSurface);
+            }
+
+            // 3. 添加按钮 (黄底白字)：90%透明度
+            if (btnAddGoal != null) {
+                int fabColor = ContextCompat.getColor(requireContext(), R.color.app_yellow);
+                int translucentFab = androidx.core.graphics.ColorUtils.setAlphaComponent(fabColor, 230);
+                btnAddGoal.setBackgroundTintList(ColorStateList.valueOf(translucentFab));
+            }
+
+            // 4. 历史记录按钮 (白底黄字)：90%透明度
+            if (btnHistory != null) {
+                int fabColor = ContextCompat.getColor(requireContext(), R.color.white);
+                int translucentFab = androidx.core.graphics.ColorUtils.setAlphaComponent(fabColor, 230);
+                btnHistory.setBackgroundTintList(ColorStateList.valueOf(translucentFab));
+            }
+
+        } else {
+            // ================= 恢复系统默认模式 =================
+            view.setBackgroundResource(R.color.bar_background);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundResource(R.color.bar_background);
+            if (tabLayout != null) tabLayout.setBackgroundResource(R.color.bar_background);
+
+            if (cardMonthSummary != null) {
+                cardMonthSummary.setCardBackgroundColor(ContextCompat.getColor(requireContext(), R.color.white));
+            }
+            if (btnAddGoal != null) {
+                btnAddGoal.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.app_yellow)));
+            }
+            if (btnHistory != null) {
+                btnHistory.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.white)));
+            }
+        }
+
+        // 通知下面的列表适配器也刷新自己的背景卡片
+        if (goalAdapter != null) goalAdapter.notifyDataSetChanged();
+        if (detailedAdapter != null) detailedAdapter.notifyDataSetChanged();
+    }
+
+    private void applyThemeBackground() {
+        View view = getView();
+        if (view == null) return;
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
+        TabLayout tabLayout = view.findViewById(R.id.tab_layout_budget);
+
+        if (prefs.getInt("theme_mode", -1) == 3) {
+            // 自定义图片背景模式，设置原背景完全透明
+            view.setBackgroundColor(Color.TRANSPARENT);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundColor(Color.TRANSPARENT);
+            if (tabLayout != null) tabLayout.setBackgroundColor(Color.TRANSPARENT);
+        } else {
+            // 日间/夜间模式，恢复原背景
+            view.setBackgroundResource(R.color.bar_background);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundResource(R.color.bar_background);
+            if (tabLayout != null) tabLayout.setBackgroundResource(R.color.bar_background);
+        }
+    }
+
+
+
 }

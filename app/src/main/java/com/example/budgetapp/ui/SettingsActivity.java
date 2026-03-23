@@ -62,6 +62,30 @@ public class SettingsActivity extends AppCompatActivity {
         return false;
     }
 
+    // 新增：用于选择自定义背景图片的 Launcher
+    private final ActivityResultLauncher<String[]> pickCustomBgLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        // 获取持久化读取权限，保证应用重启后依然可以读取该图片
+                        getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+                        prefs.edit()
+                                .putInt("theme_mode", 3) // 使用 3 代表自定义背景模式
+                                .putString("custom_bg_uri", uri.toString())
+                                .apply();
+
+                        Toast.makeText(this, "自定义背景已保存，请返回主页查看", Toast.LENGTH_SHORT).show();
+                    } catch (SecurityException e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "获取图片权限失败", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+    );
+
     private boolean isDuplicateTransaction(Transaction newTx, List<Transaction> existingList) {
         if (existingList == null || existingList.isEmpty()) return false;
         for (Transaction ext : existingList) {
@@ -696,15 +720,25 @@ public class SettingsActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         int currentMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
 
+        // 新增对 mode == 3 (自定义背景) 的判断
         if (currentMode == AppCompatDelegate.MODE_NIGHT_NO) {
             rgTheme.check(R.id.rb_day_mode);
         } else if (currentMode == AppCompatDelegate.MODE_NIGHT_YES) {
             rgTheme.check(R.id.rb_night_mode);
+        } else if (currentMode == 3) {
+            rgTheme.check(R.id.rb_custom_bg);
         } else {
             rgTheme.check(R.id.rb_follow_system);
         }
 
         rgTheme.setOnCheckedChangeListener((group, checkedId) -> {
+            // 如果用户点击了自定义背景，触发选择图片并直接返回
+            if (checkedId == R.id.rb_custom_bg) {
+                pickCustomBgLauncher.launch(new String[]{"image/*"});
+                view.postDelayed(dialog::dismiss, 200);
+                return;
+            }
+
             int selectedMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
             if (checkedId == R.id.rb_day_mode) {
                 selectedMode = AppCompatDelegate.MODE_NIGHT_NO;
@@ -712,7 +746,12 @@ public class SettingsActivity extends AppCompatActivity {
                 selectedMode = AppCompatDelegate.MODE_NIGHT_YES;
             }
 
-            prefs.edit().putInt("theme_mode", selectedMode).apply();
+            // 用户如果切回了普通的主题模式，清除自定义背景标识
+            prefs.edit()
+                    .putInt("theme_mode", selectedMode)
+                    // 可以选择保留之前选中的 URI，也可以不处理，只要 theme_mode 变了就行
+                    .apply();
+
             AppCompatDelegate.setDefaultNightMode(selectedMode);
             view.postDelayed(dialog::dismiss, 200);
         });

@@ -112,16 +112,21 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 【新增】在界面创建前应用主题设置
-        // 确保应用启动时能根据用户之前的选择（日间/夜间/跟随系统）正确显示
+        // 【修改】在界面创建前应用主题设置
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         int themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        AppCompatDelegate.setDefaultNightMode(themeMode);
+
+        // 如果是自定义背景(3)，底层主题使用日间模式 (或者 MODE_NIGHT_FOLLOW_SYSTEM)，避免系统无法识别 3
+        int delegateMode = (themeMode == 3) ? AppCompatDelegate.MODE_NIGHT_NO : themeMode;
+        AppCompatDelegate.setDefaultNightMode(delegateMode);
 
         super.onCreate(savedInstanceState);
 
         // 【关键新增】允许内容延伸到状态栏和导航栏区域
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
+        // 【关键新增】：强制状态栏颜色为透明，确保自定义图片能完美沉浸到状态栏区域
+        getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
 
         setContentView(R.layout.activity_main);
 
@@ -137,6 +142,9 @@ public class MainActivity extends AppCompatActivity {
 
         LinearLayout rootLayout = findViewById(R.id.root_layout);
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
+
+        // 初始化时应用背景
+        applyCustomBackground();
 
         ViewCompat.setOnApplyWindowInsetsListener(rootLayout, (v, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -232,6 +240,63 @@ public class MainActivity extends AppCompatActivity {
         }
 
         checkPermissions();
+    }
+
+    // 【修改】应用自定义背景
+    private void applyCustomBackground() {
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        int themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        View rootLayout = findViewById(R.id.root_layout);
+        View navHostFragment = findViewById(R.id.nav_host_fragment); // 获取碎片容器
+
+        // 🌟 获取底栏
+        com.google.android.material.bottomnavigation.BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
+
+        if (rootLayout == null) return;
+
+        if (themeMode == 3) { // 3 代表开启了自定义背景
+            String uriString = prefs.getString("custom_bg_uri", null);
+            if (uriString != null) {
+                try {
+                    Uri uri = Uri.parse(uriString);
+                    java.io.InputStream inputStream = getContentResolver().openInputStream(uri);
+                    android.graphics.drawable.Drawable drawable =
+                            android.graphics.drawable.Drawable.createFromStream(inputStream, uri.toString());
+
+                    // 设置为根布局背景
+                    rootLayout.setBackground(drawable);
+
+                    // 【动态透明】：保留你原本的逻辑，把顶层容器的透明度调成 100% (完全透明)
+                    if (navHostFragment != null) {
+                        navHostFragment.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                    }
+
+                    // 🌟 【仅仅新增这里】：底栏设置 95% 不透明度 (Alpha: 242)
+                    if (bottomNav != null && bottomNav.getBackground() != null) {
+                        bottomNav.getBackground().mutate().setAlpha(230);
+                    }
+
+                    if (inputStream != null) inputStream.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    rootLayout.setBackgroundResource(R.color.bar_background);
+                    if (navHostFragment != null) navHostFragment.setBackgroundResource(R.color.white);
+                    // 异常时恢复底栏透明度
+                    if (bottomNav != null && bottomNav.getBackground() != null) bottomNav.getBackground().mutate().setAlpha(255);
+                }
+            }
+        } else {
+            // 如果不是自定义背景模式，恢复系统默认颜色
+            rootLayout.setBackgroundResource(R.color.bar_background);
+            if (navHostFragment != null) {
+                navHostFragment.setBackgroundResource(R.color.white);
+            }
+
+            // 🌟 【仅仅新增这里】：恢复底栏 100% 不透明度
+            if (bottomNav != null && bottomNav.getBackground() != null) {
+                bottomNav.getBackground().mutate().setAlpha(255);
+            }
+        }
     }
 
     private void checkPermissions() {
@@ -347,6 +412,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        // 【新增】每次回到主界面时，检查并刷新背景
+        applyCustomBackground();
 
         // 动态控制"预算"菜单栏是否显示
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);

@@ -2,6 +2,7 @@
 package com.example.budgetapp.ui;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.util.TypedValue;
@@ -244,6 +245,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         boolean isSelected = date.equals(selectedDate);
 
         // --- 在判断背景色之前，先保存 View 原本的 Padding ---
+        // --- 在判断背景色之前，先保存 View 原本的 Padding ---
         int padLeft = holder.itemView.getPaddingLeft();
         int padTop = holder.itemView.getPaddingTop();
         int padRight = holder.itemView.getPaddingRight();
@@ -252,6 +254,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         // --- 核心优化：检测多项自动续费日期 ---
         boolean isRenewalDay = false;
         for (RenewalItem item : renewalItems) {
+            // ... (保留你原有的续费日期判断逻辑不变)
             if ("Month".equals(item.period)) {
                 if (date.getDayOfMonth() == item.day) {
                     isRenewalDay = true;
@@ -264,6 +267,11 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                 }
             }
         }
+
+        // ====== 新增：提前获取是否开启了自定义背景 ======
+        SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
+        // ===============================================
 
         // --- 样式优先级：选中 > 今天 > 续费日期 > 普通 ---
         if (isSelected) {
@@ -290,14 +298,13 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             // [自动续费状态]：显示红色边框
             holder.itemView.setBackgroundResource(R.drawable.bg_selected_date);
             Drawable bg = holder.itemView.getBackground();
-            if (bg != null) bg.setTint(incomeRed); // 设置为红色边框适配“自动续费”标识
+            if (bg != null) bg.setTint(incomeRed);
 
             holder.tvDay.setTextColor(defaultDayColor);
             holder.itemView.setSelected(false);
 
         } else if (isBudgetEnabled && monthlyBudget > 0 && isCurrentMonth && !date.isAfter(LocalDate.now())) {
-
-            // [新增：预算状态] 开启预算且是当月日期，并且“不是未来的日期”才显示预算背景
+            // [预算状态]
             int daysInMonth = date.lengthOfMonth();
             double dailyBudget = monthlyBudget / daysInMonth;
             if (dailyExpenseForBudget > dailyBudget) {
@@ -305,14 +312,55 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             } else {
                 holder.itemView.setBackgroundResource(R.drawable.bg_budget_safe);
             }
+
+            Drawable bg = holder.itemView.getBackground();
+            if (bg != null) {
+                // 如果是自定义背景，设置为 217 (85% 不透明度)，否则恢复 255 (不透明)
+                bg.mutate().setAlpha(isCustomBg ? 230 : 255);
+            }
+
             holder.tvDay.setTextColor(defaultDayColor);
             holder.itemView.setSelected(false);
 
         } else {
-            // [普通状态]
-            holder.itemView.setBackgroundResource(0);
+            // ====== 修改：[普通状态] ======
+            if (isCustomBg) {
+                // 1. 创建圆角矩形 Shape
+                android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+                shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+
+                // 【新增判断】：如果是当月日期，用 90% 不透明度 (230)；如果是非当月(上个月/下个月)，用 60% 不透明度 (153)
+                int alpha = isCurrentMonth ? 230 : 153;
+
+                // 设置颜色：淡灰底色注入动态透明度
+                int lightGray = Color.parseColor("#F5F5F5");
+                int translucentGray = androidx.core.graphics.ColorUtils.setAlphaComponent(lightGray, alpha);
+                shape.setColor(translucentGray);
+
+                // 设置圆角：12dp 转换为 px
+                float radius = android.util.TypedValue.applyDimension(
+                        android.util.TypedValue.COMPLEX_UNIT_DIP, 12, context.getResources().getDisplayMetrics());
+                shape.setCornerRadius(radius);
+
+                // 2. 创建 Inset 缩进
+                // 设置间隙：4dp 转换为 px
+                int inset = (int) android.util.TypedValue.applyDimension(
+                        android.util.TypedValue.COMPLEX_UNIT_DIP, 4, context.getResources().getDisplayMetrics());
+
+                // 将 Shape 放入 InsetDrawable 中，四周缩进 4dp
+                android.graphics.drawable.InsetDrawable insetDrawable =
+                        new android.graphics.drawable.InsetDrawable(shape, inset, inset, inset, inset);
+
+                // 应用背景
+                holder.itemView.setBackground(insetDrawable);
+            } else {
+                // 系统纯色背景：恢复完全透明，不遮挡系统的底色
+                holder.itemView.setBackgroundResource(0);
+            }
+
             holder.tvDay.setTextColor(defaultDayColor);
             holder.itemView.setSelected(false);
+            // ===============================
         }
 
         // --- 新增：背景设置完毕后，强行恢复原本的 Padding ---

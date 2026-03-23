@@ -600,6 +600,10 @@ public class AssetsFragment extends Fragment {
             Context context = holder.itemView.getContext();
             SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
             boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+
+            // 【关键修复：一定要在这里声明 isCustomBg】
+            boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
+
             String symbol = (item.currencySymbol != null && !item.currencySymbol.isEmpty()) ? item.currencySymbol : "¥";
 
             if (holder instanceof NormalVH) {
@@ -634,6 +638,13 @@ public class AssetsFragment extends Fragment {
                         normalHolder.tvAmount.setTextColor(context.getColor(R.color.income_red));
                     }
                 }
+
+                // 【应用透明度】
+                android.graphics.drawable.Drawable bg = normalHolder.itemView.getBackground();
+                if (bg != null) {
+                    bg.mutate().setAlpha(isCustomBg ? 230 : 255);
+                }
+
                 normalHolder.tvNote.setVisibility(View.GONE);
             }
             else if (holder instanceof InvestmentVH) {
@@ -641,28 +652,32 @@ public class AssetsFragment extends Fragment {
                 String typeStr = item.isFixedTerm ? "定期" : "活期";
                 String interestModeStr = item.isCompoundInterest ? "复利" : "单利";
 
-                // 【新增：计算并格式化存入时间与结算时间】
                 String depositStr = "--";
                 String settlementStr = "--";
                 if (item.depositDate > 0) {
                     java.time.LocalDate dDate = java.time.Instant.ofEpochMilli(item.depositDate).atZone(java.time.ZoneId.systemDefault()).toLocalDate();
                     depositStr = dDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-                    // 结算时间 = 存入时间 + 存储月数
                     java.time.LocalDate sDate = dDate.plusMonths(item.durationMonths);
                     settlementStr = sDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
                 }
 
-                // 重新拼接理财卡片的显示信息
                 String info = String.format("%s (%s | %s)\n本金: %s%.2f\n存入: %s | 结算: %s\n周期: %d个月 | 年化: %.2f%%\n预计结算: %s%.2f",
                         item.name, typeStr, interestModeStr, symbol, item.amount, depositStr, settlementStr, item.durationMonths, item.interestRate, symbol, item.expectedReturn);
 
                 invHolder.tvInfo.setText(info);
 
+                // 【应用透明度】
+                if (invHolder.itemView instanceof androidx.cardview.widget.CardView) {
+                    androidx.cardview.widget.CardView card = (androidx.cardview.widget.CardView) invHolder.itemView;
+                    int surfaceColor = androidx.core.content.ContextCompat.getColor(context, R.color.white);
+                    card.setCardBackgroundColor(isCustomBg ?
+                            androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230) : surfaceColor);
+                }
+
                 boolean isDefault = (item.id == defaultAssetId);
                 invHolder.itemView.setSelected(isDefault);
             }
 
-            // 绑定点击和长按事件
             holder.itemView.setOnClickListener(v -> listener.onClick(item));
             holder.itemView.setOnLongClickListener(v -> {
                 longListener.onLongClick(item);
@@ -696,4 +711,73 @@ public class AssetsFragment extends Fragment {
             }
         }
     }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
+        updateFragmentTransparency(isCustomBg);
+    }
+
+    private void updateFragmentTransparency(boolean isCustomBg) {
+        View view = getView();
+        if (view == null) return;
+
+        TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
+        androidx.cardview.widget.CardView cardAssetsSummary = view.findViewById(R.id.card_assets_summary);
+        com.google.android.material.floatingactionbutton.FloatingActionButton fabAddAsset = view.findViewById(R.id.fab_add_asset);
+
+        if (isCustomBg) {
+            // 1. 基础背景全透明
+            view.setBackgroundColor(Color.TRANSPARENT);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundColor(Color.TRANSPARENT);
+
+            // 2. 顶部总计卡片：90%透明度 (230)
+            if (cardAssetsSummary != null) {
+                int surfaceColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white);
+                int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
+                cardAssetsSummary.setCardBackgroundColor(translucentSurface);
+            }
+
+            // 3. 添加资产按钮：90%透明度
+            if (fabAddAsset != null) {
+                int fabColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.app_yellow);
+                int translucentFab = androidx.core.graphics.ColorUtils.setAlphaComponent(fabColor, 230);
+                fabAddAsset.setBackgroundTintList(android.content.res.ColorStateList.valueOf(translucentFab));
+            }
+
+        } else {
+            // ================= 恢复系统默认模式 =================
+            view.setBackgroundResource(R.color.bar_background);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundResource(R.color.bar_background);
+
+            if (cardAssetsSummary != null) {
+                cardAssetsSummary.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white));
+            }
+            if (fabAddAsset != null) {
+                fabAddAsset.setBackgroundTintList(android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.app_yellow)));
+            }
+        }
+
+        // 通知列表刷新，以便更新列表项的透明度
+        if (adapter != null) adapter.notifyDataSetChanged();
+    }
+
+    private void applyThemeBackground() {
+        View view = getView();
+        if (view == null) return;
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
+
+        if (prefs.getInt("theme_mode", -1) == 3) {
+            view.setBackgroundColor(Color.TRANSPARENT);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundColor(Color.TRANSPARENT);
+        } else {
+            view.setBackgroundResource(R.color.bar_background);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundResource(R.color.bar_background);
+        }
+    }
+
 }

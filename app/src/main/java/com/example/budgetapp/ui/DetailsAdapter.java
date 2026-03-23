@@ -1,6 +1,8 @@
 package com.example.budgetapp.ui;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -96,20 +98,34 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         Context context = holder.itemView.getContext();
+
+        // 🌟 新增：获取当前是否为自定义背景模式
+        SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
+
         if (getItemViewType(position) == DetailsItem.TYPE_HEADER) {
             HeaderItem header = (HeaderItem) items.get(position);
             HeaderViewHolder hvh = (HeaderViewHolder) holder;
             hvh.tvDate.setText(header.dateStr);
             hvh.tvIncome.setText(header.income > 0 ? "收: " + String.format("%.2f", header.income) : "");
             hvh.tvExpense.setText(header.expense > 0 ? "支: " + String.format("%.2f", header.expense) : "");
-            // 🌟 设置结余文字
             hvh.tvBalance.setText("结: " + String.format("%.2f", header.balance));
+
+            // 🌟 1. 设置日期头透明度 (90% 透明度, Alpha: 230)
+            if (isCustomBg) {
+                int surfaceColor = ContextCompat.getColor(context, R.color.bar_background);
+                int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
+                hvh.itemView.setBackgroundColor(translucentSurface);
+            } else {
+                hvh.itemView.setBackgroundResource(R.color.bar_background);
+            }
+
         } else {
             TransactionItem item = (TransactionItem) items.get(position);
             Transaction t = item.transaction;
             TransactionViewHolder tvh = (TransactionViewHolder) holder;
 
-            // 1. 金额与颜色 (对齐记账模块)
+            // ... (这里保留你原来所有的金额、颜色、分类、备注等 UI 赋值逻辑) ...
             String amountStr = String.format("%.2f", t.amount);
             if (t.type == 1) { // 收入
                 tvh.tvAmount.setText("+" + amountStr);
@@ -118,8 +134,6 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 tvh.tvAmount.setText("-" + amountStr);
                 tvh.tvAmount.setTextColor(ContextCompat.getColor(context, R.color.expense_green));
             }
-
-            // 2. 分类与二级分类
             tvh.tvCategory.setText(t.category);
             if (!TextUtils.isEmpty(t.subCategory)) {
                 tvh.tvSubCategory.setText(t.subCategory);
@@ -127,20 +141,15 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             } else {
                 tvh.tvSubCategory.setVisibility(View.GONE);
             }
-
-            // 3. 备注与记录标识
             if (!TextUtils.isEmpty(t.note)) {
                 tvh.tvNote.setVisibility(View.VISIBLE);
                 tvh.tvNote.setText(t.note);
             } else {
                 tvh.tvNote.setVisibility(View.GONE);
             }
-
-            // 4. 资产名称与备注指示器
             String assetName = (t.assetId != 0) ? assetMap.get(t.assetId) : null;
             boolean hasRemarkOrPhoto = !TextUtils.isEmpty(t.remark) || !TextUtils.isEmpty(t.photoPath);
             int statusColor = hasRemarkOrPhoto ? ContextCompat.getColor(context, R.color.expense_green) : ContextCompat.getColor(context, R.color.income_red);
-
             if (assetName != null) {
                 tvh.viewIndicator.setVisibility(View.GONE);
                 tvh.tvAssetName.setVisibility(View.VISIBLE);
@@ -150,6 +159,30 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 tvh.tvAssetName.setVisibility(View.GONE);
                 tvh.viewIndicator.setVisibility(View.VISIBLE);
                 tvh.viewIndicator.setBackgroundColor(statusColor);
+            }
+            // ... (上面是保留的原代码) ...
+
+            // 🌟 2. 为明细账单设置 80% (Alpha: 204) 透明度淡灰色卡片背景
+            if (isCustomBg) {
+                android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+                shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                int lightGray = Color.parseColor("#F5F5F5");
+                int translucentGray = androidx.core.graphics.ColorUtils.setAlphaComponent(lightGray, 230);
+                shape.setColor(translucentGray);
+
+                // 增加一点圆角 (12dp) 让它更高级
+                float radius = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 0, context.getResources().getDisplayMetrics());
+                shape.setCornerRadius(radius);
+
+                // 增加缩进间距 (上下 4dp, 左右 12dp)，让列表项独立成卡片，底层图片从缝隙透出
+                int insetV = (int) android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 0, context.getResources().getDisplayMetrics());
+                int insetH = (int) android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 0, context.getResources().getDisplayMetrics());
+                android.graphics.drawable.InsetDrawable insetDrawable = new android.graphics.drawable.InsetDrawable(shape, insetH, insetV, insetH, insetV);
+
+                tvh.itemView.setBackground(insetDrawable);
+            } else {
+                // 恢复系统默认：无背景
+                tvh.itemView.setBackgroundColor(Color.TRANSPARENT);
             }
 
             holder.itemView.setOnClickListener(v -> {

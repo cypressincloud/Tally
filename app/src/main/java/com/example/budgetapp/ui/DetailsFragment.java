@@ -994,4 +994,85 @@ public class DetailsFragment extends Fragment {
             return null;
         }
     }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
+        updateFragmentTransparency(isCustomBg);
+    }
+
+    private void updateFragmentTransparency(boolean isCustomBg) {
+        View view = getView();
+        if (view == null) return;
+
+        View rootLayout = view.findViewById(R.id.root_layout_details);
+        TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
+        RadioGroup rgTimeMode = view.findViewById(R.id.rg_time_mode);
+        RecyclerView recyclerDetails = view.findViewById(R.id.recycler_details);
+
+        if (isCustomBg) {
+            // 1. 基础背景全透明，完全透出底层自定义图片
+            if (rootLayout != null) rootLayout.setBackgroundColor(Color.TRANSPARENT);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundColor(Color.TRANSPARENT);
+            if (recyclerDetails != null) recyclerDetails.setBackgroundColor(Color.TRANSPARENT);
+
+            // 2. 年月日切换栏：同时处理外框和内部按钮的透明度
+            if (rgTimeMode != null) {
+                // 处理 RadioGroup 外框的透明度 (90%)
+                if (rgTimeMode.getBackground() != null) {
+                    rgTimeMode.getBackground().mutate().setAlpha(230);
+                }
+                // 遍历里面的 "年", "月", "周" 按钮
+                for (int i = 0; i < rgTimeMode.getChildCount(); i++) {
+                    View child = rgTimeMode.getChildAt(i);
+                    // 将按钮被选中时的背景块透明度改为 80% (Alpha: 204)，与外框形成层次感
+                    if (child.getBackground() != null) {
+                        child.getBackground().mutate().setAlpha(242);
+                    }
+                }
+            }
+        } else {
+            // ================= 恢复系统默认模式 =================
+            if (rootLayout != null) rootLayout.setBackgroundResource(R.color.bar_background);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundResource(R.color.bar_background);
+            if (recyclerDetails != null) recyclerDetails.setBackgroundResource(R.color.bar_background);
+
+            if (rgTimeMode != null) {
+                if (rgTimeMode.getBackground() != null) {
+                    rgTimeMode.getBackground().mutate().setAlpha(255); // 恢复不透明
+                }
+                for (int i = 0; i < rgTimeMode.getChildCount(); i++) {
+                    View child = rgTimeMode.getChildAt(i);
+                    if (child.getBackground() != null) {
+                        child.getBackground().mutate().setAlpha(255); // 恢复不透明
+                    }
+                }
+            }
+        }
+
+        // 通知列表刷新，以更新具体账单和日期头的透明度
+        if (adapter != null) adapter.notifyDataSetChanged();
+    }
+
+    private void applyThemeBackground() {
+        View view = getView();
+        if (view == null) return;
+
+        SharedPreferences appPrefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
+        RecyclerView recyclerDetails = view.findViewById(R.id.recycler_details);
+
+        if (appPrefs.getInt("theme_mode", -1) == 3) {
+            view.setBackgroundColor(Color.TRANSPARENT);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundColor(Color.TRANSPARENT);
+            if (recyclerDetails != null) recyclerDetails.setBackgroundColor(Color.TRANSPARENT);
+        } else {
+            view.setBackgroundResource(R.color.bar_background);
+            if (tvTopTitle != null) tvTopTitle.setBackgroundResource(R.color.bar_background);
+            if (recyclerDetails != null) recyclerDetails.setBackgroundResource(R.color.bar_background);
+        }
+    }
+
 }
