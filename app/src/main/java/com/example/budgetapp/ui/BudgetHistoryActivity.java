@@ -9,6 +9,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import com.example.budgetapp.util.CategoryManager;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -71,9 +73,22 @@ public class BudgetHistoryActivity extends AppCompatActivity {
     /**
      * 核心算法：情景重现，推演历史记录
      */
+    /**
+     * 核心算法：情景重现，推演历史记录
+     */
     private void generateTimeline(List<Transaction> transactions, List<Goal> goals) {
         SharedPreferences prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         float defaultBudget = prefs.getFloat("monthly_budget", 0f);
+
+        // 【修复2】：同步 BudgetFragment 中的详细分类预算总额逻辑
+        boolean isDetailedEnabled = prefs.getBoolean("is_detailed_budget_enabled", false);
+        float detailedTotalBudget = 0f;
+        if (isDetailedEnabled) {
+            List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
+            for (String cat : expenseCategories) {
+                detailedTotalBudget += prefs.getFloat("budget_cat_" + cat, 0f);
+            }
+        }
 
         // 1. 获取首次开启预算的记录时间
         long startTs = prefs.getLong("budget_start_time", 0);
@@ -108,8 +123,13 @@ public class BudgetHistoryActivity extends AppCompatActivity {
         YearMonth currentProcessingMonth = YearMonth.from(earliestDate);
         double currentMonthExpense = 0;
 
-        // 读取当月独立预算
-        float activeMonthBudget = prefs.getFloat("budget_" + currentProcessingMonth.getYear() + "_" + currentProcessingMonth.getMonthValue(), defaultBudget);
+        // 【修复2】：根据是否开启详细模式，读取正确的当月预算
+        float activeMonthBudget;
+        if (isDetailedEnabled) {
+            activeMonthBudget = detailedTotalBudget;
+        } else {
+            activeMonthBudget = prefs.getFloat("budget_" + currentProcessingMonth.getYear() + "_" + currentProcessingMonth.getMonthValue(), defaultBudget);
+        }
 
         for (LocalDate d = earliestDate; !d.isAfter(today); d = d.plusDays(1)) {
             YearMonth ym = YearMonth.from(d);
@@ -123,7 +143,11 @@ public class BudgetHistoryActivity extends AppCompatActivity {
 
                 // 进入新月份，重新读取新月份的独立预算
                 currentProcessingMonth = ym;
-                activeMonthBudget = prefs.getFloat("budget_" + ym.getYear() + "_" + ym.getMonthValue(), defaultBudget);
+                if (isDetailedEnabled) {
+                    activeMonthBudget = detailedTotalBudget;
+                } else {
+                    activeMonthBudget = prefs.getFloat("budget_" + ym.getYear() + "_" + ym.getMonthValue(), defaultBudget);
+                }
                 currentMonthExpense = 0;
             }
 
@@ -140,7 +164,7 @@ public class BudgetHistoryActivity extends AppCompatActivity {
 
             currentMonthExpense += expenseToday;
 
-            // 【新增修复】：判断这一天是否存在尚未完成的目标
+            // 判断这一天是否存在尚未完成的目标
             boolean hasActiveGoal = false;
             for (Goal g : pendingGoals) {
                 LocalDate createDate = Instant.ofEpochMilli(g.createdAt).atZone(ZoneId.systemDefault()).toLocalDate();
@@ -169,7 +193,7 @@ public class BudgetHistoryActivity extends AppCompatActivity {
                     LocalDate finishDate = Instant.ofEpochMilli(g.finishedDate).atZone(ZoneId.systemDefault()).toLocalDate();
                     if (!d.isBefore(finishDate)) { // 当推演到用户点击完成的那一天
                         long ts = d.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                        timeline.add(new GoalItem(ts, g.name, d, g)); // 【修改】：加上参数 g
+                        timeline.add(new GoalItem(ts, g.name, d, g));
                         it.remove();
                         continue; // 手动完成的不消耗资金池
                     }
@@ -180,13 +204,13 @@ public class BudgetHistoryActivity extends AppCompatActivity {
                 if (needed <= 0) {
                     // 仅靠基础资金就完成了
                     long ts = d.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                    timeline.add(new GoalItem(ts, g.name, d, g)); // 【修改】：加上参数 g
+                    timeline.add(new GoalItem(ts, g.name, d, g));
                     it.remove();
                 } else if (pool >= needed) {
                     // 资金池填满了目标
                     pool -= needed;
                     long ts = d.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                    timeline.add(new GoalItem(ts, g.name, d, g)); // 【修改】：加上参数 g
+                    timeline.add(new GoalItem(ts, g.name, d, g));
                     it.remove();
                 } else {
                     break; // 资金不够填目前的最高优目标，停止当天的顺延分配
@@ -194,18 +218,15 @@ public class BudgetHistoryActivity extends AppCompatActivity {
             }
         }
 
-        // 添加当前进行中月份的结余
-        double currentSurplus = activeMonthBudget - currentMonthExpense;
-        long nowTs = System.currentTimeMillis();
-        timeline.add(new MonthItem(nowTs, currentProcessingMonth.getYear(), currentProcessingMonth.getMonthValue(), currentSurplus));
+        // 【修复1】：已删除原先“强行添加当前进行中月份的结余”的代码逻辑。
+        // 现在当月必须等到进入次月1号触发 (!ym.equals(currentProcessingMonth)) 才会生成 MonthItem 进入历史。
 
-        // 按时间正序排列（最早的在最上面，符合你的阅读习惯）
+        // 按时间正序排列（最早的在最上面，符合阅读习惯）
         Collections.sort(timeline, (a, b) -> Long.compare(a.getTimestamp(), b.getTimestamp()));
 
         adapter = new TimelineAdapter(timeline);
         rvTimeline.setAdapter(adapter);
     }
-
     /**
      * 弹出确认删除目标记录的对话框
      */

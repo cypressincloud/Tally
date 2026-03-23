@@ -158,8 +158,10 @@ public class BudgetFragment extends Fragment {
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         List<CategoryBudgetModel> list = new ArrayList<>();
 
-        long startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-        long endOfNow = System.currentTimeMillis();
+        LocalDate today = LocalDate.now();
+        long startOfMonth = today.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        // 【修复】将 endOfNow 改为月底，保证逻辑一致
+        long endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1;
 
         List<String> expenseCategories = CategoryManager.getExpenseCategories(requireContext());
         for (String cat : expenseCategories) {
@@ -167,7 +169,8 @@ public class BudgetFragment extends Fragment {
             if (limit > 0) {
                 double spent = 0;
                 for (Transaction t : transactions) {
-                    if (t.type == 0 && t.date >= startOfMonth && t.date <= endOfNow && cat.equals(t.category)) {
+                    // 将 t.date <= endOfNow 替换为 t.date <= endOfMonth
+                    if (t.type == 0 && t.date >= startOfMonth && t.date <= endOfMonth && cat.equals(t.category)) {
                         spent += t.amount;
                     }
                 }
@@ -309,15 +312,13 @@ public class BudgetFragment extends Fragment {
 
         float monthlyBudget = 0;
 
-        // 【核心修改】：同步月总预算
+        // 获取当月总预算
         if (isDetailedEnabled) {
-            // 如果开启了详细预算，月总预算严格等于各个分类预算之和
             List<String> expenseCategories = CategoryManager.getExpenseCategories(requireContext());
             for (String cat : expenseCategories) {
                 monthlyBudget += prefs.getFloat("budget_cat_" + cat, 0f);
             }
         } else {
-            // 没有开启时，读取当月独立设置的预算，如果没有则使用默认预算
             float defaultBudget = prefs.getFloat("monthly_budget", 0f);
             String monthKey = "budget_" + today.getYear() + "_" + today.getMonthValue();
             monthlyBudget = prefs.getFloat(monthKey, defaultBudget);
@@ -336,27 +337,38 @@ public class BudgetFragment extends Fragment {
             return;
         }
 
-        double dailyBudget = (double) monthlyBudget / today.lengthOfMonth();
-        double expectedExpenseSoFar = today.getDayOfMonth() * dailyBudget;
         double actualExpenseSoFar = 0;
+
+        // 【修复1】修正时间边界：涵盖整个月，防止丢失未来日期（但属本月）的账单
         long startOfMonth = today.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-        long endOfNow = System.currentTimeMillis();
+        // 本月最后一天加1天，获取下个月零点作为结束边界 (减 1 毫秒即本月末)
+        long endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1;
 
         if (transactions != null) {
             for (Transaction t : transactions) {
-                if (t.date >= startOfMonth && t.date <= endOfNow && t.type == 0) {
+                if (t.date >= startOfMonth && t.date <= endOfMonth && t.type == 0) {
                     actualExpenseSoFar += t.amount;
                 }
             }
         }
 
-        currentMonthSurplus = expectedExpenseSoFar - actualExpenseSoFar;
-        String sign = currentMonthSurplus >= 0 ? "+" : "";
-        tvTotalSurplus.setText(String.format("%s%.2f", sign, currentMonthSurplus));
+        // 【修复3】总结余应该是真实剩余预算 = 总预算 - 实际总支出
+        double monthRemaining = monthlyBudget - actualExpenseSoFar;
+        String sign = monthRemaining >= 0 ? "+" : ""; // 按照原逻辑保留加号
+        tvTotalSurplus.setText(String.format("%s%.2f", sign, monthRemaining));
         tvTotalSurplus.setTextColor(ContextCompat.getColor(requireContext(),
-                currentMonthSurplus >= 0 ? R.color.app_yellow : R.color.budget_progress_exceed));
+                monthRemaining >= 0 ? R.color.app_yellow : R.color.budget_progress_exceed));
 
-        tvHeaderDailyAvailable.setText(String.format("%.2f", dailyBudget + currentMonthSurplus));
+        // 【修复2】更合理的“今日可用”计算：推荐采用“剩余平摊法”
+        int remainingDays = today.lengthOfMonth() - today.getDayOfMonth() + 1;
+        // 如果整体预算超支，今日可用为0；否则平摊到剩余天数
+        double dailyAvailable = monthRemaining > 0 ? (monthRemaining / remainingDays) : 0;
+
+        // 如果你坚持要用原作者的“进度结余法”，可以替换为这句:
+        // double expectedExpenseSoFar = today.getDayOfMonth() * ((double) monthlyBudget / today.lengthOfMonth());
+        // double dailyAvailable = expectedExpenseSoFar - actualExpenseSoFar;
+
+        tvHeaderDailyAvailable.setText(String.format("%.2f", Math.max(0, dailyAvailable)));
     }
 
     private void showSetMonthBudgetDialog() {
