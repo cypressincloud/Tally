@@ -1815,7 +1815,7 @@ public class StatsFragment extends Fragment {
                     android.util.TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics());
             shape.setCornerRadius(radius);
 
-            int lightGray = android.graphics.Color.parseColor("#F5F5F5");
+            int lightGray = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white);
             shape.setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(lightGray, 230));
 
             targetView.setBackground(shape);

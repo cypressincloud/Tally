@@ -103,6 +103,8 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
 
+        int surfaceColor = ContextCompat.getColor(context, R.color.white);
+
         if (getItemViewType(position) == DetailsItem.TYPE_HEADER) {
             HeaderItem header = (HeaderItem) items.get(position);
             HeaderViewHolder hvh = (HeaderViewHolder) holder;
@@ -113,7 +115,6 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
             // 🌟 1. 设置日期头透明度 (90% 透明度, Alpha: 230)
             if (isCustomBg) {
-                int surfaceColor = ContextCompat.getColor(context, R.color.bar_background);
                 int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
                 hvh.itemView.setBackgroundColor(translucentSurface);
             } else {
@@ -166,7 +167,7 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             if (isCustomBg) {
                 android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
                 shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-                int lightGray = Color.parseColor("#F5F5F5");
+                int lightGray = androidx.core.content.ContextCompat.getColor(context, R.color.white);
                 int translucentGray = androidx.core.graphics.ColorUtils.setAlphaComponent(lightGray, 230);
                 shape.setColor(translucentGray);
 

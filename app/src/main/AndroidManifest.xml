@@ -41,6 +41,8 @@
             android:label="照片备份设置"
             android:theme="@style/Theme.BudgetApp"/>
 
+        <activity android:name=".ui.ThemeSettingsActivity" />
+
         <activity android:name=".ui.PhotoActionActivity"
             android:theme="@style/Theme.BudgetApp.Transparent"
             android:excludeFromRecents="true"

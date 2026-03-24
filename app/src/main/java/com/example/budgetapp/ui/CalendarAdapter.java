@@ -333,8 +333,8 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                 int alpha = isCurrentMonth ? 230 : 153;
 
                 // 设置颜色：淡灰底色注入动态透明度
-                int lightGray = Color.parseColor("#F5F5F5");
-                int translucentGray = androidx.core.graphics.ColorUtils.setAlphaComponent(lightGray, alpha);
+                int surfaceColor = androidx.core.content.ContextCompat.getColor(context, R.color.white);
+                int translucentGray = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, alpha);
                 shape.setColor(translucentGray);
 
                 // 设置圆角：12dp 转换为 px

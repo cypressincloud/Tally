@@ -112,12 +112,22 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 【修改】在界面创建前应用主题设置
+        // 【修改】适配双背景组合逻辑
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         int themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
 
-        // 如果是自定义背景(3)，底层主题使用日间模式 (或者 MODE_NIGHT_FOLLOW_SYSTEM)，避免系统无法识别 3
-        int delegateMode = (themeMode == 3) ? AppCompatDelegate.MODE_NIGHT_NO : themeMode;
+        int delegateMode = themeMode;
+        if (themeMode == 3) {
+            String dayUri = prefs.getString("custom_bg_day_uri", null);
+            String nightUri = prefs.getString("custom_bg_night_uri", null);
+            if (dayUri != null && nightUri == null) {
+                delegateMode = AppCompatDelegate.MODE_NIGHT_NO; // 只有日间图片，全局锁死日间模式
+            } else if (nightUri != null && dayUri == null) {
+                delegateMode = AppCompatDelegate.MODE_NIGHT_YES; // 只有夜间图片，全局锁死夜间模式
+            } else {
+                delegateMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM; // 都有，跟随系统自动切换
+            }
+        }
         AppCompatDelegate.setDefaultNightMode(delegateMode);
 
         super.onCreate(savedInstanceState);
@@ -242,7 +252,7 @@ public class MainActivity extends AppCompatActivity {
         checkPermissions();
     }
 
-    // 【修改】应用自定义背景
+    // 【修改】应用自定义背景（完美保留原有透明度适配逻辑，仅新增日/夜双图片判断）
     private void applyCustomBackground() {
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         int themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
@@ -255,10 +265,29 @@ public class MainActivity extends AppCompatActivity {
         if (rootLayout == null) return;
 
         if (themeMode == 3) { // 3 代表开启了自定义背景
-            String uriString = prefs.getString("custom_bg_uri", null);
-            if (uriString != null) {
+            // 🌟 【修改部分开始】：智能获取应该加载日间还是夜间的图片
+            String dayUriStr = prefs.getString("custom_bg_day_uri", null);
+            String nightUriStr = prefs.getString("custom_bg_night_uri", null);
+            String targetUriStr = null;
+
+            if (dayUriStr != null && nightUriStr == null) {
+                targetUriStr = dayUriStr; // 只有日间
+            } else if (nightUriStr != null && dayUriStr == null) {
+                targetUriStr = nightUriStr; // 只有夜间
+            } else if (dayUriStr != null && nightUriStr != null) {
+                // 两个都有，判断当前系统是否为暗黑模式
+                int currentNightMode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+                if (currentNightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES) {
+                    targetUriStr = nightUriStr;
+                } else {
+                    targetUriStr = dayUriStr;
+                }
+            }
+            // 🌟 【修改部分结束】
+
+            if (targetUriStr != null) {
                 try {
-                    Uri uri = Uri.parse(uriString);
+                    android.net.Uri uri = android.net.Uri.parse(targetUriStr);
                     java.io.InputStream inputStream = getContentResolver().openInputStream(uri);
                     android.graphics.drawable.Drawable drawable =
                             android.graphics.drawable.Drawable.createFromStream(inputStream, uri.toString());
@@ -271,7 +300,7 @@ public class MainActivity extends AppCompatActivity {
                         navHostFragment.setBackgroundColor(android.graphics.Color.TRANSPARENT);
                     }
 
-                    // 🌟 【仅仅新增这里】：底栏设置 95% 不透明度 (Alpha: 242)
+                    // 🌟 【保留原有】：底栏设置透明度 (Alpha: 230)
                     if (bottomNav != null && bottomNav.getBackground() != null) {
                         bottomNav.getBackground().mutate().setAlpha(230);
                     }
@@ -284,6 +313,11 @@ public class MainActivity extends AppCompatActivity {
                     // 异常时恢复底栏透明度
                     if (bottomNav != null && bottomNav.getBackground() != null) bottomNav.getBackground().mutate().setAlpha(255);
                 }
+            } else {
+                // 如果开启了自定义背景，但用户把两张图都"清除"了，则恢复系统默认
+                rootLayout.setBackgroundResource(R.color.bar_background);
+                if (navHostFragment != null) navHostFragment.setBackgroundResource(R.color.white);
+                if (bottomNav != null && bottomNav.getBackground() != null) bottomNav.getBackground().mutate().setAlpha(255);
             }
         } else {
             // 如果不是自定义背景模式，恢复系统默认颜色
@@ -292,7 +326,7 @@ public class MainActivity extends AppCompatActivity {
                 navHostFragment.setBackgroundResource(R.color.white);
             }
 
-            // 🌟 【仅仅新增这里】：恢复底栏 100% 不透明度
+            // 🌟 【保留原有】：恢复底栏 100% 不透明度
             if (bottomNav != null && bottomNav.getBackground() != null) {
                 bottomNav.getBackground().mutate().setAlpha(255);
             }
