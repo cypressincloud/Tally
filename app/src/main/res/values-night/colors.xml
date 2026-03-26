@@ -21,6 +21,9 @@
 
     <color name="divider_color">#2C2C2C</color>
 
+    <color name="transfer_fab_bg">#2C2C2C</color>
+    <color name="transfer_fab_icon_tint">#E0E0E0</color>
+
     <color name="calendar_lunar_text">#6b6d6d</color>
 
     <color name="bottom_selected">@color/app_yellow</color>

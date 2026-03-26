@@ -146,6 +146,12 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         for (Transaction t : transactions) {
             if (t.date >= start && t.date < end) {
 
+                // 🌟 核心拦截：如果是资产互转，直接跳过，不参与日历下方任何数字的计算
+                boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
+                if (isTransfer) {
+                    continue;
+                }
+
                 // <--- 2. 新增这块：只要是支出(type==0)，就累加到预算统计里 --->
                 if (t.type == 0) {
                     dailyExpenseForBudget += t.amount;
@@ -155,7 +161,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                     case 0: // 结余
                         if (t.type == 1) {
                             if (!"加班".equals(t.category)) dailySum += t.amount;
-                        } else {
+                        } else if (t.type == 0) { // 🌟 严格限制只有真正的支出才减去金额
                             dailySum -= t.amount;
                         }
                         break;
@@ -166,10 +172,10 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                         if (t.type == 0) dailySum += t.amount;
                         break;
                     case 3: // 加班工资
-                        if ("加班".equals(t.category)) dailySum += t.amount;
+                        if (t.type == 1 && "加班".equals(t.category)) dailySum += t.amount;
                         break;
                     case 4: // 加班工时
-                        if ("加班".equals(t.category)) {
+                        if (t.type == 1 && "加班".equals(t.category)) {
                             if (t.note != null) {
                                 java.util.regex.Matcher m = java.util.regex.Pattern.compile("时长:\\s*([0-9.]+)\\s*小时").matcher(t.note);
                                 if (m.find()) {
@@ -231,6 +237,13 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                     } else {
                         netText = lunar.getDayInChinese();
                     }
+                }
+
+                // ==========================================
+                // 新增逻辑：限制农历/节假日最多显示三个字，超出显示"..."
+                // ==========================================
+                if (netText.length() > 3) {
+                    netText = netText.substring(0, 3) + "...";
                 }
 
                 // 【修改这里】：动态获取系统当前模式下的颜色 (日间#666666，夜间#6b6d6d)

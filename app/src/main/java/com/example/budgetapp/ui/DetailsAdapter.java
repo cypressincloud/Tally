@@ -128,10 +128,16 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
             // ... (这里保留你原来所有的金额、颜色、分类、备注等 UI 赋值逻辑) ...
             String amountStr = String.format("%.2f", t.amount);
-            if (t.type == 1) { // 收入
+            if (t.type == 2) {
+                // 🌟 资产转移：主题色 (黄色)，不带正负号
+                tvh.tvAmount.setText(amountStr);
+                tvh.tvAmount.setTextColor(ContextCompat.getColor(context, R.color.app_yellow));
+            } else if (t.type == 1) {
+                // 收入：红色，带加号
                 tvh.tvAmount.setText("+" + amountStr);
                 tvh.tvAmount.setTextColor(ContextCompat.getColor(context, R.color.income_red));
-            } else { // 支出
+            } else {
+                // 支出：绿色，带减号
                 tvh.tvAmount.setText("-" + amountStr);
                 tvh.tvAmount.setTextColor(ContextCompat.getColor(context, R.color.expense_green));
             }
@@ -186,6 +192,7 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 tvh.itemView.setBackgroundColor(Color.TRANSPARENT);
             }
 
+            // 🌟 解除拦截，将转移记录的点击事件也透传给 Fragment 处理
             holder.itemView.setOnClickListener(v -> {
                 if (listener != null) listener.onTransactionClick(t);
             });

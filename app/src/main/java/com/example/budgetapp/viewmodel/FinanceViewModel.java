@@ -170,4 +170,51 @@ public class FinanceViewModel extends AndroidViewModel {
             }
         });
     }
+
+    // ================= 业务逻辑：撤回与自动续费 =================
+    // (在 ViewModel 中新增转移方法)
+
+    /**
+     * 资产转移：处理余额增减，并生成一条转账记录
+     */
+    public void transferAsset(AssetAccount fromAccount, AssetAccount toAccount, double amount, String note) {
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            // 1. 处理转出账户余额
+            if (fromAccount.type == 1) {
+                // 从负债账户转出（例如用信用卡取现借出），意味着负债增加
+                fromAccount.amount += amount;
+            } else {
+                // 从资产(0)、借出(2)、理财(3)转出，余额减少
+                fromAccount.amount -= amount;
+            }
+
+            // 2. 处理转入账户余额
+            if (toAccount.type == 1) {
+                // 转入负债账户（例如还信用卡），负债减少
+                toAccount.amount -= amount;
+            } else {
+                // 转入资产(0)、借出(2)、理财(3)，余额增加
+                toAccount.amount += amount;
+            }
+
+            // 更新数据库中的资产信息
+            assetDao.update(fromAccount);
+            assetDao.update(toAccount);
+
+            // 3. 生成对应的账单明细
+            Transaction transaction = new Transaction();
+            transaction.amount = amount;
+            // ⚠️使用 2 代表转账，避免转账被混淆统计入常规的“支出(0)”或“收入(1)”中
+            // 需要确保你的 DetailsAdapter 和 StatsFragment 支持或过滤 type = 2 的情况
+            transaction.type = 2;
+            transaction.category = "资产互转";
+            String noteContent = fromAccount.name + " -> " + toAccount.name;
+            transaction.note = noteContent + (note.isEmpty() ? "" : " (" + note + ")");
+            transaction.date = System.currentTimeMillis();
+            transaction.assetId = fromAccount.id; // 关联转出账户
+
+            transactionDao.insert(transaction);
+        });
+    }
+
 }

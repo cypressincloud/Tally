@@ -165,20 +165,41 @@
 
     </LinearLayout>
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fab_add_asset"
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
+        android:orientation="vertical"
         android:layout_margin="20dp"
-        android:src="@android:drawable/ic_input_add"
-        app:tint="@android:color/white"
-        android:contentDescription="添加资产"
-        app:backgroundTint="@color/app_yellow"
+        android:gravity="center_horizontal">
 
-        app:elevation="0dp"
-        app:pressedTranslationZ="0dp"
-        app:borderWidth="0dp"
-        android:stateListAnimator="@null"/>
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_transfer_asset"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:src="@drawable/ic_transfer_arrows"
+            android:contentDescription="转移资产"
+            app:backgroundTint="@color/white"
+            app:tint="@color/app_yellow"
+            app:fabSize="mini"
+            app:elevation="0dp"
+            app:pressedTranslationZ="0dp"
+            app:borderWidth="0dp"
+            android:stateListAnimator="@null" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_add_asset"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@android:drawable/ic_input_add"
+            app:tint="@android:color/white"
+            android:contentDescription="添加资产"
+            app:backgroundTint="@color/app_yellow"
+            app:elevation="0dp"
+            app:pressedTranslationZ="0dp"
+            app:borderWidth="0dp"
+            android:stateListAnimator="@null"/>
+    </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

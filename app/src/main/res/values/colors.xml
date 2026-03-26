@@ -16,6 +16,9 @@
     <color name="text_primary">#333333</color>
     <color name="text_secondary">#757575</color>
 
+    <color name="transfer_fab_bg">#FFFFFF</color>
+    <color name="transfer_fab_icon_tint">@color/text_primary</color>
+
     <color name="budget_safe_bg">#E8F5E9</color>
     <color name="budget_exceed_bg">#FFEBEE</color>
     <color name="budget_progress_safe">#4CAF50</color>

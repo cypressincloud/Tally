@@ -106,10 +106,164 @@ public class AssetsFragment extends Fragment {
             showAddOrEditDialog(null, currentType);
         });
 
+        // 🌟 补齐转移按钮的点击监听
+        View fabTransfer = view.findViewById(R.id.fab_transfer_asset);
+        if (fabTransfer != null) {
+            fabTransfer.setOnClickListener(v -> {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                if (allAccounts == null || allAccounts.size() < 2) {
+                    Toast.makeText(getContext(), "至少需要两个资产账户才能进行转移", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showTransferDialog();
+            });
+        }
+
+        // 新增转移按钮监听
+        view.findViewById(R.id.fab_transfer_asset).setOnClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+            if (allAccounts == null || allAccounts.size() < 2) {
+                Toast.makeText(getContext(), "至少需要两个资产账户才能进行转移", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            showTransferDialog();
+        });
+
         layoutAssets.setOnClickListener(v -> switchType(0));
         layoutLiability.setOnClickListener(v -> switchType(1));
         layoutLent.setOnClickListener(v -> switchType(2));
     }
+
+    // 🌟 补齐完整的资产转移弹窗渲染与数据处理逻辑 (分别提示转出/转入)
+    private void showTransferDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_transfer_asset, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        android.widget.Spinner spinnerFrom = view.findViewById(R.id.spinner_from_account);
+        android.widget.Spinner spinnerTo = view.findViewById(R.id.spinner_to_account);
+        EditText etAmount = view.findViewById(R.id.et_transfer_amount);
+        EditText etNote = view.findViewById(R.id.et_transfer_note);
+        Button btnCancel = view.findViewById(R.id.btn_cancel);
+        Button btnConfirm = view.findViewById(R.id.btn_confirm);
+
+        // 🌟 1. 分别为“转出”和“转入”创建数据列表，并插入专属提示词
+        List<String> fromAccountNames = new ArrayList<>();
+        List<String> toAccountNames = new ArrayList<>();
+        fromAccountNames.add("请选择转出账户");
+        toAccountNames.add("请选择转入账户");
+
+        for (AssetAccount acc : allAccounts) {
+            String symbol = (acc.currencySymbol != null && !acc.currencySymbol.isEmpty()) ? acc.currencySymbol : "¥";
+            String accountDisplay = acc.name + " (" + symbol + String.format("%.2f", acc.amount) + ")";
+            fromAccountNames.add(accountDisplay);
+            toAccountNames.add(accountDisplay);
+        }
+
+        // 🌟 2. 抽象出一个创建适配器的方法，让第 0 项（提示词）变成浅色且不可点击
+        android.widget.ArrayAdapter<String> fromAdapter = createHintAdapter(fromAccountNames);
+        android.widget.ArrayAdapter<String> toAdapter = createHintAdapter(toAccountNames);
+
+        spinnerFrom.setAdapter(fromAdapter);
+        spinnerTo.setAdapter(toAdapter);
+
+        // 默认显示为第0项（即提示词）
+        spinnerFrom.setSelection(0);
+        spinnerTo.setSelection(0);
+
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnConfirm.setOnClickListener(v -> {
+            int fromIndex = spinnerFrom.getSelectedItemPosition();
+            int toIndex = spinnerTo.getSelectedItemPosition();
+
+            // 拦截未选择的情况 (索引为 0 代表选中的是提示词)
+            if (fromIndex == 0 || toIndex == 0) {
+                Toast.makeText(getContext(), "请选择转出和转入账户", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (fromIndex == toIndex) {
+                Toast.makeText(getContext(), "转出和转入账户不能相同", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            String amountStr = etAmount.getText().toString().trim();
+            if (amountStr.isEmpty()) {
+                Toast.makeText(getContext(), "请输入转账金额", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            double amount;
+            try {
+                amount = Double.parseDouble(amountStr);
+                if (amount <= 0) {
+                    Toast.makeText(getContext(), "转账金额必须大于0", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            } catch (NumberFormatException e) {
+                Toast.makeText(getContext(), "金额格式不正确", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // 获取实际账户时，索引需要减 1（因为第 0 项是虚拟的提示词）
+            AssetAccount fromAccount = allAccounts.get(fromIndex - 1);
+            AssetAccount toAccount = allAccounts.get(toIndex - 1);
+            String note = etNote.getText().toString().trim();
+
+            viewModel.transferAsset(fromAccount, toAccount, amount, note);
+            Toast.makeText(getContext(), "资产转移成功", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    // 🌟 辅助方法：生成带有浅色提示词特效的 ArrayAdapter
+    private android.widget.ArrayAdapter<String> createHintAdapter(List<String> dataList) {
+        android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<String>(
+                getContext(),
+                R.layout.item_spinner_dropdown,
+                dataList
+        ) {
+            @Override
+            public boolean isEnabled(int position) {
+                return position != 0; // 禁用第 0 项点击
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View v = super.getDropDownView(position, convertView, parent);
+                TextView tv = (TextView) v;
+                if (position == 0) {
+                    tv.setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.text_secondary));
+                } else {
+                    tv.setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.text_primary));
+                }
+                return v;
+            }
+
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View v = super.getView(position, convertView, parent);
+                TextView tv = (TextView) v;
+                if (position == 0) {
+                    tv.setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.text_secondary));
+                } else {
+                    tv.setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.text_primary));
+                }
+                return v;
+            }
+        };
+        adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        return adapter;
+    }
+
     private void switchType(int type) {
         if (currentType != type) {
             currentType = type;
@@ -727,6 +881,7 @@ public class AssetsFragment extends Fragment {
         TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
         androidx.cardview.widget.CardView cardAssetsSummary = view.findViewById(R.id.card_assets_summary);
         com.google.android.material.floatingactionbutton.FloatingActionButton fabAddAsset = view.findViewById(R.id.fab_add_asset);
+        com.google.android.material.floatingactionbutton.FloatingActionButton fabTransferAsset = view.findViewById(R.id.fab_transfer_asset);
 
         if (isCustomBg) {
             // 1. 基础背景全透明
@@ -747,6 +902,11 @@ public class AssetsFragment extends Fragment {
                 fabAddAsset.setBackgroundTintList(android.content.res.ColorStateList.valueOf(translucentFab));
             }
 
+            if (fabTransferAsset != null) {
+                int whiteColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white);
+                fabTransferAsset.setBackgroundTintList(android.content.res.ColorStateList.valueOf(androidx.core.graphics.ColorUtils.setAlphaComponent(whiteColor, 230)));
+            }
+
         } else {
             // ================= 恢复系统默认模式 =================
             view.setBackgroundResource(R.color.bar_background);
@@ -758,6 +918,14 @@ public class AssetsFragment extends Fragment {
             if (fabAddAsset != null) {
                 fabAddAsset.setBackgroundTintList(android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.app_yellow)));
             }
+
+            fabAddAsset.setBackgroundTintList(android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.app_yellow)));
+
+            if (fabTransferAsset != null) {
+                int transferColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.transfer_fab_bg);
+                fabTransferAsset.setBackgroundTintList(android.content.res.ColorStateList.valueOf(transferColor));
+            }
+
         }
 
         // 通知列表刷新，以便更新列表项的透明度

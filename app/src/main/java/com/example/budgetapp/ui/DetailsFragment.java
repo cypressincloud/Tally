@@ -146,7 +146,23 @@ public class DetailsFragment extends Fragment {
 
         recyclerView = view.findViewById(R.id.recycler_details);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+
+        // 🌟 正确的写法：先无参实例化，再设置监听器
         adapter = new DetailsAdapter();
+        adapter.setOnTransactionClickListener(t -> {
+            // 拦截点击事件：如果是资产互转，呼出删除弹窗
+            boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
+            if (isTransfer) {
+                showDeleteTransferDialog(t);
+                return;
+            }
+
+            // 正常记录：呼出原有的编辑详情弹窗
+            LocalDate date = java.time.Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
+            showAddOrEditDialog(t, date);
+        });
+
+        recyclerView.setAdapter(adapter);
         adapter.setOnTransactionClickListener(t -> {
             LocalDate date = java.time.Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
             showAddOrEditDialog(t, date);
@@ -172,6 +188,30 @@ public class DetailsFragment extends Fragment {
 
         updateDateRangeDisplay();
         return view;
+    }
+
+    private void showDeleteTransferDialog(Transaction transaction) {
+        if (getContext() == null) return;
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(getContext());
+        android.view.View view = android.view.LayoutInflater.from(getContext()).inflate(R.layout.dialog_confirm_delete, null);
+        builder.setView(view);
+        android.app.AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        android.widget.TextView tvMsg = view.findViewById(R.id.tv_dialog_message);
+        if (tvMsg != null) {
+            tvMsg.setText("确定要删除这条资产转移记录吗？");
+        }
+
+        view.findViewById(R.id.btn_dialog_cancel).setOnClickListener(v -> dialog.dismiss());
+        view.findViewById(R.id.btn_dialog_confirm).setOnClickListener(v -> {
+            viewModel.deleteTransaction(transaction); // 删除记录，列表由于 LiveData 会自动刷新
+            android.widget.Toast.makeText(getContext(), "转移记录已删除", android.widget.Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+        });
+        dialog.show();
     }
 
     private void initGestureDetector() {
@@ -370,9 +410,13 @@ public class DetailsFragment extends Fragment {
         for (Map.Entry<String, List<Transaction>> entry : grouped.entrySet()) {
             List<Transaction> dayList = entry.getValue();
             float income = 0, expense = 0;
-            dayList.sort((t1, t2) -> Long.compare(t2.date, t1.date));
+            dayList.sort((t1, t2) -> Long.compare(t2.date, t1.date));// 严格区分：只有 type 0 才是支出，type 1 是收入，type 2 (转移) 被忽略
             for (Transaction t : dayList) {
-                if (t.type == 1) income += t.amount; else expense += t.amount;
+                if (t.type == 1) {
+                    income += t.amount;
+                } else if (t.type == 0) {
+                    expense += t.amount;
+                }
             }
             float dailyBalance = income - expense;
             try {

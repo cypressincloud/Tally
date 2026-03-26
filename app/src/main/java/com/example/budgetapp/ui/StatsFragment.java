@@ -1168,7 +1168,7 @@ public class StatsFragment extends Fragment {
                         incomeMap.put(index, incomeMap.getOrDefault(index, 0.0) + t.amount);
                         incomePieCats.put(t.category, incomePieCats.getOrDefault(t.category, 0.0) + t.amount);
                     }
-                } else { // 支出
+                } else if (t.type == 0) { // 🌟 严格限制只有 type == 0 才是支出，完美隔离 type == 2
                     expenseMap.put(index, expenseMap.getOrDefault(index, 0.0) + t.amount);
                     expensePieCats.put(t.category, expensePieCats.getOrDefault(t.category, 0.0) + t.amount);
                 }

@@ -341,7 +341,9 @@ public class RecordFragment extends Fragment {
             long endOfDay = targetDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 
             for (Transaction t : transactions) {
-                if (t.date >= startOfDay && t.date < endOfDay && t.type == 0) { // type 0 为支出
+                boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
+                // 🌟 2. 增加 !isTransfer 限制，防止把互转金额从今日预算里扣掉
+                if (t.date >= startOfDay && t.date < endOfDay && t.type == 0 && !isTransfer) {
                     targetExpense += t.amount;
                 }
             }
@@ -727,7 +729,10 @@ public class RecordFragment extends Fragment {
         for (Transaction t : transactions) {
             LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
             if (date.getYear() == year && date.getMonthValue() == month) {
-                if (t.type == 1) {
+                boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
+                if (isTransfer) {
+                    continue; // 🌟 1. 彻底跳过资产互转，不计入月度收支
+                } else if (t.type == 1) {
                     if ("加班".equals(t.category)) {
                         totalOvertimeAmount += t.amount;
                         // 提取工时数据
@@ -742,7 +747,7 @@ public class RecordFragment extends Fragment {
                     } else {
                         totalIncome += t.amount;
                     }
-                } else {
+                } else if (t.type == 0) { // 🌟 严格限制必须是 type == 0 才是支出
                     totalExpense += t.amount;
                 }
             }
@@ -788,6 +793,14 @@ public class RecordFragment extends Fragment {
                 Toast.makeText(getContext(), "待扣费账单：到达日期后将自动执行", Toast.LENGTH_SHORT).show();
                 return;
             }
+
+            // 🌟 如果是资产互转记录，则呼出删除确认弹窗
+            boolean isTransfer = (transaction.type == 2) || "资产互转".equals(transaction.category);
+            if (isTransfer) {
+                showDeleteTransferDialog(transaction);
+                return;
+            }
+
             LocalDate transDate = Instant.ofEpochMilli(transaction.date).atZone(ZoneId.systemDefault()).toLocalDate();
             showAddOrEditDialog(transaction, transDate);
         });
@@ -805,6 +818,33 @@ public class RecordFragment extends Fragment {
             currentDetailAdapter = null;
             currentDetailDialog = null;
             currentDetailSummaryTextView = null;
+        });
+        dialog.show();
+    }
+
+    private void showDeleteTransferDialog(Transaction transaction) {
+        if (getContext() == null) return;
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_confirm_delete, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+        TextView tvMsg = view.findViewById(R.id.tv_dialog_message);
+        if (tvMsg != null) {
+            tvMsg.setText("确定要删除这条资产转移记录吗？");
+        }
+
+        view.findViewById(R.id.btn_dialog_cancel).setOnClickListener(v -> dialog.dismiss());
+        view.findViewById(R.id.btn_dialog_confirm).setOnClickListener(v -> {
+            viewModel.deleteTransaction(transaction); // 从数据库删除记录
+            Toast.makeText(getContext(), "转移记录已删除", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+
+            // 刷新当前弹出的单日详情列表
+            if (currentDetailDialog != null && currentDetailDialog.isShowing() && selectedDate != null) {
+                updateDetailDialogData(selectedDate);
+            }
         });
         dialog.show();
     }
@@ -854,9 +894,13 @@ public class RecordFragment extends Fragment {
 
             for (Transaction t : dayList) {
                 if ("PREVIEW_BILL".equals(t.remark)) continue;
+
+                boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
+                if (isTransfer) continue; // 🌟 3. 在单日账单总计中忽略资产转移
+
                 if (t.type == 1) {
                     dayIncome += t.amount;
-                } else {
+                } else if (t.type == 0) { // 🌟 严格限制 type == 0
                     dayExpense += t.amount;
                 }
             }

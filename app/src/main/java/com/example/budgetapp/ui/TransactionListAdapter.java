@@ -89,10 +89,16 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
         } else {
             // 正常入库记录的颜色逻辑
             holder.tvNote.setAlpha(1.0f);
-            if (t.type == 1) { // 收入
+            if (t.type == 2) {
+                // 🌟 资产转移
+                holder.tvAmount.setTextColor(context.getColor(R.color.app_yellow));
+                holder.tvAmount.setText(displayAmount);
+            } else if (t.type == 1) {
+                // 收入
                 holder.tvAmount.setTextColor(context.getColor(R.color.income_red));
                 holder.tvAmount.setText("+" + displayAmount);
-            } else { // 支出
+            } else {
+                // 支出
                 holder.tvAmount.setTextColor(context.getColor(R.color.expense_green));
                 holder.tvAmount.setText("-" + displayAmount);
             }
