@@ -108,10 +108,25 @@ public class SelectToSpeakService extends AccessibilityService {
                 // ======= 全局无差别节点树日志捕获 =======
                 // 只有在日志页面的“开启抓取”被打开时才会进行记录，并且排除了本应用避免套娃
                 if (packageName != null && !packageName.isEmpty() && !packageName.equals("com.example.budgetapp")) {
-                    if (com.example.budgetapp.util.AutoTrackLogManager.isLogEnabled) {
+                    // 传入 this 作为上下文去读取本地状态
+                    if (com.example.budgetapp.util.AutoTrackLogManager.isLogEnabled(SelectToSpeakService.this)) {
                         String appName = getAppNameReadable(packageName);
                         com.example.budgetapp.util.AutoTrackLogManager.addLog(packageName, "►►► 捕获到 [" + appName + "] 页面刷新 ◄◄◄");
                         printNodeToManager(rootNode, 0, packageName);
+
+                        if (packageName != null && !packageName.isEmpty() && !packageName.equals("com.example.budgetapp")) {
+                            if (com.example.budgetapp.util.AutoTrackLogManager.isLogEnabled(SelectToSpeakService.this)) {
+// 【核心修复】：在抓取并写入新日志前，必须先从本地加载历史记录，防止新数据覆盖清空历史！
+                                com.example.budgetapp.util.AutoTrackLogManager.loadLogsIfNeeded(SelectToSpeakService.this);
+
+                                String logAppName = getAppNameReadable(packageName);
+                                com.example.budgetapp.util.AutoTrackLogManager.addLog(packageName, "►►► 捕获到 [" + logAppName + "] 页面刷新 ◄◄◄");
+                                printNodeToManager(rootNode, 0, packageName);
+
+                                // 【新增】：整棵节点树扫描并记录完毕后，统一打包保存到本地存储
+                                com.example.budgetapp.util.AutoTrackLogManager.saveLogsToDisk(SelectToSpeakService.this);
+                            }
+                        }
                     }
                 }
                 // =====================================

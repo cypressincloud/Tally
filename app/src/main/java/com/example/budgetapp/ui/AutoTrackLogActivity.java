@@ -62,17 +62,17 @@ public class AutoTrackLogActivity extends AppCompatActivity {
         // 注意：这里已经删掉了 btn_back 的点击事件绑定 (优化2)
 
         findViewById(R.id.btn_clear).setOnClickListener(v -> {
-            AutoTrackLogManager.clearLogs();
+            AutoTrackLogManager.clearLogs(this); // 【补全了 this】
             currentFilter = "全部";
             refreshData();
         });
 
         findViewById(R.id.btn_copy).setOnClickListener(v -> copyCurrentLogs());
 
-        // 绑定抓取开关
-        switchCapture.setChecked(AutoTrackLogManager.isLogEnabled);
+        // 绑定抓取开关 (使用 SharedPreferences 持久化状态)
+        switchCapture.setChecked(AutoTrackLogManager.isLogEnabled(this));
         switchCapture.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            AutoTrackLogManager.isLogEnabled = isChecked;
+            AutoTrackLogManager.setLogEnabled(this, isChecked);
         });
 
         rvLogs.setLayoutManager(new LinearLayoutManager(this));
@@ -120,9 +120,29 @@ public class AutoTrackLogActivity extends AppCompatActivity {
     }
 
     private void setupSpinner() {
-        // 将 ArrayAdapter 的泛型从 String 改为 AppSpinnerItem
-        ArrayAdapter<AppSpinnerItem> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new ArrayList<>());
-        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // 【核心修复】：自定义 ArrayAdapter 的样式，强制接管文字颜色，防止夜间模式下文字隐形
+        ArrayAdapter<AppSpinnerItem> spinnerAdapter = new ArrayAdapter<AppSpinnerItem>(this, android.R.layout.simple_spinner_item, new ArrayList<>()) {
+            @androidx.annotation.NonNull
+            @Override
+            public View getView(int position, @androidx.annotation.Nullable View convertView, @androidx.annotation.NonNull ViewGroup parent) {
+                TextView tv = (TextView) super.getView(position, convertView, parent);
+                boolean isNightMode = (getContext().getResources().getConfiguration().uiMode
+                        & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+                tv.setTextColor(isNightMode ? 0xFFDDDDDD : 0xFF333333); // 夜间浅灰，白天深灰
+                tv.setTextSize(15f);
+                return tv;
+            }
+
+            @Override
+            public View getDropDownView(int position, @androidx.annotation.Nullable View convertView, @androidx.annotation.NonNull ViewGroup parent) {
+                TextView tv = (TextView) super.getDropDownView(position, convertView, parent);
+                boolean isNightMode = (getContext().getResources().getConfiguration().uiMode
+                        & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+                tv.setTextColor(isNightMode ? 0xFFDDDDDD : 0xFF333333);
+                tv.setPadding(32, 32, 32, 32); // 增加下拉列表的上下间距，手感更好
+                return tv;
+            }
+        };
         spinnerPackage.setAdapter(spinnerAdapter);
 
         spinnerPackage.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -130,7 +150,7 @@ public class AutoTrackLogActivity extends AppCompatActivity {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 AppSpinnerItem selectedItem = (AppSpinnerItem) parent.getItemAtPosition(position);
                 if (selectedItem != null && !selectedItem.packageName.equals(currentFilter)) {
-                    currentFilter = selectedItem.packageName; // 底层依然使用包名过滤
+                    currentFilter = selectedItem.packageName;
                     refreshData();
                 }
             }
@@ -140,9 +160,7 @@ public class AutoTrackLogActivity extends AppCompatActivity {
     }
 
     private void refreshData() {
-        List<String> rawPackages = AutoTrackLogManager.getPackages();
-
-        // 将包名列表转换为包含通俗应用名的包装类列表
+        List<String> rawPackages = AutoTrackLogManager.getPackages(this);
         List<AppSpinnerItem> newItems = new ArrayList<>();
         for (String pkg : rawPackages) {
             newItems.add(new AppSpinnerItem(pkg, getAppName(pkg)));
@@ -150,12 +168,25 @@ public class AutoTrackLogActivity extends AppCompatActivity {
 
         ArrayAdapter<AppSpinnerItem> spinnerAdapter = (ArrayAdapter<AppSpinnerItem>) spinnerPackage.getAdapter();
 
+        // 【核心修复】：加强比对逻辑，只要内容发生改变就立刻刷新UI，而不是单纯比对长度
+        boolean needsUpdate = false;
         if (spinnerAdapter.getCount() != newItems.size()) {
+            needsUpdate = true;
+        } else {
+            for (int i = 0; i < newItems.size(); i++) {
+                if (!spinnerAdapter.getItem(i).packageName.equals(newItems.get(i).packageName)) {
+                    needsUpdate = true;
+                    break;
+                }
+            }
+        }
+
+        if (needsUpdate) {
             spinnerAdapter.clear();
             spinnerAdapter.addAll(newItems);
             spinnerAdapter.notifyDataSetChanged();
 
-            // 确保更新下拉列表后，依然选中用户正在看的那个 App
+            // 确保更新后保持原来的选中状态
             int selIndex = 0;
             for (int i = 0; i < newItems.size(); i++) {
                 if (newItems.get(i).packageName.equals(currentFilter)) {
@@ -166,8 +197,7 @@ public class AutoTrackLogActivity extends AppCompatActivity {
             spinnerPackage.setSelection(selIndex);
         }
 
-        // 获取过滤后的日志
-        List<AutoTrackLogManager.LogEntry> logs = AutoTrackLogManager.getLogs(currentFilter);
+        List<AutoTrackLogManager.LogEntry> logs = AutoTrackLogManager.getLogs(this, currentFilter);
         adapter.setLogs(logs);
 
         if (!logs.isEmpty()) {
@@ -176,7 +206,7 @@ public class AutoTrackLogActivity extends AppCompatActivity {
     }
 
     private void copyCurrentLogs() {
-        List<AutoTrackLogManager.LogEntry> logs = AutoTrackLogManager.getLogs(currentFilter);
+        List<AutoTrackLogManager.LogEntry> logs = AutoTrackLogManager.getLogs(this,currentFilter);
         if (logs == null || logs.isEmpty()) {
             Toast.makeText(this, "当前没有可复制的日志", Toast.LENGTH_SHORT).show();
             return;
