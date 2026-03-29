@@ -2,10 +2,16 @@ package com.example.budgetapp.util;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+
+import com.example.budgetapp.database.AppDatabase;
+import com.example.budgetapp.database.AssetAccount;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class AutoAssetManager {
 
@@ -80,22 +86,68 @@ public class AutoAssetManager {
 
     /**
      * 核心逻辑：根据当前应用包名和屏幕文字，匹配资产ID
-     * @return 匹配到的 assetId，如果没有匹配则返回 -1
+     * 匹配优先级：用户自定义精确规则 > 数据库智能模糊匹配 > 默认资产(未命中返回-1)
      */
     public static int matchAsset(Context context, String packageName, String text) {
         if (!isEnabled(context)) return -1;
-        if (text == null || packageName == null) return -1;
+        if (text == null || packageName == null || text.trim().isEmpty()) return -1;
 
+        // 1. 优先匹配用户自定义的精确规则 (最高优先级)
         List<AssetRule> rules = getRules(context);
         for (AssetRule rule : rules) {
-            // 1. 匹配应用包名
-            if (rule.packageName.equals(packageName)) {
-                // 2. 匹配关键字
-                if (text.contains(rule.keyword)) {
-                    return rule.assetId;
-                }
+            if (rule.packageName.equals(packageName) && text.contains(rule.keyword)) {
+                return rule.assetId; // 命中精确规则，直接返回
             }
         }
-        return -1;
+
+        // 2. 智能模糊匹配：扫描数据库中的所有资产名称 (优先级高于全局默认资产)
+        final int[] matchedId = {-1};
+        // 使用 CountDownLatch 进行安全的线程等待，防止主线程直接查库导致报错
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            try {
+                AppDatabase db = AppDatabase.getDatabase(context);
+                List<AssetAccount> allAssets = new ArrayList<>();
+
+                // 获取普通资产和负债账户
+                List<AssetAccount> type0 = db.assetAccountDao().getAssetsByTypeSync(0);
+                if (type0 != null) allAssets.addAll(type0);
+
+                List<AssetAccount> type1 = db.assetAccountDao().getAssetsByTypeSync(1);
+                if (type1 != null) allAssets.addAll(type1);
+
+                for (AssetAccount asset : allAssets) {
+                    // 忽略“不关联资产”(id=0)和名字太短(少于2个字)的资产，防止发生诸如 "宝" 匹配上 "支付宝" 的低级误命中
+                    if (asset.id == 0 || asset.name == null || asset.name.length() < 2) {
+                        continue;
+                    }
+
+                    // 核心模糊匹配双向算法：
+                    // 场景A: 抓取到的付款方式(text) 包含 资产名(asset.name)
+                    //        比如: text="中国银行储蓄卡(4260)", asset.name="中国银行"
+                    // 场景B: 资产名(asset.name) 包含 抓取到的付款方式(text)
+                    //        比如: text="零钱", asset.name="微信零钱"
+                    if (text.contains(asset.name) || asset.name.contains(text)) {
+                        matchedId[0] = asset.id;
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                latch.countDown();
+            }
+        });
+
+        try {
+            // 最多等待 500 毫秒，防止由于极端情况下的数据库查询缓慢导致辅助服务卡顿
+            latch.await(500, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // 如果 matchedId[0] 被修改了，说明模糊匹配成功；否则返回 -1，交由底层调用去兜底使用“默认资产”
+        return matchedId[0];
     }
 }

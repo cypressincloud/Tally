@@ -1799,8 +1799,8 @@ public class SelectToSpeakService extends AccessibilityService {
     // ================= 支付宝适配测试代码 结束 =================
 
     /**
-     * 专门适配支付宝支付成功页面
-     * 提取收款人（如 *勇）作为记录标识
+     * 专门适配支付宝支付成功页面（基于最新节点树结构）
+     * 提取实际支付金额、收款方（作为记录标识），以及付款方式（模糊匹配资产）
      */
     private boolean handleAlipayPaySuccessPage(AccessibilityNodeInfo root) {
         if (root == null) return false;
@@ -1810,42 +1810,59 @@ public class SelectToSpeakService extends AccessibilityService {
 
         boolean isPaySuccess = false;
         String payeeName = "";
+        String paymentMethod = "";
         double amount = -1;
 
         for (int i = 0; i < allNodes.size(); i++) {
             AccessibilityNodeInfo node = allNodes.get(i);
-            String text = node.getText() != null ? node.getText().toString() : "";
-            String desc = node.getContentDescription() != null ? node.getContentDescription().toString() : "";
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+
+            String content = !text.isEmpty() ? text : desc;
 
             // 1. 识别“支付成功”页面特征
-            if (text.equals("支付成功") || desc.contains("支付成功")) {
+            if ("支付成功".equals(content)) {
                 isPaySuccess = true;
             }
 
-            // 2. 提取备注（收款人）：寻找类似 [*勇] 的节点
-            // 根据日志，它通常在“支付成功”和“金额”之间，且不含货币符号
-            if (isPaySuccess && payeeName.isEmpty()) {
-                if (!text.isEmpty() && !text.equals("支付成功") && !text.contains("￥")
-                        && !text.contains("¥") && !text.equals("完成") && !text.equals("回首页")) {
-                    // 排除掉纯数字或类似 0.00 的干扰项
-                    if (!text.matches("\\d+\\.\\d+")) {
-                        payeeName = text;
+            // 2. 提取金额（在“支付成功”后出现的纯数字或带小数的数字，如 "0.01"）
+            if (isPaySuccess && amount == -1) {
+                // 正则匹配：纯数字，可带1到2位小数
+                if (content.matches("^\\d+(\\.\\d{1,2})?$")) {
+                    try {
+                        amount = Double.parseDouble(content);
+                    } catch (Exception e) {
+                        // 解析失败继续找
                     }
                 }
             }
 
-            // 3. 提取实际支付金额（￥0.01）
-            // 注意：排除掉带负号的优惠金额（-￥0.01）
-            if (text.contains("￥") || text.contains("¥")) {
-                if (!text.startsWith("-")) {
-                    try {
-                        String cleanAmount = text.replace("￥", "").replace("¥", "").trim();
-                        double parsed = Double.parseDouble(cleanAmount);
-                        if (parsed > 0) {
-                            amount = parsed;
-                        }
-                    } catch (Exception e) {
-                        // 解析失败继续找
+            // 3. 提取资产来源 (付款方式)
+            if ("付款方式".equals(content)) {
+                // 核心修复：向下遍历，跨过不可见的排版空节点，寻找第一个带有文字的真实节点
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        paymentMethod = nextContent;
+                        break;
+                    }
+                }
+            }
+
+            // 4. 提取收款方 (作为记录标识备注)
+            if ("收款方".equals(content)) {
+                // 核心修复：向下遍历，跨过空节点
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        payeeName = nextContent;
+                        break;
                     }
                 }
             }
@@ -1856,25 +1873,26 @@ public class SelectToSpeakService extends AccessibilityService {
             long now = System.currentTimeMillis();
             if (now - lastWindowDismissTime < 2500) return true;
 
-            // 确定备注内容
+            // 确定备注内容（如果没抓到收款方，兜底使用"支付宝支付"）
             final String finalPayee = payeeName.isEmpty() ? "支付宝支付" : payeeName;
             final double finalAmount = amount;
 
-            // 防止重复触发
-            String signature = amount + "-0-" + finalPayee;
+            // 防止在页面停留时重复触发弹窗
+            String signature = "alipay_success-" + amount + "-" + finalPayee;
             if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
 
-            // 【核心修改】：构造记录标识，替换 "auto"
+            // 【构造记录标识】：如 "03-24 00:13 酷到爆(**轩)"
             SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
             final String recordIdentifier = sdf.format(new Date(now)) + " " + finalPayee;
 
-            // 自动匹配支付宝相关的资产账户
-            int autoAssetId = AutoAssetManager.matchAsset(this, "com.eg.android.AlipayGphone", "支付成功");
+            // 【资产匹配】：使用抓取到的付款方式去模糊匹配
+            String assetKeyword = paymentMethod.isEmpty() ? "支付宝" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.eg.android.AlipayGphone", assetKeyword);
 
-            // 触发记账弹窗 (type: 0 支出)
+            // 触发记账弹窗 (type: 0 代表支出)
             handler.post(() -> showConfirmWindow(finalAmount, 0, "购物", recordIdentifier, autoAssetId, "¥"));
 
             return true;
@@ -1882,6 +1900,5 @@ public class SelectToSpeakService extends AccessibilityService {
 
         return false;
     }
-
     @Override public void onInterrupt() {}
 }
