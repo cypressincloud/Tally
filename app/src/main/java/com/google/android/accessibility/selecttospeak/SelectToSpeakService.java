@@ -105,20 +105,31 @@ public class SelectToSpeakService extends AccessibilityService {
                 String packageName = rootNode.getPackageName() != null ? rootNode.getPackageName().toString() : "";
 
 
-                // ==========================================
-                // 【测试阶段临时添加】如果是微信，则打印整棵节点树
-                if ("com.tencent.mm".equals(packageName)) {
-                    debugWeChatNodeTree(rootNode);
+                // ======= 全局无差别节点树日志捕获 =======
+                // 只有在日志页面的“开启抓取”被打开时才会进行记录，并且排除了本应用避免套娃
+                if (packageName != null && !packageName.isEmpty() && !packageName.equals("com.example.budgetapp")) {
+                    if (com.example.budgetapp.util.AutoTrackLogManager.isLogEnabled) {
+                        String appName = getAppNameReadable(packageName);
+                        com.example.budgetapp.util.AutoTrackLogManager.addLog(packageName, "►►► 捕获到 [" + appName + "] 页面刷新 ◄◄◄");
+                        printNodeToManager(rootNode, 0, packageName);
+                    }
                 }
-                // ==========================================
+                // =====================================
 
-                // ======= 支付宝调试入口 =======
-                if ("com.eg.android.AlipayGphone".equals(packageName)) {
-                    debugAlipayNodeTree(rootNode);
-                    // 如果已经写好了支付宝的特定适配方法，也可以在这里调用
-                    // if (handleAlipaySpecificPage(rootNode)) return;
-                }
-                // ============================
+//                // ==========================================
+//                // 【测试阶段临时添加】如果是微信，则打印整棵节点树
+//                if ("com.tencent.mm".equals(packageName)) {
+//                    debugWeChatNodeTree(rootNode);
+//                }
+//                // ==========================================
+//
+//                // ======= 支付宝调试入口 =======
+//                if ("com.eg.android.AlipayGphone".equals(packageName)) {
+//                    debugAlipayNodeTree(rootNode);
+//                    // 如果已经写好了支付宝的特定适配方法，也可以在这里调用
+//                    // if (handleAlipaySpecificPage(rootNode)) return;
+//                }
+//                // ============================
 
                 // ======= 支付宝专属逻辑 =======
                 if ("com.eg.android.AlipayGphone".equals(packageName)) {
@@ -158,6 +169,44 @@ public class SelectToSpeakService extends AccessibilityService {
             }
         }
     };
+
+    // 新增：向界面输出Logcat同款节点树日志 (去除视觉噪音版)
+    private void printNodeToManager(AccessibilityNodeInfo node, int depth, String packageName) {
+        if (node == null) return;
+
+        StringBuilder indent = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            indent.append("    "); // 使用纯空格替代圆点，保持等宽对齐
+        }
+
+        String text = node.getText() != null ? node.getText().toString() : "null";
+        String desc = node.getContentDescription() != null ? node.getContentDescription().toString() : "null";
+        String className = node.getClassName() != null ? node.getClassName().toString() : "null";
+        String viewId = node.getViewIdResourceName() != null ? node.getViewIdResourceName() : "null";
+
+        // 过滤无意义空节点
+        if (!"null".equals(text) || !"null".equals(desc) || !"null".equals(viewId)) {
+            String shortClass = className.contains(".") ? className.substring(className.lastIndexOf('.') + 1) : className;
+
+            // 非根节点加一个小巧的折线箭头，视觉更清晰
+            String prefix = depth == 0 ? "" : "↳ ";
+
+            StringBuilder logMsg = new StringBuilder(indent.toString() + prefix + shortClass);
+            if (!"null".equals(text)) logMsg.append(" | Text: [").append(text).append("]");
+            if (!"null".equals(desc)) logMsg.append(" | Desc: [").append(desc).append("]");
+            if (!"null".equals(viewId)) {
+                String shortId = viewId.contains("/") ? viewId.substring(viewId.indexOf('/') + 1) : viewId;
+                logMsg.append(" | ID: ").append(shortId);
+            }
+
+            com.example.budgetapp.util.AutoTrackLogManager.addLog(packageName, logMsg.toString());
+        }
+
+        int count = node.getChildCount();
+        for (int i = 0; i < count; i++) {
+            printNodeToManager(node.getChild(i), depth + 1, packageName);
+        }
+    }
 
     @Override
     public void onServiceConnected() {

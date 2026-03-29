@@ -378,6 +378,10 @@ public class SettingsActivity extends AppCompatActivity {
             startActivity(new Intent(this, UserNoticeActivity.class));
         });
 
+        findViewById(R.id.btn_auto_track_log).setOnClickListener(v -> {
+            startActivity(new Intent(this, AutoTrackLogActivity.class));
+        });
+
         findViewById(R.id.btn_donate).setOnClickListener(v -> {
             startActivity(new Intent(this, DonateActivity.class));
         });

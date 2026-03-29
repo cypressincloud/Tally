@@ -180,12 +180,13 @@
             android:layout_marginBottom="16dp"
             android:src="@drawable/ic_transfer_arrows"
             android:contentDescription="转移资产"
-            app:backgroundTint="@color/white"
+            app:backgroundTint="@color/transfer_fab_bg"
             app:tint="@color/app_yellow"
             app:fabSize="mini"
             app:elevation="0dp"
             app:pressedTranslationZ="0dp"
             app:borderWidth="0dp"
+            app:rippleColor="@android:color/transparent"
             android:stateListAnimator="@null" />
 
         <com.google.android.material.floatingactionbutton.FloatingActionButton

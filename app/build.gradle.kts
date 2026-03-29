@@ -10,8 +10,8 @@ android {
         applicationId = "com.example.budgetapp"
         minSdk = 26
         targetSdk = 36
-        versionCode = 60
-        versionName = "3.3.9"
+        versionCode = 61
+        versionName = "3.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
