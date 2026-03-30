@@ -194,6 +194,12 @@ public class SelectToSpeakService extends AccessibilityService {
                 }
                 // ============================
 
+                // ======= 京东专属逻辑 =======
+                if ("com.jingdong.app.mall".equals(packageName)) {
+                    if (handleJDPaySuccessPage(rootNode)) return;
+                }
+                // ============================
+
                 // ======= 通义千问 / AI充值专属逻辑 =======
                 if ("com.aliyun.tongyi".equals(packageName)) {
                     if (handleQwenPaySuccessPage(rootNode)) return;
@@ -311,12 +317,12 @@ public class SelectToSpeakService extends AccessibilityService {
         if (pkg.contains("tencent.mm")) return "微信";
         if (pkg.contains("alipay")) return "支付宝";
         if (pkg.contains("taobao")) return "淘宝";
-        if (pkg.contains("jingdong")) return "京东";
+        if (pkg.equals("com.jingdong.app.mall")) return "京东"; // 【修改】：使用真实的京东全包名
         if (pkg.contains("pinduoduo")) return "拼多多";
         if (pkg.contains("aweme")) return "抖音";
         if (pkg.contains("meituan")) return "美团";
         if (pkg.equals("com.aliyun.tongyi")) return "通义千问";
-        if (pkg.equals("com.unionpay")) return "云闪付"; // 【修改】：使用真实的云闪付全包名
+        if (pkg.equals("com.unionpay")) return "云闪付";
         return "自动记账";
     }
 
@@ -2740,6 +2746,79 @@ public class SelectToSpeakService extends AccessibilityService {
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", "支付成功");
 
             final String finalCategory = defaultCategory;
+            handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配京东“支付成功”页面
+     * 从合并节点 (如 "京东白条付款¥7.7") 中同时剥离出付款方式和金额
+     */
+    private boolean handleJDPaySuccessPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isPaySuccess = false;
+        double amount = -1;
+        String paymentMethod = "";
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别页面核心特征
+            if ("支付成功".equals(content)) {
+                isPaySuccess = true;
+            }
+
+            // 2. 核心拆解：提取“京东白条付款¥7.7”或“微信支付￥12.00”这类组合结构
+            if ((content.contains("付款¥") || content.contains("付款￥") || content.contains("支付¥") || content.contains("支付￥")) && amount == -1) {
+                try {
+                    // 正则手术刀：匹配前面任意字符(组1) + 付款/支付 + ¥/￥ + 数字或小数(组2)
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("(.*?)(?:付款|支付)[¥￥](\\d+(?:\\.\\d{1,2})?)").matcher(content);
+                    if (m.find()) {
+                        paymentMethod = m.group(1).trim(); // 剥离出 "京东白条"
+                        amount = Double.parseDouble(m.group(2)); // 剥离出 "7.7"
+                    }
+                } catch (Exception e) {
+                    // 解析失败忽略
+                }
+            }
+        }
+
+        // 3. 判定：确认是支付成功页，并且成功剖析出了金额
+        if (isPaySuccess && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 防重复录入签名
+            String signature = "jd_pay-" + amount + "-" + paymentMethod;
+            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 构造统一备注
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            final String recordIdentifier = sdf.format(new Date(now)) + " 京东购物";
+
+            final double finalAmount = amount;
+            final long finalTimestamp = now;
+            final String finalCategory = "购物";
+
+            // 资产模糊匹配：自动拿着刚才切出来的“京东白条”去找你的数据库资产
+            String assetKeyword = paymentMethod.isEmpty() ? "京东" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.jingdong.app.mall", assetKeyword);
+
+            // 触发记账弹窗（type: 0 为支出）
             handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
 
             return true;
