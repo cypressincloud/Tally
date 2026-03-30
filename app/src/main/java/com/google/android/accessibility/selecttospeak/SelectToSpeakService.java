@@ -164,22 +164,25 @@ public class SelectToSpeakService extends AccessibilityService {
                     // 0. 专门适配微信红包/支付特殊页面
                     if (handleWeChatRedPacketSpecialPage(rootNode)) return;
 
-                    // 1. 优先尝试适配红包页面
+                    // 1. 【新增：专版专杀】适配微信内第三方小程序/服务商的支付成功页 (全 Desc 结构)
+                    if (handleWeChatMerchantAppPaySuccessPage(rootNode)) return;
+
+                    // 2. 优先尝试适配红包页面
                     if (handleWeChatRedPacketPage(rootNode)) return;
 
-                    // 2. 尝试适配支付成功页面
+                    // 3. 尝试适配常规支付成功页面
                     if (handleWeChatPaySuccessPage(rootNode)) return;
 
-                    // 3. 待确认收款页面适配
+                    // 4. 待确认收款页面适配
                     if (handleWeChatTransferPendingPage(rootNode)) return;
 
-                    // 4. 微信扫二维码付款 / 个人转账账单详情
+                    // 5. 微信扫二维码付款 / 个人转账账单详情
                     if (handleWeChatQRCodeTransferPage(rootNode)) return;
 
-                    // 5. 【新增：专版专杀】微信商家转账 / 提现 / 退款页面
+                    // 6. 微信商家转账 / 提现 / 退款页面
                     if (handleWeChatMerchantTransferPage(rootNode)) return;
 
-                    // 6. 普通历史账单详情页
+                    // 7. 普通历史账单详情页
                     if (handleWeChatBillDetailPage(rootNode)) return;
                 }
                 // ==============================
@@ -1773,98 +1776,6 @@ public class SelectToSpeakService extends AccessibilityService {
         }
     }
 
-    /**
-     * 专门适配第三方应用/小程序调用微信支付后的“支付成功”页面（带有返回商家按钮）
-     * 针对该页面信息全在 ContentDescription (Desc) 中的特征进行抓取
-     */
-    private boolean handleWeChatMerchantAppPaySuccessPage(AccessibilityNodeInfo root) {
-        if (root == null) return false;
-
-        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
-        flattenNodes(root, allNodes); // 展平节点树
-
-        boolean isPaySuccessPage = false;
-        String merchantName = "";
-        double amount = -1;
-
-        for (int i = 0; i < allNodes.size(); i++) {
-            AccessibilityNodeInfo node = allNodes.get(i);
-
-            // 针对该界面，核心数据在 ContentDescription 中
-            String text = node.getText() != null ? node.getText().toString().trim() : "";
-            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
-
-            // 优先使用 desc，若无则降级看 text
-            String content = !desc.isEmpty() ? desc : text;
-
-            // 1. 识别“支付成功”标志
-            if ("支付成功".equals(content)) {
-                isPaySuccessPage = true;
-            }
-
-            // 2. 提取金额（寻找带有 ￥ 或 ¥ 的节点）
-            if (content.contains("￥") || content.contains("¥")) {
-                try {
-                    String cleanAmount = content.replace("￥", "").replace("¥", "").replace(",", "").trim();
-                    double parsedAmount = Double.parseDouble(cleanAmount);
-
-                    // 确保金额有效，且只抓取第一次出现的金额
-                    if (parsedAmount > 0 && amount == -1) {
-                        amount = parsedAmount;
-
-                        // 3. 提取商户名（商户名称节点通常紧挨在金额节点的正上方）
-                        if (i > 0) {
-                            AccessibilityNodeInfo prevNode = allNodes.get(i - 1);
-                            String prevDesc = prevNode.getContentDescription() != null ? prevNode.getContentDescription().toString().trim() : "";
-                            String prevText = prevNode.getText() != null ? prevNode.getText().toString().trim() : "";
-                            String prevContent = !prevDesc.isEmpty() ? prevDesc : prevText;
-
-                            // 排除掉“支付成功”这个标题节点，剩下的就是商户名
-                            if (!prevContent.isEmpty() && !"支付成功".equals(prevContent)) {
-                                merchantName = prevContent;
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    // 解析失败忽略
-                }
-            }
-        }
-
-        // 4. 判定：如果是支付成功页，且成功抓取到金额
-        if (isPaySuccessPage && amount > 0) {
-            long now = System.currentTimeMillis();
-            if (now - lastWindowDismissTime < 2500) return true;
-
-            if (merchantName.isEmpty()) merchantName = "微信支付";
-
-            // 防抖，防止界面停留时重复弹窗
-            String signature = "merchant_app_pay-" + amount + "-" + merchantName;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
-
-            lastRecordTime = now;
-            lastContentSignature = signature;
-
-            // 构造记录标识，例如："03-21 18:18 美团"
-            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-            final String recordIdentifier = sdf.format(new Date(now)) + " " + merchantName;
-
-            final double finalAmount = amount;
-
-            // 如果商户名包含"美团"，自动将默认分类设为"餐饮"，否则设为"购物"
-            final String defaultCategory = merchantName.contains("美团") ? "餐饮" : "购物";
-
-            int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", "支付成功");
-
-            // 触发记账窗口（type: 0 代表支出，note 替换为 recordIdentifier）
-            handler.post(() -> showConfirmWindow(finalAmount, 0, defaultCategory, recordIdentifier, autoAssetId, "¥"));
-
-            return true;
-        }
-
-        return false;
-    }
-
     // ================= 支付宝适配测试代码 结束 =================
 
     /**
@@ -2731,6 +2642,105 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 触发弹窗
             handler.post(() -> showConfirmWindow(finalAmount, finalType, defaultCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配第三方应用/小程序调用微信支付后的“支付成功”页面
+     * 针对该页面信息全在 ContentDescription (Desc) 中，且带有“原价/优惠”干扰项的特征进行抓取
+     */
+    private boolean handleWeChatMerchantAppPaySuccessPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isPaySuccessPage = false;
+        String merchantName = "";
+        double amount = -1;
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+
+            // 核心特征：该页面所有有效数据全在 Desc 里，所以优先读取 Desc
+            String content = !desc.isEmpty() ? desc : text;
+
+            // 1. 识别“支付成功”标志
+            if ("支付成功".equals(content)) {
+                isPaySuccessPage = true;
+            }
+
+            // 2. 提取金额（寻找带有 ￥ 或 ¥ 的节点）
+            // 【过滤干扰】：排除掉包含"原价"、"优惠"的节点，只抓取真正的实付金额
+            if ((content.contains("￥") || content.contains("¥")) && !content.contains("原价") && !content.contains("优惠")) {
+                try {
+                    String cleanAmount = content.replace("￥", "").replace("¥", "").replace(",", "").trim();
+                    double parsedAmount = Double.parseDouble(cleanAmount);
+
+                    // 确保金额有效，且只抓取第一次出现的有效金额 (2.00)
+                    if (parsedAmount > 0 && amount == -1) {
+                        amount = parsedAmount;
+
+                        // 3. 提取商户名（中国移动）
+                        // 根据节点树规律，商户名称永远紧挨在实付金额的正上方
+                        if (i > 0) {
+                            AccessibilityNodeInfo prevNode = allNodes.get(i - 1);
+                            String prevDesc = prevNode.getContentDescription() != null ? prevNode.getContentDescription().toString().trim() : "";
+                            String prevText = prevNode.getText() != null ? prevNode.getText().toString().trim() : "";
+                            String prevContent = !prevDesc.isEmpty() ? prevDesc : prevText;
+
+                            // 排除掉“支付成功”这个标题节点，剩下的就是完美商户名
+                            if (!prevContent.isEmpty() && !"支付成功".equals(prevContent)) {
+                                merchantName = prevContent;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // 解析失败忽略
+                }
+            }
+        }
+
+        // 4. 判定：如果是支付成功页，且成功避开干扰项抓取到真实金额
+        if (isPaySuccessPage && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            if (merchantName.isEmpty()) merchantName = "微信支付";
+
+            // 防抖，防止界面停留时重复弹窗
+            String signature = "merchant_app_pay-" + amount + "-" + merchantName;
+            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 构造记录标识，例如："03-21 16:21 中国移动"
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            final String recordIdentifier = sdf.format(new Date(now)) + " " + merchantName;
+
+            final double finalAmount = amount;
+            final long finalTimestamp = now;
+
+            // 智能分类：如果商户名包含通信运营商，自动分配到"通讯"；包含美团则"餐饮"；否则默认"购物"
+            String defaultCategory = "购物";
+            if (merchantName.contains("移动") || merchantName.contains("联通") || merchantName.contains("电信") || merchantName.contains("话费")) {
+                defaultCategory = "通讯";
+            } else if (merchantName.contains("美团") || merchantName.contains("外卖")) {
+                defaultCategory = "餐饮";
+            }
+
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", "支付成功");
+
+            final String finalCategory = defaultCategory;
+            handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
 
             return true;
         }
