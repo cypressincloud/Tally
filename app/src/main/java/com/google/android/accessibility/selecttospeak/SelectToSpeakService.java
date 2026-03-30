@@ -395,8 +395,9 @@ public class SelectToSpeakService extends AccessibilityService {
             long now = System.currentTimeMillis();
             if (now - lastWindowDismissTime < 2500) return;
 
-            String signature = finalAmount + "-" + finalType;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return;
+            // 加上全屏文本指纹，防止不同页面但金额相同的账单被误杀
+            String signature = finalAmount + "-" + finalType + "-" + fullText.hashCode();
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -1057,7 +1058,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防重复录入签名
             String signature = "alipay_bill-" + amount + "-" + merchantInfo + "-" + timeString;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -1216,7 +1217,7 @@ public class SelectToSpeakService extends AccessibilityService {
             final String finalIdentifier = redPacketName;
 
             String signature = amount + "-1-" + finalIdentifier; // type=1 为收入
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -1303,7 +1304,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防重复录入标识
             String signature = amount + "-0-" + merchantInfo;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -1377,7 +1378,7 @@ public class SelectToSpeakService extends AccessibilityService {
             final String finalInfo = pendingInfo;
 
             String signature = amount + "-0-" + finalInfo;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -1508,7 +1509,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防止在同一个页面停留时疯狂弹窗
             String signature = "bill-" + amount + "-" + merchantInfo + "-" + timeString;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -1631,7 +1632,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防止在这个界面停留时重复弹出
             String signature = "confirm-" + amount + "-" + merchantInfo;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -1658,7 +1659,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
     /**
      * 专门适配微信发红包时的“支付确认”弹窗页面
-     * 稳健版：锁定 "付款方式" 和 "微信红包"，全局提取金额
+     * 稳健版：锁定 "付款方式" 和 "微信红包"，全局提取金额，并通过 Desc 提取精准资产
      */
     private boolean handleWeChatRedPacketSpecialPage(AccessibilityNodeInfo root) {
         if (root == null) return false;
@@ -1669,27 +1670,28 @@ public class SelectToSpeakService extends AccessibilityService {
         boolean hasWeChatRedPacket = false;
         boolean hasPaymentMethod = false;   // 核心页面特征锁
         double amount = -1;
-        String assetName = "微信支付"; // 默认资产
+        String assetName = "";
 
         for (int i = 0; i < allNodes.size(); i++) {
             AccessibilityNodeInfo node = allNodes.get(i);
             String text = node.getText() != null ? node.getText().toString().trim() : "";
             String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
 
-            // 页面特征锁：必须存在 "付款方式" 文本（这是支付确认弹窗最稳定的标志）
-            if ("付款方式".equals(text) || "付款方式".equals(desc)) {
+            // 1. 页面特征锁：必须存在 "付款方式" (这是支付确认弹窗最稳定的标志)
+            if ("付款方式".equals(text) || "付款方式".equals(desc) || desc.contains("付款方式,已选择")) {
                 hasPaymentMethod = true;
             }
 
-            // 核心触发节点：严格匹配 "微信红包"
+            // 2. 核心触发节点：严格匹配 "微信红包"
             if ("微信红包".equals(text) || "微信红包".equals(desc)) {
                 hasWeChatRedPacket = true;
             }
 
-            // 独立提取金额：不再强求必须紧跟在"微信红包"后面，只要页面上有合法的 ￥ 金额即可
-            if (text.startsWith("￥") || text.startsWith("¥")) {
+            // 3. 独立提取金额：支持从 Text 和 Desc 中抓取 ￥ 或 ¥
+            if (text.startsWith("￥") || text.startsWith("¥") || desc.startsWith("￥") || desc.startsWith("¥")) {
                 try {
-                    String cleanAmount = text.replace("￥", "").replace("¥", "").trim();
+                    String cleanAmount = !text.isEmpty() ? text : desc;
+                    cleanAmount = cleanAmount.replace("￥", "").replace("¥", "").trim();
                     double parsed = Double.parseDouble(cleanAmount);
                     if (parsed > 0 && amount == -1) {
                         amount = parsed;
@@ -1699,12 +1701,26 @@ public class SelectToSpeakService extends AccessibilityService {
                 }
             }
 
-            // 提取付款方式（如 "零钱"），它通常紧跟在 "更改" 节点之后
-            if ("更改".equals(text) || "更改".equals(desc)) {
+            // 4. 【核心优化】：提取付款方式（如 "零钱" 或 "中国银行储蓄卡"）
+            // 方案 A：从 Button 的 Desc 中精准剥离 (如 "付款方式,已选择零钱,更改")
+            if (desc.contains("付款方式") && desc.contains("已选择") && desc.contains("更改")) {
+                try {
+                    String[] parts = desc.split(",");
+                    for (String part : parts) {
+                        if (part.startsWith("已选择")) {
+                            assetName = part.replace("已选择", "").trim();
+                        }
+                    }
+                } catch (Exception e) {}
+            }
+
+            // 方案 B：降级方案，寻找 "更改" 节点后面的文本
+            if (("更改".equals(text) || "更改".equals(desc)) && assetName.isEmpty()) {
                 if (i + 1 < allNodes.size()) {
                     AccessibilityNodeInfo nextNode = allNodes.get(i + 1);
-                    if (nextNode.getText() != null && !nextNode.getText().toString().trim().isEmpty()) {
-                        assetName = nextNode.getText().toString().trim(); // 这里会抓取到 "零钱" 等资产
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    if (!nextText.isEmpty()) {
+                        assetName = nextText; // 抓取到 "零钱"
                     }
                 }
             }
@@ -1715,9 +1731,11 @@ public class SelectToSpeakService extends AccessibilityService {
             long now = System.currentTimeMillis();
             if (now - lastWindowDismissTime < 2500) return true;
 
-            // 防抖签名
-            String signature = "confirm-" + amount + "-0-微信红包";
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (assetName.isEmpty()) assetName = "微信支付";
+
+            // 防抖签名：加入刚才设置的 5分钟(300000)屏蔽，并加入资产名指纹
+            String signature = "confirm-" + amount + "-0-微信红包-" + assetName;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -1728,7 +1746,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             final double finalAmount = amount;
 
-            // 自动匹配资产
+            // 自动匹配资产 (将提取出的 "零钱" 传入模糊匹配引擎)
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", assetName);
 
             // 触发记账弹窗（type: 0 代表支出，分类默认给 "红包"）
@@ -1739,7 +1757,6 @@ public class SelectToSpeakService extends AccessibilityService {
 
         return false;
     }
-
 
     // ================= 支付宝适配测试代码 开始 =================
     private void debugAlipayNodeTree(AccessibilityNodeInfo root) {
@@ -1881,7 +1898,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防重复签名
             String signature = "alipay_transfer-" + amount + "-" + targetAccount + "-" + timeString;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -2009,7 +2026,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防止在页面停留时重复触发弹窗
             String signature = "alipay_success-" + amount + "-" + finalPayee;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -2101,7 +2118,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防重复录入签名
             String signature = "pdd_pay-" + amount + "-" + paymentMethod;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -2187,7 +2204,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防重复录入签名
             String signature = "qwen_pay-" + amount + "-" + note;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -2308,7 +2325,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防重复录入签名
             String signature = "wx_qr_transfer-" + amount + "-" + targetAccount + "-" + timeString;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -2464,7 +2481,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防重复签名
             String signature = "wx_merchant_transfer-" + amount + "-" + finalNote + "-" + timeString;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -2609,7 +2626,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防重复录入签名
             String signature = "unionpay-" + amount + "-" + note + "-" + timeString;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -2723,7 +2740,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防抖，防止界面停留时重复弹窗
             String signature = "merchant_app_pay-" + amount + "-" + merchantName;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
@@ -2801,7 +2818,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 防重复录入签名
             String signature = "jd_pay-" + amount + "-" + paymentMethod;
-            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
