@@ -161,7 +161,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
                 // ======= 微信专属页面拦截 =======
                 if ("com.tencent.mm".equals(packageName)) {
-                    // 0. 新增：专门适配你日志中提供的这种特定的微信红包/支付页面
+                    // 0. 专门适配微信红包/支付特殊页面
                     if (handleWeChatRedPacketSpecialPage(rootNode)) return;
 
                     // 1. 优先尝试适配红包页面
@@ -170,16 +170,36 @@ public class SelectToSpeakService extends AccessibilityService {
                     // 2. 尝试适配支付成功页面
                     if (handleWeChatPaySuccessPage(rootNode)) return;
 
-                    // 3. 待确认收款页面适配 (新增)
+                    // 3. 待确认收款页面适配
                     if (handleWeChatTransferPendingPage(rootNode)) return;
 
-                    // 4. 历史账单详情页 (新增)
-                    if (handleWeChatBillDetailPage(rootNode)) return;
+                    // 4. 微信扫二维码付款 / 个人转账账单详情
+                    if (handleWeChatQRCodeTransferPage(rootNode)) return;
 
-                    // 5. 历史账单详情页 (新增)
+                    // 5. 【新增：专版专杀】微信商家转账 / 提现 / 退款页面
+                    if (handleWeChatMerchantTransferPage(rootNode)) return;
+
+                    // 6. 普通历史账单详情页
                     if (handleWeChatBillDetailPage(rootNode)) return;
                 }
                 // ==============================
+
+                // ======= 拼多多专属逻辑 =======
+                if ("com.xunmeng.pinduoduo".equals(packageName)) {
+                    // 适配拼多多多多钱包支付弹窗页面
+                    if (handlePinduoduoPaymentPage(rootNode)) return;
+                }
+                // ============================
+
+                // ======= 通义千问 / AI充值专属逻辑 =======
+                if ("com.aliyun.tongyi".equals(packageName)) {
+                    if (handleQwenPaySuccessPage(rootNode)) return;
+                }
+
+                // ======= 云闪付专属逻辑 =======
+                if ("com.unionpay".equals(packageName)) {
+                    if (handleUnionPayBillDetailPage(rootNode)) return;
+                }
 
                 scanAndAnalyze(rootNode, packageName);
             } catch (Exception e) {
@@ -283,13 +303,17 @@ public class SelectToSpeakService extends AccessibilityService {
     }
 
     private String getAppNameReadable(String packageName) {
-        if (packageName.contains("tencent.mm")) return "微信";
-        if (packageName.contains("Alipay")) return "支付宝";
-        if (packageName.contains("taobao")) return "淘宝";
-        if (packageName.contains("jingdong")) return "京东";
-        if (packageName.contains("pinduoduo")) return "拼多多";
-        if (packageName.contains("aweme")) return "抖音";
-        if (packageName.contains("meituan")) return "美团";
+        if (packageName == null) return "自动记账";
+        String pkg = packageName.toLowerCase();
+        if (pkg.contains("tencent.mm")) return "微信";
+        if (pkg.contains("alipay")) return "支付宝";
+        if (pkg.contains("taobao")) return "淘宝";
+        if (pkg.contains("jingdong")) return "京东";
+        if (pkg.contains("pinduoduo")) return "拼多多";
+        if (pkg.contains("aweme")) return "抖音";
+        if (pkg.contains("meituan")) return "美团";
+        if (pkg.equals("com.aliyun.tongyi")) return "通义千问";
+        if (pkg.equals("com.unionpay")) return "云闪付"; // 【修改】：使用真实的云闪付全包名
         return "自动记账";
     }
 
@@ -2089,5 +2113,630 @@ public class SelectToSpeakService extends AccessibilityService {
 
         return false;
     }
+
+    /**
+     * 【专版专杀】专门适配拼多多“多多钱包”支付密码弹窗页面
+     * 提取实际支付金额、付款方式(将拆分的银行卡和尾号拼接)
+     */
+    private boolean handlePinduoduoPaymentPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isPddPayment = false;
+        String paymentMethod = "";
+        double amount = -1;
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别页面核心特征：拼多多密码输入框
+            if ("请输入多多钱包密码".equals(content) || content.contains("多多钱包密码") || content.contains("密码输入框")) {
+                isPddPayment = true;
+            }
+
+            // 2. 提取金额 (匹配 Text: [40.04] 或 Desc: [人民币40.04元])
+            if (desc.startsWith("人民币") && desc.endsWith("元")) {
+                try {
+                    String cleanAmount = desc.replace("人民币", "").replace("元", "").replace(",", "").trim();
+                    double parsed = Double.parseDouble(cleanAmount);
+                    if (parsed > 0 && amount == -1) amount = parsed;
+                } catch (Exception e) {}
+            } else if (text.matches("^\\d+\\.\\d{2}$") && amount == -1) {
+                try {
+                    amount = Double.parseDouble(text);
+                } catch (Exception e) {}
+            }
+
+            // 3. 提取并拼接支付方式 (跨越节点将 "中国银行储蓄卡" 和 "(4260)" 拼接)
+            if ("支付方式".equals(content)) {
+                StringBuilder pmBuilder = new StringBuilder();
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+
+                    if (!nextContent.isEmpty()) {
+                        // 遇到单字符的字体图标（如 ）或者无关文字则停止拼接
+                        if (nextContent.length() == 1 || nextContent.equals("找回密码") || nextContent.contains("密码")) {
+                            break;
+                        }
+                        pmBuilder.append(nextContent);
+                        // 拼多多支付方式通常分为两段，第二段包含尾号右括号，遇到则视为拼接完成
+                        if (nextContent.contains(")")) {
+                            break;
+                        }
+                    }
+                }
+                paymentMethod = pmBuilder.toString().trim();
+            }
+        }
+
+        // 判定：确认是拼多多支付页且成功抓取到金额
+        if (isPddPayment && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 防重复录入签名
+            String signature = "pdd_pay-" + amount + "-" + paymentMethod;
+            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 构造记录标识，例如："03-30 10:12 拼多多购物"
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            String displayTime = sdf.format(new Date(now));
+            final String recordIdentifier = displayTime + " 拼多多购物";
+
+            final double finalAmount = amount;
+            final long finalTimestamp = now;
+
+            // 自动匹配资产：如果成功拼接到了“中国银行储蓄卡(4260)”，就用它去模糊匹配，否则兜底搜索“多多钱包”
+            String assetKeyword = paymentMethod.isEmpty() ? "多多钱包" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.xunmeng.pinduoduo", assetKeyword);
+
+            // 触发记账确认窗口（type: 0 为支出，分类默认给“购物”）
+            handler.post(() -> showConfirmWindow(finalAmount, 0, "购物", recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配通义千问等AI应用的“充值/支付已完成”页面
+     * 提取实际支付金额(如 45.00)、充值说明作为备注
+     */
+    private boolean handleQwenPaySuccessPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isQwenPay = false;
+        double amount = -1;
+        String note = "千问消费";
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别核心特征：支付已完成
+            if ("支付已完成".equals(content) || "已完成支付".equals(content)) {
+                isQwenPay = true;
+            }
+
+            // 2. 提取金额：寻找 "小计 ¥" 或者类似标识，金额在它的下一个节点
+            if ("小计 ¥".equals(content) || "小计¥".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+
+                    if (!nextContent.isEmpty()) {
+                        try {
+                            amount = Double.parseDouble(nextContent.trim());
+                            break;
+                        } catch (Exception e) {}
+                    }
+                }
+            }
+
+            // 3. 提取备注说明 (如: 已成功充值话费50元...)
+            if (content.startsWith("已成功充值") || content.contains("充值话费")) {
+                // 如果文字太长，做个截断处理，保持记账界面的清爽
+                if (content.length() > 20) {
+                    note = content.substring(0, 18) + "...";
+                } else {
+                    note = content;
+                }
+            }
+        }
+
+        // 判定：确认是支付完成页，且成功抓取到了 45.00 这笔金额
+        if (isQwenPay && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 防重复录入签名
+            String signature = "qwen_pay-" + amount + "-" + note;
+            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 构造记录标识，例如："03-30 10:10 已成功充值话费50元..."
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            String displayTime = sdf.format(new Date(now));
+            final String recordIdentifier = displayTime + " " + note;
+
+            final double finalAmount = amount;
+            final long finalTimestamp = now;
+
+            // 智能分类：充话费默认分到“通讯”，其他则设为“购物”
+            String defaultCategory = note.contains("话费") ? "通讯" : "购物";
+
+            // 资产模糊匹配 (考虑到通常是拉起支付宝完成的充值，这里默认搜支付宝)
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.alibaba.android.qwen", "支付宝");
+
+            // 触发记账确认窗口
+            handler.post(() -> showConfirmWindow(finalAmount, 0, defaultCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配微信“扫二维码付款”或“个人转账”的账单详情页
+     * 核心特征为含有“转账单号”、“收款方备注”等标签
+     */
+    private boolean handleWeChatQRCodeTransferPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isTargetPage = false;
+        String targetAccount = "";
+        String timeString = "";
+        String paymentMethod = "";
+        double amount = -1;
+        int type = 0; // 默认 0 为支出，1 为收入
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别页面特征：包含“转账单号” (扫个人码或者转账都会有这个)
+            if ("转账单号".equals(content)) {
+                isTargetPage = true;
+            }
+
+            // 2. 提取金额和收支类型 (精准锁定格式如 "-2.00")
+            if (content.matches("^[-+]?\\d+\\.\\d{2}$") && amount == -1) {
+                try {
+                    double parsedAmount = Double.parseDouble(content);
+                    if (parsedAmount < 0) {
+                        type = 0;
+                        amount = Math.abs(parsedAmount);
+                    } else if (parsedAmount > 0) {
+                        type = 1;
+                        amount = parsedAmount;
+                    }
+
+                    // 3. 提取交易对象 (就在金额节点的正上方，例如 "扫二维码付款-给郭宝生")
+                    if (i > 0) {
+                        AccessibilityNodeInfo prevNode = allNodes.get(i - 1);
+                        String prevText = prevNode.getText() != null ? prevNode.getText().toString().trim() : "";
+                        String prevDesc = prevNode.getContentDescription() != null ? prevNode.getContentDescription().toString().trim() : "";
+                        String prevContent = !prevText.isEmpty() ? prevText : prevDesc;
+
+                        if (!prevContent.isEmpty() && !prevContent.matches("^[-+]?\\d+\\.\\d{2}$")) {
+                            targetAccount = prevContent;
+                        }
+                    }
+                } catch (Exception e) {}
+            }
+
+            // 4. 提取支付方式 (例如：零钱、某某银行卡)
+            if ("支付方式".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        paymentMethod = nextContent;
+                        break;
+                    }
+                }
+            }
+
+            // 5. 提取转账时间 (格式如：2026年3月29日 11:12:16)
+            if ("转账时间".equals(content) || "支付时间".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        timeString = nextContent;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 判定：确认是目标账单详情页且金额提取成功
+        if (isTargetPage && amount >= 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 兜底默认值
+            if (targetAccount.isEmpty()) targetAccount = "微信扫码付款";
+
+            // 防重复录入签名
+            String signature = "wx_qr_transfer-" + amount + "-" + targetAccount + "-" + timeString;
+            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 核心：解析抓取到的微信真实时间
+            long parsedTimestamp = now;
+            String displayTime = "";
+            if (!timeString.isEmpty()) {
+                try {
+                    // 按照微信时间格式解析
+                    SimpleDateFormat parseFormat = new SimpleDateFormat("yyyy年M月d日 HH:mm:ss", Locale.getDefault());
+                    java.util.Date date = parseFormat.parse(timeString);
+                    if (date != null) {
+                        parsedTimestamp = date.getTime();
+                        SimpleDateFormat displayFormat = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+                        displayTime = displayFormat.format(date);
+                    }
+                } catch (Exception e) {}
+            }
+            if (displayTime.isEmpty()) {
+                SimpleDateFormat displayFormat = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+                displayTime = displayFormat.format(new java.util.Date(now));
+            }
+
+            // 构造记录标识，如："03-29 11:12 扫二维码付款-给郭宝生"
+            final String recordIdentifier = displayTime + " " + targetAccount;
+
+            final double finalAmount = amount;
+            final int finalType = type;
+            final long finalTimestamp = parsedTimestamp;
+
+            // 动态选择分类：针对个人的扫码通常发生在小摊贩/餐饮店，默认给"餐饮"或"购物"
+            String defaultCategory = targetAccount.contains("付款") ? "购物" : "转账";
+
+            // 使用抓取到的支付方式（如“零钱”）去模糊匹配资产
+            String assetKeyword = paymentMethod.isEmpty() ? "微信" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", assetKeyword);
+
+            // 触发弹窗
+            handler.post(() -> showConfirmWindow(finalAmount, finalType, defaultCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配微信“商家转账/提现”账单详情页 (如：QQ音乐金币提现)
+     * 核心特征为含有“付款单号”、“收款方式”和“付款备注”等标签
+     */
+    private boolean handleWeChatMerchantTransferPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isTargetPage = false;
+        String note = "";
+        String fallbackTitle = "";
+        String timeString = "";
+        String paymentMethod = "";
+        double amount = -1;
+        int type = 1; // 通常这种页面是提现/收入，默认设为1
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别页面特征：包含“付款单号” (商家转账特有标签)
+            if ("付款单号".equals(content) || "商家单号".equals(content)) {
+                isTargetPage = true;
+            }
+
+            // 2. 提取金额和收支类型 (精准锁定格式如 "+0.50" 或 "-0.50")
+            if (content.matches("^[-+]?\\d+\\.\\d{2}$") && amount == -1) {
+                try {
+                    double parsedAmount = Double.parseDouble(content);
+                    if (parsedAmount < 0) {
+                        type = 0; // 支出
+                        amount = Math.abs(parsedAmount);
+                    } else if (parsedAmount > 0) {
+                        type = 1; // 收入
+                        amount = parsedAmount;
+                    }
+
+                    // 顺便抓一下金额上方的标题作为兜底备注 (例如："商家转账-来自QQ音乐")
+                    if (i > 0) {
+                        AccessibilityNodeInfo prevNode = allNodes.get(i - 1);
+                        String prevText = prevNode.getText() != null ? prevNode.getText().toString().trim() : "";
+                        String prevDesc = prevNode.getContentDescription() != null ? prevNode.getContentDescription().toString().trim() : "";
+                        String prevContent = !prevText.isEmpty() ? prevText : prevDesc;
+                        if (!prevContent.isEmpty() && !prevContent.matches("^[-+]?\\d+\\.\\d{2}$")) {
+                            fallbackTitle = prevContent;
+                        }
+                    }
+                } catch (Exception e) {}
+            }
+
+            // 3. 提取收款/付款方式 (作为资产名，如："零钱")
+            if ("收款方式".equals(content) || "退款方式".equals(content) || "支付方式".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        paymentMethod = nextContent;
+                        break;
+                    }
+                }
+            }
+
+            // 4. 提取转账/到账时间 (格式如：2026年3月27日 12:56:00)
+            if ("转账时间".equals(content) || "到账时间".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        timeString = nextContent;
+                        break;
+                    }
+                }
+            }
+
+            // 5. 提取最高优先级的详细备注 (如："QQ音乐金币提现")
+            if ("付款备注".equals(content) || "退款原因".equals(content) || "收款理由".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        note = nextContent;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 判定：确认是目标页面，且提取到了有效的金额
+        if (isTargetPage && amount >= 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 确定最终备注：如果有"付款备注"优先用，没有就用标题兜底
+            String finalNote = note.isEmpty() ? fallbackTitle : note;
+            if (finalNote.isEmpty()) finalNote = "微信商家转账";
+
+            // 防重复签名
+            String signature = "wx_merchant_transfer-" + amount + "-" + finalNote + "-" + timeString;
+            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 解析真实微信时间戳
+            long parsedTimestamp = now;
+            String displayTime = "";
+            if (!timeString.isEmpty()) {
+                try {
+                    SimpleDateFormat parseFormat = new SimpleDateFormat("yyyy年M月d日 HH:mm:ss", Locale.getDefault());
+                    java.util.Date date = parseFormat.parse(timeString);
+                    if (date != null) {
+                        parsedTimestamp = date.getTime();
+                        SimpleDateFormat displayFormat = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+                        displayTime = displayFormat.format(date);
+                    }
+                } catch (Exception e) {}
+            }
+            if (displayTime.isEmpty()) {
+                SimpleDateFormat displayFormat = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+                displayTime = displayFormat.format(new java.util.Date(now));
+            }
+
+            // 构造记录标识，如："03-27 12:56 QQ音乐金币提现"
+            final String recordIdentifier = displayTime + " " + finalNote;
+
+            final double finalAmount = amount;
+            final int finalType = type;
+            final long finalTimestamp = parsedTimestamp;
+
+            // 动态选择分类：针对提现、退款等操作通常默认分配到"其他"或"理财"等类目
+            String defaultCategory = "其他";
+            if (finalNote.contains("提现") || finalNote.contains("退款") || finalNote.contains("返现")) {
+                defaultCategory = (finalType == 1) ? "退款" : "其他";
+            }
+
+            // 使用抓取到的收款方式（如“零钱”）去模糊匹配资产
+            String assetKeyword = paymentMethod.isEmpty() ? "微信" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", assetKeyword);
+
+            // 【核心修复】：增加 final 关键字进行定格，满足 Lambda 表达式的语法要求
+            final String finalCategory = defaultCategory;
+            handler.post(() -> showConfirmWindow(finalAmount, finalType, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配云闪付的“交易详情”页面
+     * 提取金额(如 -¥10.02)、商户名、付款方式以及准确的交易时间
+     */
+    private boolean handleUnionPayBillDetailPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isTargetPage = false;
+        String note = "";
+        String timeString = "";
+        String paymentMethod = "";
+        double amount = -1;
+        int type = 0; // 0代表支出, 1代表收入
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别页面核心特征：包含“云闪付交易详情”或“云闪付APP”
+            if ("云闪付交易详情".equals(content) || "云闪付APP".equals(content)) {
+                isTargetPage = true;
+            }
+
+            // 2. 提取金额和收支类型 (精准锁定格式，如 "-¥10.02" 或 "+¥10.02")
+            if (content.matches("^[-+]?¥?\\d+\\.\\d{2}$") && amount == -1) {
+                try {
+                    // 去除可能的 ¥ 符号
+                    String cleanAmount = content.replace("¥", "").trim();
+                    double parsedAmount = Double.parseDouble(cleanAmount);
+                    if (parsedAmount < 0) {
+                        type = 0;
+                        amount = Math.abs(parsedAmount);
+                    } else if (parsedAmount > 0) {
+                        type = 1;
+                        amount = parsedAmount;
+                    }
+
+                    // 3. 提取交易商户 (云闪付的商户名正好就在大字金额的正上方一个节点)
+                    if (i > 0) {
+                        AccessibilityNodeInfo prevNode = allNodes.get(i - 1);
+                        String prevText = prevNode.getText() != null ? prevNode.getText().toString().trim() : "";
+                        String prevDesc = prevNode.getContentDescription() != null ? prevNode.getContentDescription().toString().trim() : "";
+                        String prevContent = !prevText.isEmpty() ? prevText : prevDesc;
+
+                        if (!prevContent.isEmpty() && !prevContent.matches("^[-+]?¥?\\d+\\.\\d{2}$")) {
+                            note = prevContent;
+                        }
+                    }
+                } catch (Exception e) {}
+            }
+
+            // 4. 提取付款方式 (如：广发银行银联信用卡[9620])
+            if ("付款方式".equals(content) || "支付方式".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        paymentMethod = nextContent;
+                        break;
+                    }
+                }
+            }
+
+            // 5. 提取订单时间 (如：2026年3月29日 00:27:21)
+            if ("订单时间".equals(content) || "交易时间".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        timeString = nextContent;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 判定：确认是云闪付交易详情页，并且成功解析到了金额
+        if (isTargetPage && amount >= 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 兜底值
+            if (note.isEmpty()) note = "云闪付交易";
+
+            // 防重复录入签名
+            String signature = "unionpay-" + amount + "-" + note + "-" + timeString;
+            if (now - lastRecordTime < 5000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 解析真实的时间戳
+            long parsedTimestamp = now;
+            String displayTime = "";
+            if (!timeString.isEmpty()) {
+                try {
+                    SimpleDateFormat parseFormat = new SimpleDateFormat("yyyy年M月d日 HH:mm:ss", Locale.getDefault());
+                    java.util.Date date = parseFormat.parse(timeString);
+                    if (date != null) {
+                        parsedTimestamp = date.getTime();
+                        SimpleDateFormat displayFormat = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+                        displayTime = displayFormat.format(date);
+                    }
+                } catch (Exception e) {}
+            }
+            if (displayTime.isEmpty()) {
+                SimpleDateFormat displayFormat = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+                displayTime = displayFormat.format(new java.util.Date(now));
+            }
+
+            // 构造记录标识，例如："03-29 00:27 拼多多平台商户"
+            final String recordIdentifier = displayTime + " " + note;
+            final double finalAmount = amount;
+            final int finalType = type;
+            final long finalTimestamp = parsedTimestamp;
+
+            // 动态选择默认分类
+            String defaultCategory = note.contains("拼多多") || note.contains("淘宝") || note.contains("京东") ? "购物" : "云闪付";
+
+            // 资产模糊匹配，用“广发银行银联信用卡[9620]”这种全称去撞击用户的数据库
+            String assetKeyword = paymentMethod.isEmpty() ? "云闪付" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.unionpay", assetKeyword);
+
+            // 触发弹窗
+            handler.post(() -> showConfirmWindow(finalAmount, finalType, defaultCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
     @Override public void onInterrupt() {}
 }
