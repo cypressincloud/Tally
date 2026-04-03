@@ -497,7 +497,7 @@ public class AssetsFragment extends Fragment {
         // 初始化已有数据
         if (existing != null) {
             etName.setText(existing.name);
-            etAmount.setText(String.valueOf(existing.amount));
+            etAmount.setText(String.format("%.2f", existing.amount)); // 修改为保留两位小数
             btnCancel.setVisibility(View.GONE);
             btnDelete.setVisibility(View.VISIBLE);
 
