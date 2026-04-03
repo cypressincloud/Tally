@@ -194,6 +194,12 @@ public class SelectToSpeakService extends AccessibilityService {
                 }
                 // ============================
 
+                // ======= 抖音专属逻辑 =======
+                if ("com.ss.android.ugc.aweme".equals(packageName)) {
+                    if (handleDouyinPaymentPage(rootNode)) return;
+                }
+                // ============================
+
                 // ======= 京东专属逻辑 =======
                 if ("com.jingdong.app.mall".equals(packageName)) {
                     if (handleJDPaySuccessPage(rootNode)) return;
@@ -319,7 +325,7 @@ public class SelectToSpeakService extends AccessibilityService {
         if (pkg.contains("taobao")) return "淘宝";
         if (pkg.equals("com.jingdong.app.mall")) return "京东"; // 【修改】：使用真实的京东全包名
         if (pkg.contains("pinduoduo")) return "拼多多";
-        if (pkg.contains("aweme")) return "抖音";
+        if (pkg.equals("com.ss.android.ugc.aweme")) return "抖音";
         if (pkg.contains("meituan")) return "美团";
         if (pkg.equals("com.aliyun.tongyi")) return "通义千问";
         if (pkg.equals("com.unionpay")) return "云闪付";
@@ -1329,7 +1335,7 @@ public class SelectToSpeakService extends AccessibilityService {
     }
     /**
      * 专门适配微信“待确认收款”页面
-     * 提取“待xxx确认收款”作为记录标识
+     * 提取“待xxx确认收款”作为记录标识，并自动匹配微信资产
      */
     private boolean handleWeChatTransferPendingPage(AccessibilityNodeInfo root) {
         if (root == null) return false;
@@ -1343,8 +1349,8 @@ public class SelectToSpeakService extends AccessibilityService {
 
         for (int i = 0; i < allNodes.size(); i++) {
             AccessibilityNodeInfo node = allNodes.get(i);
-            String text = node.getText() != null ? node.getText().toString() : "";
-            String desc = node.getContentDescription() != null ? node.getContentDescription().toString() : "";
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
 
             // 1. 识别“支付成功”顶部标志
             if ("支付成功".equals(text) || "支付成功".equals(desc)) {
@@ -1357,11 +1363,14 @@ public class SelectToSpeakService extends AccessibilityService {
             }
 
             // 3. 提取金额（格式通常为 ￥0.01）
-            if (text.contains("￥")) {
+            if (text.startsWith("￥") || text.startsWith("¥") || desc.startsWith("￥") || desc.startsWith("¥")) {
                 try {
-                    // 兼容中文全角 ￥ 和英文半角 ¥
-                    String cleanAmount = text.replace("￥", "").replace("¥", "").trim();
-                    amount = Double.parseDouble(cleanAmount);
+                    String cleanAmount = !text.isEmpty() ? text : desc;
+                    cleanAmount = cleanAmount.replace("￥", "").replace("¥", "").trim();
+                    double parsed = Double.parseDouble(cleanAmount);
+                    if (parsed > 0 && amount == -1) {
+                        amount = parsed;
+                    }
                 } catch (Exception e) {
                     // 解析失败继续寻找
                 }
@@ -1373,11 +1382,8 @@ public class SelectToSpeakService extends AccessibilityService {
             long now = System.currentTimeMillis();
             if (now - lastWindowDismissTime < 2500) return true;
 
-            // 解决 Lambda 变量 final 要求
-            final double finalAmount = amount;
-            final String finalInfo = pendingInfo;
-
-            String signature = amount + "-0-" + finalInfo;
+            // 防抖签名：加入 5分钟(300000)屏蔽，并加入专属特征签
+            String signature = "wx_transfer_pending-" + amount + "-" + pendingInfo;
             if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
@@ -1385,10 +1391,17 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 构造记录标识：时间 + 待陈勇13929622781确认收款
             SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-            final String recordIdentifier = sdf.format(new Date(now)) + " " + finalInfo;
+            final String recordIdentifier = sdf.format(new Date(now)) + " " + pendingInfo;
 
-            // 触发记账（支出类型 0，分类默认“转账”或“其他”）
-            handler.post(() -> showConfirmWindow(finalAmount, 0, "转账", recordIdentifier, 0, "¥"));
+            final double finalAmount = amount;
+            // 明确为转账行为，默认分类锁定为"转账"
+            final String finalCategory = "转账";
+
+            // 由于该页面未提供具体银行卡信息，统一使用"微信"作为关键词进行资产模糊兜底匹配
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", "微信");
+
+            // 触发记账（支出类型 0）
+            handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥"));
 
             return true;
         }
@@ -2836,6 +2849,86 @@ public class SelectToSpeakService extends AccessibilityService {
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.jingdong.app.mall", assetKeyword);
 
             // 触发记账弹窗（type: 0 为支出）
+            handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配抖音支付确认弹窗页面 (如: 输入支付密码)
+     * 精准提取金额，并将“付款方式”传递给底层资产引擎
+     */
+    private boolean handleDouyinPaymentPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isPaymentPage = false;
+        String paymentMethod = "";
+        double amount = -1;
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别核心特征：输入支付密码 或 免密支付协议
+            if ("输入支付密码".equals(content) || content.contains("免密支付协议")) {
+                isPaymentPage = true;
+            }
+
+            // 2. 提取金额：精准锁定带有两位小数的纯数字格式 (如 "16.90")
+            if (content.matches("^\\d+\\.\\d{2}$") && amount == -1) {
+                try {
+                    amount = Double.parseDouble(content);
+                } catch (Exception e) {}
+            }
+
+            // 3. 提取支付方式：寻找 "支付方式" 节点，紧接着的下一个有效节点就是银行卡信息
+            if ("支付方式".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        paymentMethod = nextContent;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 4. 判定：确认是抖音支付页且成功抓取到金额
+        if (isPaymentPage && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 防重复录入签名 (采用刚更新的 5分钟/300000ms 防抖)
+            String signature = "douyin_pay-" + amount + "-" + paymentMethod;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 构造统一备注
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            final String recordIdentifier = sdf.format(new Date(now)) + " 抖音购物";
+
+            final double finalAmount = amount;
+            final long finalTimestamp = now;
+            final String finalCategory = "购物";
+
+            // 资产模糊匹配：将提取出的 "中国银行储蓄卡 (4260)" 传入模糊匹配引擎
+            String assetKeyword = paymentMethod.isEmpty() ? "抖音" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.ss.android.ugc.aweme", assetKeyword);
+
+            // 触发记账确认窗口（type: 0 为支出）
             handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
 
             return true;

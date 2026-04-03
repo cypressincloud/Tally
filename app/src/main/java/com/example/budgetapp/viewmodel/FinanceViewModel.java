@@ -59,8 +59,68 @@ public class FinanceViewModel extends AndroidViewModel {
         AppDatabase.databaseWriteExecutor.execute(() -> transactionDao.delete(transaction));
     }
 
+    // 保留原方法，供只修改照片、备注等不涉及金额变动的场景使用
     public void updateTransaction(Transaction transaction) {
         AppDatabase.databaseWriteExecutor.execute(() -> transactionDao.update(transaction));
+    }
+
+    /**
+     * 【新增】同步修改历史账单及对应的资产余额
+     * 解决修改历史账单金额、类型或账户时，资产未同步变化的问题。
+     */
+    public void updateTransactionWithAssetSync(Transaction oldTx, Transaction newTx) {
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            // 1. 处理资产变更
+            if (oldTx.assetId == newTx.assetId && oldTx.assetId != 0) {
+                // 资产账户未变，计算并应用差额
+                AssetAccount asset = assetDao.getAssetByIdSync(oldTx.assetId);
+                if (asset != null) {
+                    revertAssetBalance(asset, oldTx); // 先撤回旧金额
+                    applyAssetBalance(asset, newTx);  // 再应用新金额
+                    assetDao.update(asset);
+                }
+            } else {
+                // 资产账户发生了改变，分别撤回旧账户金额，追加到新账户
+                if (oldTx.assetId != 0) {
+                    AssetAccount oldAsset = assetDao.getAssetByIdSync(oldTx.assetId);
+                    if (oldAsset != null) {
+                        revertAssetBalance(oldAsset, oldTx);
+                        assetDao.update(oldAsset);
+                    }
+                }
+                if (newTx.assetId != 0) {
+                    AssetAccount newAsset = assetDao.getAssetByIdSync(newTx.assetId);
+                    if (newAsset != null) {
+                        applyAssetBalance(newAsset, newTx);
+                        assetDao.update(newAsset);
+                    }
+                }
+            }
+            // 2. 最终更新数据库中的账单记录
+            transactionDao.update(newTx);
+        });
+    }
+
+    // 【新增辅助方法】撤回账单对资产的影响
+    private void revertAssetBalance(AssetAccount asset, Transaction tx) {
+        if (asset.type == 0) { // 普通资产：撤回支出余额增加，撤回收入余额减少
+            if (tx.type == 0) asset.amount += tx.amount;
+            else if (tx.type == 1) asset.amount -= tx.amount;
+        } else if (asset.type == 1) { // 负债账户(信用卡)：撤回支出负债减少，撤回收入负债增加
+            if (tx.type == 0) asset.amount -= tx.amount;
+            else if (tx.type == 1) asset.amount += tx.amount;
+        }
+    }
+
+    // 【新增辅助方法】应用账单对资产的影响
+    private void applyAssetBalance(AssetAccount asset, Transaction tx) {
+        if (asset.type == 0) { // 普通资产：支出余额减少，收入余额增加
+            if (tx.type == 0) asset.amount -= tx.amount;
+            else if (tx.type == 1) asset.amount += tx.amount;
+        } else if (asset.type == 1) { // 负债账户(信用卡)：支出负债增加，收入负债减少
+            if (tx.type == 0) asset.amount += tx.amount;
+            else if (tx.type == 1) asset.amount -= tx.amount;
+        }
     }
 
     // ================= 资产账户 (Asset) 相关 =================
@@ -216,5 +276,7 @@ public class FinanceViewModel extends AndroidViewModel {
             transactionDao.insert(transaction);
         });
     }
+
+
 
 }

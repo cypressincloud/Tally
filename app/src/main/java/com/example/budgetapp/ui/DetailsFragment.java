@@ -792,7 +792,33 @@ public class DetailsFragment extends Fragment {
             });
 
             tvRevoke.setVisibility(View.VISIBLE);
-            tvRevoke.setOnClickListener(v -> showRevokeDialog(existingTransaction, dialog));
+            tvRevoke.setOnClickListener(v -> {
+                String amountStr = etAmount.getText().toString();
+                if (amountStr.isEmpty()) {
+                    Toast.makeText(getContext(), "金额不能为空", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                // 构建一个临时账单对象，实时读取当前输入框里的最新数据
+                Transaction tempTx = new Transaction();
+                tempTx.id = existingTransaction.id;
+                tempTx.amount = Double.parseDouble(amountStr);
+                tempTx.type = rgType.getCheckedRadioButtonId() == R.id.rb_income ? 1 : 0;
+                tempTx.photoPath = currentPhotoPath[0];
+
+                // 实时读取当前在下拉框中选择的资产（注意这里使用的是 localAssetList）
+                int selectedAssetId = 0;
+                if (isAssetEnabled) {
+                    int selectedPos = spAsset.getSelectedItemPosition();
+                    if (selectedPos >= 0 && selectedPos < localAssetList.size()) {
+                        selectedAssetId = localAssetList.get(selectedPos).id;
+                    }
+                }
+                tempTx.assetId = selectedAssetId;
+
+                // 将包含了最新数据的临时对象传给撤回确认弹窗
+                showRevokeDialog(tempTx, dialog);
+            });
         }
 
         btnSave.setOnClickListener(v -> {
@@ -831,7 +857,9 @@ public class DetailsFragment extends Fragment {
                     updateT.currencySymbol = currencySymbol;
                     updateT.subCategory = selectedSubCategory[0];
                     updateT.photoPath = currentPhotoPath[0];
-                    viewModel.updateTransaction(updateT);
+
+                    // 改为调用同步资产的方法
+                    viewModel.updateTransactionWithAssetSync(existingTransaction, updateT);
                 }
                 dialog.dismiss();
             }
