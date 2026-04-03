@@ -200,6 +200,12 @@ public class SelectToSpeakService extends AccessibilityService {
                 }
                 // ============================
 
+                // ======= 美团专属逻辑 =======
+                if (packageName != null && packageName.contains("meituan")) {
+                    if (handleMeituanPaySuccessPage(rootNode)) return;
+                }
+                // ============================
+
                 // ======= 京东专属逻辑 =======
                 if ("com.jingdong.app.mall".equals(packageName)) {
                     if (handleJDPaySuccessPage(rootNode)) return;
@@ -2921,6 +2927,92 @@ public class SelectToSpeakService extends AccessibilityService {
             // 资产模糊匹配：将提取出的 "中国银行储蓄卡 (4260)" 传入模糊匹配引擎
             String assetKeyword = paymentMethod.isEmpty() ? "抖音" : paymentMethod;
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.ss.android.ugc.aweme", assetKeyword);
+
+            // 触发记账确认窗口（type: 0 为支出）
+            handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配美团“支付成功”页面
+     * 解决金额与标题合并 (如 "支付成功 ¥25.38") 的问题，并精准提取支付方式
+     */
+    private boolean handleMeituanPaySuccessPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isPaySuccess = false;
+        double amount = -1;
+        String paymentMethod = "";
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别页面特征并提取合并的金额
+            // 美团节点特征: [支付成功 ¥25.38]
+            if (content.contains("支付成功")) {
+                isPaySuccess = true;
+
+                // 尝试从该节点直接剥离金额
+                if (content.contains("¥") || content.contains("￥")) {
+                    try {
+                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("[¥￥](\\d+(?:\\.\\d{1,2})?)").matcher(content);
+                        if (m.find()) {
+                            amount = Double.parseDouble(m.group(1));
+                        }
+                    } catch (Exception e) {}
+                }
+            }
+
+            // 2. 提取支付方式：寻找 "支付方式" 节点，紧接着的下一个节点就是资产名
+            if ("支付方式".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+
+                    if (!nextContent.isEmpty()) {
+                        paymentMethod = nextContent;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 3. 判定：确认是美团支付成功页且成功抓取到金额
+        if (isPaySuccess && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 防重复录入签名 (使用 5分钟/300000ms 防抖)
+            String signature = "meituan_pay-" + amount + "-" + paymentMethod;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 构造统一备注
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            final String recordIdentifier = sdf.format(new Date(now)) + " 美团消费";
+
+            final double finalAmount = amount;
+            final long finalTimestamp = now;
+            // 美团消费大概率是吃饭、外卖或买菜，分类默认打上"餐饮"
+            final String finalCategory = "餐饮";
+
+            // 资产模糊匹配：将提取出的 "中国银行储蓄卡(4260)" 传入模糊匹配引擎
+            String assetKeyword = paymentMethod.isEmpty() ? "美团" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.sankuai.meituan", assetKeyword);
 
             // 触发记账确认窗口（type: 0 为支出）
             handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
