@@ -2,14 +2,21 @@ package com.example.budgetapp.database;
 
 import androidx.room.Entity;
 import androidx.room.Ignore;
+import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
-@Entity(tableName = "transactions")
+// 【优化】添加 indices 索引，极大提升查询和过滤速度
+@Entity(tableName = "transactions",
+        indices = {
+                @Index("date"),
+                @Index("type"),
+                @Index("category")
+        })
 public class Transaction {
     @PrimaryKey(autoGenerate = true)
     public int id;
     public long date;
-    public int type;
+    public int type; // 0支出, 1收入, 2转账
     public String category;
     public double amount;
     public String note;

@@ -66,7 +66,8 @@ public class YearPagerAdapter extends RecyclerView.Adapter<YearPagerAdapter.Year
         long end = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX).atZone(zoneId).toInstant().toEpochMilli();
 
         var dao = AppDatabase.getDatabase(context).transactionDao();
-        var transactions = dao.getTransactionsByRange(start, end);
+        // 🌟 核心优化：使用轻量级对象
+        var transactions = dao.getMinimalTransactionsSync(start, end);
 
         Map<Integer, Map<Integer, Double>> stats = new HashMap<>();
         if (transactions != null) {
@@ -74,6 +75,7 @@ public class YearPagerAdapter extends RecyclerView.Adapter<YearPagerAdapter.Year
                 LocalDate date = Instant.ofEpochMilli(t.date).atZone(zoneId).toLocalDate();
                 int m = date.getMonthValue();
                 int d = date.getDayOfMonth();
+                // SQL中已过滤转账，这里直接计算净值
                 stats.computeIfAbsent(m, k -> new HashMap<>())
                         .merge(d, t.type == 1 ? t.amount : -t.amount, Double::sum);
             }

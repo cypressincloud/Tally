@@ -4,6 +4,8 @@ import android.app.Application;
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.Transformations;
 
 import com.example.budgetapp.database.AppDatabase;
 import com.example.budgetapp.database.AssetAccount;
@@ -29,6 +31,12 @@ public class FinanceViewModel extends AndroidViewModel {
     private final LiveData<List<AssetAccount>> allAssets;
     private final LiveData<List<Goal>> allGoals; // 新增 LiveData 观察存储目标
 
+    // ================= 新增：动态查询所需变量 =================
+    // 存储当前请求的时间范围：[0]是start，[1]是end
+    private final MutableLiveData<long[]> currentRangeFilter = new MutableLiveData<>();
+
+    // 动态观察该时间段内的账单
+    private final LiveData<List<Transaction>> rangeTransactions;
     public FinanceViewModel(@NonNull Application application) {
         super(application);
         // 1. 获取数据库实例
@@ -43,6 +51,14 @@ public class FinanceViewModel extends AndroidViewModel {
         allTransactions = transactionDao.getAllTransactions();
         allAssets = assetDao.getAllAssets();
         allGoals = goalDao.getAllGoals(); // 获取所有目标
+
+        // 新增：利用 Transformations.switchMap 实现只要 currentRangeFilter 变化，就自动去数据库查新范围的数据
+        rangeTransactions = Transformations.switchMap(currentRangeFilter, range -> {
+            if (range == null || range.length != 2) {
+                return new MutableLiveData<>();
+            }
+            return transactionDao.getTransactionsByRangeLive(range[0], range[1]);
+        });
     }
 
     // ================= 账单记录 (Transaction) 相关 =================
@@ -277,6 +293,41 @@ public class FinanceViewModel extends AndroidViewModel {
         });
     }
 
+// ================= 新增：动态按需加载 API =================
 
+    /**
+     * Fragment 调用此方法设置当前要查看的时间范围
+     */
+    public void setDateRange(long startMillis, long endMillis) {
+        currentRangeFilter.setValue(new long[]{startMillis, endMillis});
+    }
+
+    /**
+     * Fragment 观察此 LiveData 获取按需加载的账单数据
+     */
+    public LiveData<List<Transaction>> getRangeTransactions() {
+        return rangeTransactions;
+    }
+
+    /**
+     * 直接获取指定时间段的总收支（用于顶部面板统计）
+     */
+    public LiveData<Double> getTotalAmountByType(long start, long end, int type) {
+        return transactionDao.getTotalAmountByTypeLive(start, end, type);
+    }
+
+    /**
+     * 获取指定时间段的加班总金额
+     */
+    public LiveData<Double> getOvertimeTotalAmount(long start, long end) {
+        return transactionDao.getOvertimeTotalAmountLive(start, end);
+    }
+
+    /**
+     * 供 DetailsFragment 使用：直接从数据库进行多条件混合查询
+     */
+    public LiveData<List<Transaction>> getFilteredTransactions(long start, long end, Integer type, String category) {
+        return transactionDao.getFilteredTransactionsLive(start, end, type, category);
+    }
 
 }

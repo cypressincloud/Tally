@@ -10,8 +10,7 @@ import androidx.annotation.NonNull;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-// 【修改 1】版本号升级为 10
-@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 15, exportSchema = false)
+@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 16, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract TransactionDao transactionDao();
@@ -109,6 +108,16 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    // 【新增】15 -> 16 的迁移逻辑：为 transactions 表的 date, type, category 添加索引，提升查询速度
+    static final Migration MIGRATION_15_16 = new Migration(15, 16) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_date` ON `transactions` (`date`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_type` ON `transactions` (`type`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_category` ON `transactions` (`category`)");
+        }
+    };
+
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
@@ -121,7 +130,7 @@ public abstract class AppDatabase extends RoomDatabase {
                                     MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                                     MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
                                     MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
-                                    MIGRATION_14_15
+                                    MIGRATION_14_15, MIGRATION_15_16
                             )
                             .fallbackToDestructiveMigration()
                             .build();

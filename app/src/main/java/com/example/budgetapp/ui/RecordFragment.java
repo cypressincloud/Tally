@@ -108,6 +108,27 @@ public class RecordFragment extends Fragment {
     private TextView tvBudgetText;
     private android.widget.ProgressBar pbBudget;
 
+    // 新增：用于记录当前请求的时间范围，防止无限循环查询
+    private long currentStartMillis = 0;
+    private long currentEndMillis = 0;
+
+    private void fetchDataForCurrentMonth() {
+        LocalDate firstDay = currentMonth.atDay(1);
+        int offset = firstDay.getDayOfWeek().getValue() - 1;
+        LocalDate startOfGrid = firstDay.minusDays(offset);
+        LocalDate endOfGrid = currentMonth.atEndOfMonth().plusDays(14); // 留点缓冲天数
+
+        long startMillis = startOfGrid.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        long endMillis = endOfGrid.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1;
+
+        // 如果时间范围发生变化，才通知 ViewModel 去数据库查询
+        if (currentStartMillis != startMillis || currentEndMillis != endMillis) {
+            currentStartMillis = startMillis;
+            currentEndMillis = endMillis;
+            viewModel.setDateRange(startMillis, endMillis);
+        }
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -190,13 +211,16 @@ public class RecordFragment extends Fragment {
         calendarRecycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         adapter = new CalendarAdapter(date -> {
+            // 如果点击的是已经选中的日期（即第二次点击），则弹出账单详情弹窗
             if (date.equals(selectedDate)) {
                 showDateDetailDialog(date);
             } else {
+                // 如果点击的是新日期（即第一次点击），只做选中高亮和刷新面板
                 selectedDate = date;
                 adapter.setSelectedDate(date);
-                // 新增：选中新日期后，立即刷新预算卡片
-                List<Transaction> currentList = viewModel.getAllTransactions().getValue();
+
+                // 立即刷新预算卡片 (保留高性能的 getRangeTransactions)
+                List<Transaction> currentList = viewModel.getRangeTransactions().getValue();
                 if (currentList != null) {
                     updateBudgetCard(currentList);
                 }
@@ -268,7 +292,8 @@ public class RecordFragment extends Fragment {
             updateCalendar(1);
         });
 
-        viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
+        // 【优化】不再全量观察，只观察当前月份按需请求的数据
+        viewModel.getRangeTransactions().observe(getViewLifecycleOwner(), list -> {
             updateCalendar(0); // 数据刷新不播放滑动动画
             if (currentDetailDialog != null && currentDetailDialog.isShowing() && selectedDate != null) {
                 updateDetailDialogData(selectedDate);
@@ -387,7 +412,7 @@ public class RecordFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        List<Transaction> currentList = viewModel.getAllTransactions().getValue();
+        List<Transaction> currentList = viewModel.getRangeTransactions().getValue();
         if (currentList != null) {
             updateBudgetCard(currentList);
         }
@@ -665,7 +690,7 @@ public class RecordFragment extends Fragment {
         currentFilterMode = mode;
         adapter.setFilterMode(mode);
         // 重新计算并刷新顶部统计数据和日历显示
-        List<Transaction> currentList = viewModel.getAllTransactions().getValue();
+        List<Transaction> currentList = viewModel.getRangeTransactions().getValue();
         if (currentList != null) {
             calculateMonthTotals(currentList);
         }
@@ -677,6 +702,9 @@ public class RecordFragment extends Fragment {
         if (tvMonthLabel != null) {
             tvMonthLabel.setText(currentMonth.getMonthValue() + "月");
         }
+
+        // 🌟 核心优化：每次日历刷新前，触发按需加载本月数据
+        fetchDataForCurrentMonth();
 
         List<LocalDate> days = new ArrayList<>();
         LocalDate firstDay = currentMonth.atDay(1);
@@ -693,7 +721,8 @@ public class RecordFragment extends Fragment {
             days.add(currentMonth.atDay(i));
         }
 
-        List<Transaction> allList = viewModel.getAllTransactions().getValue();
+        // 🌟 读取刚刚请求到的本月数据 (取代全量获取)
+        List<Transaction> allList = viewModel.getRangeTransactions().getValue();
         List<Transaction> currentList = allList != null ? allList : new ArrayList<>();
 
         adapter.setRenewalItems(assistantConfig.getRenewalList());
@@ -706,7 +735,6 @@ public class RecordFragment extends Fragment {
 
         calculateMonthTotals(currentList);
 
-        // 执行平滑动画
         if (getContext() != null && calendarRecycler != null) {
             if (direction == 1) {
                 Animation anim = AnimationUtils.loadAnimation(getContext(), R.anim.slide_in_right);
@@ -851,7 +879,7 @@ public class RecordFragment extends Fragment {
 
     private void updateDetailDialogData(LocalDate date) {
         if (currentDetailAdapter == null) return;
-        List<Transaction> all = viewModel.getAllTransactions().getValue();
+        List<Transaction> all = viewModel.getRangeTransactions().getValue();
         List<Transaction> dayList = new ArrayList<>();
         if (all != null) {
             long start = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();

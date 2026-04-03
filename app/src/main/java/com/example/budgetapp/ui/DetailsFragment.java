@@ -80,6 +80,9 @@ public class DetailsFragment extends Fragment {
     private List<AssetAccount> assetList = new ArrayList<>();
     private TextView tvDateRange;
 
+    // 🌟 用于管理当前的数据库查询观察者，防止重复刷新
+    private androidx.lifecycle.LiveData<List<Transaction>> currentFilteredDataLive;
+
     // 手势检测与状态管理
     private GestureDetector gestureDetector;
     private LocalDate selectedDate = LocalDate.now();
@@ -177,10 +180,12 @@ public class DetailsFragment extends Fragment {
         });
 
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
-        viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
-            allTransactions = list;
-            processAndDisplayData(0);
-        });
+//        viewModel.getAllTransactions().observe(getViewLifecycleOwner(), list -> {
+//            allTransactions = list;
+//            processAndDisplayData(0);
+//        });
+        // 🌟 初始化时直接请求一次当前页面的数据
+        processAndDisplayData(0);
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             this.assetList = assets;
             adapter.setAssets(assets);
@@ -361,76 +366,68 @@ public class DetailsFragment extends Fragment {
     }
 
     private void processAndDisplayData(int direction) {
-        if (allTransactions == null) return;
         long[] range = getTimeRange();
 
-        List<Transaction> filtered = allTransactions.stream().filter(t -> {
-            // 1. 时间范围筛选
-            if (t.date < range[0] || t.date > range[1]) return false;
-            // 2. 金额范围筛选
-            if (currentFilter.minAmount != null && t.amount < currentFilter.minAmount) return false;
-            if (currentFilter.maxAmount != null && t.amount > currentFilter.maxAmount) return false;
-
-            // 🌟 新增：账单类型筛选
-            if (currentFilter.type != null && t.type != currentFilter.type) {
-                return false;
-            }
-
-            // 🌟 3. 分类筛选 (修改这里：同时匹配一级和二级分类)
-            if (!TextUtils.isEmpty(currentFilter.category)) {
-                String searchKeyword = currentFilter.category;
-                boolean matchMainCategory = t.category != null && t.category.contains(searchKeyword);
-                boolean matchSubCategory = t.subCategory != null && t.subCategory.contains(searchKeyword);
-
-                // 如果一级分类和二级分类都没有包含关键字，则过滤掉
-                if (!matchMainCategory && !matchSubCategory) {
-                    return false;
-                }
-            }
-            // 🌟 4. 备注与记录标识筛选 (修改这部分)
-            // currentFilter.assetName 变量存储的是"备注包含"输入框的关键字
-            if (!TextUtils.isEmpty(currentFilter.assetName)) {
-                boolean matchRemark = t.remark != null && t.remark.contains(currentFilter.assetName);
-                boolean matchNote = t.note != null && t.note.contains(currentFilter.assetName);
-                // 如果备注和记录标识都没有包含该关键字，则过滤掉该账单
-                if (!matchRemark && !matchNote) {
-                    return false;
-                }
-            }
-
-            return true;
-        }).collect(Collectors.toList());
-        Map<String, List<Transaction>> grouped = new TreeMap<>(Collections.reverseOrder());
-        for (Transaction t : filtered) {
-            String key = dateFormat.format(new Date(t.date));
-            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(t);
+        // 1. 如果之前有正在观察的 LiveData，先移除它，防止重复触发
+        if (currentFilteredDataLive != null) {
+            currentFilteredDataLive.removeObservers(getViewLifecycleOwner());
         }
 
-        List<DetailsItem> displayItems = new ArrayList<>();
-        for (Map.Entry<String, List<Transaction>> entry : grouped.entrySet()) {
-            List<Transaction> dayList = entry.getValue();
-            float income = 0, expense = 0;
-            dayList.sort((t1, t2) -> Long.compare(t2.date, t1.date));// 严格区分：只有 type 0 才是支出，type 1 是收入，type 2 (转移) 被忽略
-            for (Transaction t : dayList) {
-                if (t.type == 1) {
-                    income += t.amount;
-                } else if (t.type == 0) {
-                    expense += t.amount;
+        // 处理分类搜索关键字（如果为空则传 null，让 SQL 忽略该条件）
+        String keyword = TextUtils.isEmpty(currentFilter.category) ? null : currentFilter.category;
+
+        // 2. 核心优化：让 SQLite 帮我们做时间、类型、分类的第一层极速过滤
+        currentFilteredDataLive = viewModel.getFilteredTransactions(range[0], range[1], currentFilter.type, keyword);
+
+        // 3. 观察返回的结果
+        currentFilteredDataLive.observe(getViewLifecycleOwner(), list -> {
+            if (list == null) return;
+            allTransactions = list; // 更新缓存供其他弹窗用
+
+            // 第 2 层轻量过滤：在极其有限的数据中处理金额和备注
+            List<Transaction> filtered = list.stream().filter(t -> {
+                if (currentFilter.minAmount != null && t.amount < currentFilter.minAmount) return false;
+                if (currentFilter.maxAmount != null && t.amount > currentFilter.maxAmount) return false;
+
+                if (!TextUtils.isEmpty(currentFilter.assetName)) {
+                    boolean matchRemark = t.remark != null && t.remark.contains(currentFilter.assetName);
+                    boolean matchNote = t.note != null && t.note.contains(currentFilter.assetName);
+                    if (!matchRemark && !matchNote) return false;
                 }
+                return true;
+            }).collect(Collectors.toList());
+
+            // 第 3 步：数据按天分组 (这部分保留你原本的逻辑)
+            Map<String, List<Transaction>> grouped = new TreeMap<>(Collections.reverseOrder());
+            for (Transaction t : filtered) {
+                String key = dateFormat.format(new Date(t.date));
+                grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(t);
             }
-            float dailyBalance = income - expense;
-            try {
-                displayItems.add(new HeaderItem(displayDateFormat.format(dateFormat.parse(entry.getKey())), income, expense, dailyBalance));
-            } catch (Exception ignored) {}
-            for (Transaction t : dayList) displayItems.add(new TransactionItem(t));
-        }
 
-        adapter.setData(displayItems);
+            List<DetailsItem> displayItems = new ArrayList<>();
+            for (Map.Entry<String, List<Transaction>> entry : grouped.entrySet()) {
+                List<Transaction> dayList = entry.getValue();
+                float income = 0, expense = 0;
+                dayList.sort((t1, t2) -> Long.compare(t2.date, t1.date));
+                for (Transaction t : dayList) {
+                    if (t.type == 1) income += t.amount;
+                    else if (t.type == 0) expense += t.amount;
+                }
+                float dailyBalance = income - expense;
+                try {
+                    displayItems.add(new HeaderItem(displayDateFormat.format(dateFormat.parse(entry.getKey())), income, expense, dailyBalance));
+                } catch (Exception ignored) {}
+                for (Transaction t : dayList) displayItems.add(new TransactionItem(t));
+            }
 
-        if (getContext() != null && recyclerView != null && direction != 0) {
-            Animation anim = AnimationUtils.loadAnimation(getContext(), direction == 1 ? R.anim.slide_in_right : R.anim.slide_in_left);
-            recyclerView.startAnimation(anim);
-        }
+            adapter.setData(displayItems);
+
+            // 列表动画
+            if (getContext() != null && recyclerView != null && direction != 0) {
+                Animation anim = AnimationUtils.loadAnimation(getContext(), direction == 1 ? R.anim.slide_in_right : R.anim.slide_in_left);
+                recyclerView.startAnimation(anim);
+            }
+        });
     }
 
     private long[] getTimeRange() {

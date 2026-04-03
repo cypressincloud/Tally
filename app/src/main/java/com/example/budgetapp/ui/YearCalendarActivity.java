@@ -201,17 +201,18 @@ public class YearCalendarActivity extends AppCompatActivity {
         }
     }
 
-    // 【新增】纯粹的数据库查询逻辑抽离
+    // 【修改】使用轻量级对象查询，极大降低内存占用
     private Map<Integer, Map<Integer, Double>> fetchYearStatsFromDb(int year) {
         ZoneId zoneId = ZoneId.systemDefault();
         long start = LocalDate.of(year, 1, 1).atStartOfDay(zoneId).toInstant().toEpochMilli();
         long end = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX).atZone(zoneId).toInstant().toEpochMilli();
 
         TransactionDao dao = AppDatabase.getDatabase(this).transactionDao();
-        List<Transaction> transactions = dao.getTransactionsByRange(start, end);
+        // 🌟 核心优化：只查 date, type, amount 三个字段，且已在 SQL 层排除了转账记录
+        List<com.example.budgetapp.database.TransactionMinimal> transactions = dao.getMinimalTransactionsSync(start, end);
 
         Map<Integer, Map<Integer, Double>> stats = new HashMap<>();
-        for (Transaction t : transactions) {
+        for (com.example.budgetapp.database.TransactionMinimal t : transactions) {
             LocalDate date = Instant.ofEpochMilli(t.date).atZone(zoneId).toLocalDate();
             int month = date.getMonthValue();
             int day = date.getDayOfMonth();
