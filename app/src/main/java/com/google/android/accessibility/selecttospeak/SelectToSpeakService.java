@@ -164,20 +164,20 @@ public class SelectToSpeakService extends AccessibilityService {
                     // 0. 专门适配微信红包/支付特殊页面
                     if (handleWeChatRedPacketSpecialPage(rootNode)) return;
 
-                    // 1. 【新增：专版专杀】适配微信内第三方小程序/服务商的支付成功页 (全 Desc 结构)
-                    if (handleWeChatMerchantAppPaySuccessPage(rootNode)) return;
-
-                    // 2. 优先尝试适配红包页面
-                    if (handleWeChatRedPacketPage(rootNode)) return;
-
-                    // 3. 尝试适配常规支付成功页面
-                    if (handleWeChatPaySuccessPage(rootNode)) return;
-
-                    // 4. 待确认收款页面适配
+                    // 1. 【防误杀：必须排在绝对第一位】待确认收款页面适配
                     if (handleWeChatTransferPendingPage(rootNode)) return;
 
-                    // 5. 微信扫二维码付款 / 个人转账账单详情
+                    // 2. 微信扫二维码付款 / 个人转账账单详情
                     if (handleWeChatQRCodeTransferPage(rootNode)) return;
+
+                    // 3. 适配微信内第三方小程序/服务商的支付成功页 (全 Desc 结构)
+                    if (handleWeChatMerchantAppPaySuccessPage(rootNode)) return;
+
+                    // 4. 优先尝试适配红包页面
+                    if (handleWeChatRedPacketPage(rootNode)) return;
+
+                    // 5. 尝试适配常规支付成功页面
+                    if (handleWeChatPaySuccessPage(rootNode)) return;
 
                     // 6. 微信商家转账 / 提现 / 退款页面
                     if (handleWeChatMerchantTransferPage(rootNode)) return;
@@ -1334,7 +1334,7 @@ public class SelectToSpeakService extends AccessibilityService {
         return false;
     }
     /**
-     * 专门适配微信“待确认收款”页面
+     * 【专版专杀】专门适配微信“待确认收款”页面
      * 提取“待xxx确认收款”作为记录标识，并自动匹配微信资产
      */
     private boolean handleWeChatTransferPendingPage(AccessibilityNodeInfo root) {
@@ -1343,7 +1343,7 @@ public class SelectToSpeakService extends AccessibilityService {
         List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
         flattenNodes(root, allNodes); // 展平节点树
 
-        boolean isPaySuccessPage = false;
+        boolean isPendingPage = false;
         String pendingInfo = "";
         double amount = -1;
 
@@ -1351,24 +1351,20 @@ public class SelectToSpeakService extends AccessibilityService {
             AccessibilityNodeInfo node = allNodes.get(i);
             String text = node.getText() != null ? node.getText().toString().trim() : "";
             String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
 
-            // 1. 识别“支付成功”顶部标志
-            if ("支付成功".equals(text) || "支付成功".equals(desc)) {
-                isPaySuccessPage = true;
+            // 1. 捕捉核心特征节点：只要包含"待"和"确认收款"即锁定该页面
+            if (content.contains("待") && content.contains("确认收款")) {
+                isPendingPage = true;
+                pendingInfo = content;
             }
 
-            // 2. 捕捉关键节点：待xxxx确认收款
-            if (text.contains("确认收款")) {
-                pendingInfo = text;
-            }
-
-            // 3. 提取金额（格式通常为 ￥0.01）
-            if (text.startsWith("￥") || text.startsWith("¥") || desc.startsWith("￥") || desc.startsWith("¥")) {
+            // 2. 提取金额（格式通常为 ￥0.01）
+            if ((content.contains("￥") || content.contains("¥")) && amount == -1) {
                 try {
-                    String cleanAmount = !text.isEmpty() ? text : desc;
-                    cleanAmount = cleanAmount.replace("￥", "").replace("¥", "").trim();
+                    String cleanAmount = content.replace("￥", "").replace("¥", "").replace(",", "").trim();
                     double parsed = Double.parseDouble(cleanAmount);
-                    if (parsed > 0 && amount == -1) {
+                    if (parsed > 0) {
                         amount = parsed;
                     }
                 } catch (Exception e) {
@@ -1377,27 +1373,26 @@ public class SelectToSpeakService extends AccessibilityService {
             }
         }
 
-        // 判定：如果是支付成功页，且识别到了“待确认”信息和金额
-        if (isPaySuccessPage && amount > 0 && !pendingInfo.isEmpty()) {
+        // 3. 判定：只要锁定核心特征且抓到了金额，100%是待确认收款页面
+        if (isPendingPage && amount > 0 && !pendingInfo.isEmpty()) {
             long now = System.currentTimeMillis();
             if (now - lastWindowDismissTime < 2500) return true;
 
-            // 防抖签名：加入 5分钟(300000)屏蔽，并加入专属特征签
+            // 防抖签名：加入 5分钟(300000ms)屏蔽
             String signature = "wx_transfer_pending-" + amount + "-" + pendingInfo;
             if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
 
-            // 构造记录标识：时间 + 待陈勇13929622781确认收款
+            // 构造记录标识：时间 + 待...确认收款
             SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
             final String recordIdentifier = sdf.format(new Date(now)) + " " + pendingInfo;
 
             final double finalAmount = amount;
-            // 明确为转账行为，默认分类锁定为"转账"
-            final String finalCategory = "转账";
+            final String finalCategory = "转账"; // 明确为转账行为，默认分类锁定为"转账"
 
-            // 由于该页面未提供具体银行卡信息，统一使用"微信"作为关键词进行资产模糊兜底匹配
+            // 该页面未提供具体银行卡信息，统一使用"微信"作为关键词进行资产模糊匹配
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", "微信");
 
             // 触发记账（支出类型 0）
@@ -2704,8 +2699,6 @@ public class SelectToSpeakService extends AccessibilityService {
 
             String text = node.getText() != null ? node.getText().toString().trim() : "";
             String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
-
-            // 核心特征：该页面所有有效数据全在 Desc 里，所以优先读取 Desc
             String content = !desc.isEmpty() ? desc : text;
 
             // 1. 识别“支付成功”标志
@@ -2720,21 +2713,22 @@ public class SelectToSpeakService extends AccessibilityService {
                     String cleanAmount = content.replace("￥", "").replace("¥", "").replace(",", "").trim();
                     double parsedAmount = Double.parseDouble(cleanAmount);
 
-                    // 确保金额有效，且只抓取第一次出现的有效金额 (2.00)
+                    // 确保金额有效，且只抓取第一次出现的有效金额
                     if (parsedAmount > 0 && amount == -1) {
                         amount = parsedAmount;
 
                         // 3. 提取商户名（中国移动）
-                        // 根据节点树规律，商户名称永远紧挨在实付金额的正上方
-                        if (i > 0) {
-                            AccessibilityNodeInfo prevNode = allNodes.get(i - 1);
+                        // 【核心修复】：向上倒序遍历，跨过所有不可见的排版空节点，寻找真正的商户名称
+                        for (int j = i - 1; j >= 0; j--) {
+                            AccessibilityNodeInfo prevNode = allNodes.get(j);
                             String prevDesc = prevNode.getContentDescription() != null ? prevNode.getContentDescription().toString().trim() : "";
                             String prevText = prevNode.getText() != null ? prevNode.getText().toString().trim() : "";
                             String prevContent = !prevDesc.isEmpty() ? prevDesc : prevText;
 
-                            // 排除掉“支付成功”这个标题节点，剩下的就是完美商户名
+                            // 排除掉空节点和“支付成功”这个标题节点，剩下的就是完美商户名
                             if (!prevContent.isEmpty() && !"支付成功".equals(prevContent)) {
                                 merchantName = prevContent;
+                                break;
                             }
                         }
                     }
@@ -2765,7 +2759,7 @@ public class SelectToSpeakService extends AccessibilityService {
             final double finalAmount = amount;
             final long finalTimestamp = now;
 
-            // 智能分类：如果商户名包含通信运营商，自动分配到"通讯"；包含美团则"餐饮"；否则默认"购物"
+            // 智能分类
             String defaultCategory = "购物";
             if (merchantName.contains("移动") || merchantName.contains("联通") || merchantName.contains("电信") || merchantName.contains("话费")) {
                 defaultCategory = "通讯";
