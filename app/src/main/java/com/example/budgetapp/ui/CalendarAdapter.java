@@ -264,20 +264,13 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         int padRight = holder.itemView.getPaddingRight();
         int padBottom = holder.itemView.getPaddingBottom();
 
-        // --- 核心优化：检测多项自动续费日期 ---
+        // --- 核心优化：检测多项自动续费日期 (支持自定义) ---
         boolean isRenewalDay = false;
         for (RenewalItem item : renewalItems) {
-            // ... (保留你原有的续费日期判断逻辑不变)
-            if ("Month".equals(item.period)) {
-                if (date.getDayOfMonth() == item.day) {
-                    isRenewalDay = true;
-                    break;
-                }
-            } else if ("Year".equals(item.period)) {
-                if (date.getMonthValue() == item.month && date.getDayOfMonth() == item.day) {
-                    isRenewalDay = true;
-                    break;
-                }
+            // 【关键修改】：调用新增的统一判断方法
+            if (isRenewalDate(item, date)) {
+                isRenewalDay = true;
+                break;
             }
         }
 
@@ -400,6 +393,54 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             listener.onDateClick(date);
         });
     }
+
+    // 新增：用于判断目标日期是否为续费日（包含自定义周期的计算）
+    private boolean isRenewalDate(RenewalItem item, LocalDate targetDate) {
+        if ("Month".equals(item.period)) {
+            return targetDate.getDayOfMonth() == item.day;
+        } else if ("Year".equals(item.period)) {
+            return targetDate.getMonthValue() == item.month && targetDate.getDayOfMonth() == item.day;
+        } else if ("Custom".equals(item.period)) {
+            // 安全检查，兼容旧数据
+            int startYear = item.year > 2000 ? item.year : targetDate.getYear();
+            LocalDate startDate;
+            try {
+                startDate = LocalDate.of(startYear, item.month, item.day);
+            } catch (Exception e) {
+                return false;
+            }
+
+            // 如果当前查看的日期在起算日期之前，则不触发
+            if (targetDate.isBefore(startDate)) {
+                return false;
+            }
+
+            int value = item.durationValue > 0 ? item.durationValue : 1;
+
+            if ("Day".equals(item.durationUnit)) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(startDate, targetDate);
+                return days % value == 0;
+            } else if ("Week".equals(item.durationUnit)) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(startDate, targetDate);
+                return days % (7L * value) == 0;
+            } else if ("Month".equals(item.durationUnit)) {
+                // 计算相差的自然月数
+                int diffMonths = (targetDate.getYear() - startDate.getYear()) * 12 + (targetDate.getMonthValue() - startDate.getMonthValue());
+                if (diffMonths >= 0 && diffMonths % value == 0) {
+                    return startDate.plusMonths(diffMonths).equals(targetDate);
+                }
+                return false;
+            } else if ("Year".equals(item.durationUnit)) {
+                int diffYears = targetDate.getYear() - startDate.getYear();
+                if (diffYears >= 0 && diffYears % value == 0) {
+                    return startDate.plusYears(diffYears).equals(targetDate);
+                }
+                return false;
+            }
+        }
+        return false;
+    }
+
     @Override
     public int getItemCount() {
         return days.size();

@@ -164,6 +164,9 @@ public class SelectToSpeakService extends AccessibilityService {
                     // 0. 专门适配微信红包/支付特殊页面
                     if (handleWeChatRedPacketSpecialPage(rootNode)) return;
 
+                    //    【新增】微信个人转账“已收款”页面适配
+                    if (handleWeChatTransferReceivedPage(rootNode)) return;
+
                     // 1. 【防误杀：必须排在绝对第一位】待确认收款页面适配
                     if (handleWeChatTransferPendingPage(rootNode)) return;
 
@@ -1414,8 +1417,8 @@ public class SelectToSpeakService extends AccessibilityService {
     }
 
     /**
-     * 专门适配微信“普通历史账单详情页”及“交易详情变体页”
-     * 增加对 [商品] 和 [商户全称] 标签的定向捕获，完美提取超长明细备注
+     * 专门适配微信“普通历史账单详情页”及“各种交易详情变体页”
+     * 增加对金额正下方商户名（如拼多多平台商户）的向下嗅探捕获，并过滤无效商品标签
      */
     private boolean handleWeChatBillDetailPage(AccessibilityNodeInfo root) {
         if (root == null) return false;
@@ -1426,6 +1429,7 @@ public class SelectToSpeakService extends AccessibilityService {
         boolean isBillDetailPage = false;
         String note = "";
         String fallbackNote = "";
+        String directBelowNote = ""; // 新增：金额正下方的紧邻文本
         String productNote = "";
         String merchantNote = "";
         String timeString = "";
@@ -1456,7 +1460,7 @@ public class SelectToSpeakService extends AccessibilityService {
                         amount = parsedAmount;
                     }
 
-                    // 向上寻找兜底备注 (跨越空节点)
+                    // A. 向上寻找兜底备注 (跨越空节点)
                     for (int j = i - 1; j >= 0; j--) {
                         AccessibilityNodeInfo prevNode = allNodes.get(j);
                         String prevText = prevNode.getText() != null ? prevNode.getText().toString().trim() : "";
@@ -1468,10 +1472,26 @@ public class SelectToSpeakService extends AccessibilityService {
                             break;
                         }
                     }
+
+                    // B. 【核心修复】：向下寻找紧跟在金额后面的备注 (如：拼多多平台商户)
+                    for (int j = i + 1; j < allNodes.size(); j++) {
+                        AccessibilityNodeInfo nextNode = allNodes.get(j);
+                        String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                        String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                        String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+
+                        // 找到第一个有内容的节点，只要不是"原价"、"优惠"等干扰项，就当做商户名
+                        if (!nextContent.isEmpty()) {
+                            if (!nextContent.contains("原价") && !nextContent.contains("优惠") && !nextContent.contains("￥") && !nextContent.contains("¥")) {
+                                directBelowNote = nextContent;
+                            }
+                            break; // 只看第一个实质节点，看完就撤
+                        }
+                    }
                 } catch (Exception e) {}
             }
 
-            // 3. 【核心优化】：定向提取 [商品] 或 [商品名称] 后面的详细明细 (优先级最高)
+            // 3. 定向提取 [商品] 后面的明细
             if ("商品".equals(content) || "商品名称".equals(content)) {
                 for (int j = i + 1; j < allNodes.size(); j++) {
                     AccessibilityNodeInfo nextNode = allNodes.get(j);
@@ -1485,7 +1505,7 @@ public class SelectToSpeakService extends AccessibilityService {
                 }
             }
 
-            // 4. 定向提取 [商户全称] 或 [收款方] (优先级次之)
+            // 4. 定向提取 [商户全称]
             if ("商户全称".equals(content) || "收款方".equals(content)) {
                 for (int j = i + 1; j < allNodes.size(); j++) {
                     AccessibilityNodeInfo nextNode = allNodes.get(j);
@@ -1533,17 +1553,23 @@ public class SelectToSpeakService extends AccessibilityService {
             long now = System.currentTimeMillis();
             if (now - lastWindowDismissTime < 2500) return true;
 
-            // 【核心决策】：层层递进，确定最终最完美的备注
-            if (!productNote.isEmpty()) {
-                note = productNote; // 首选最详尽的“商品”标签文本
-            } else if (!merchantNote.isEmpty()) {
-                note = merchantNote; // 其次选商户全称
+            // 【核心决策树】：层层递进，防忽悠拦截
+            // 如果商品备注存在，且不是微信敷衍塞进来的单号，则首选它 (如美团外卖的菜品)
+            if (!productNote.isEmpty() && !productNote.startsWith("商户单号") && !productNote.startsWith("交易单号")) {
+                note = productNote;
+            }
+            // 否则，优先选用金额正下方的名称 (如：拼多多平台商户)
+            else if (!directBelowNote.isEmpty() && !directBelowNote.contains("交易详情") && !directBelowNote.contains("账单详情")) {
+                note = directBelowNote;
+            }
+            // 兜底方案
+            else if (!merchantNote.isEmpty()) {
+                note = merchantNote;
             } else if (!fallbackNote.isEmpty() && !fallbackNote.contains("交易详情") && !fallbackNote.contains("账单详情")) {
-                note = fallbackNote; // 最后才用上方抓取的兜底文本
+                note = fallbackNote;
             }
 
             if (note.isEmpty()) note = "微信账单";
-            // 为了防止有些外卖单子商品详情长达几百字撑爆界面，做个安全截断
             if (note.length() > 50) note = note.substring(0, 48) + "...";
 
             // 防重复签名
@@ -1582,6 +1608,8 @@ public class SelectToSpeakService extends AccessibilityService {
             String defaultCategory = "购物";
             if (note.contains("烧烤") || note.contains("餐饮") || note.contains("面") || note.contains("饭") || note.contains("吃") || note.contains("汉堡") || note.contains("外卖")) {
                 defaultCategory = "餐饮";
+            } else if (note.contains("拼多多") || note.contains("淘宝") || note.contains("京东") || note.contains("超市")) {
+                defaultCategory = "购物";
             }
 
             String assetKeyword = paymentMethod.isEmpty() ? "微信" : paymentMethod;
@@ -1595,6 +1623,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
         return false;
     }
+
     /**
      * 专门适配微信“支付确认”弹窗（输入密码前）
      * 提取商户名、金额，并将“付款方式”（如：零钱）作为关联资产的模糊搜索关键词
@@ -3143,6 +3172,123 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 触发弹窗
             handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配微信“个人转账已收款”页面
+     * 提取存入零钱的金额(收入)、转账说明以及真实的收款时间
+     */
+    private boolean handleWeChatTransferReceivedPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isTransferReceived = false;
+        double amount = -1;
+        String timeString = "";
+        String note = "";
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别页面特征：你已收款，资金已存入零钱
+            if (content.contains("你已收款") && content.contains("已存入零钱")) {
+                isTransferReceived = true;
+            }
+
+            // 2. 提取金额 (如：¥12.00)
+            if ((content.startsWith("¥") || content.startsWith("￥")) && amount == -1) {
+                try {
+                    String cleanAmount = content.replace("¥", "").replace("￥", "").replace(",", "").trim();
+                    amount = Double.parseDouble(cleanAmount);
+                } catch (Exception e) {}
+            }
+
+            // 3. 提取转账说明 (如：捐赠支持)
+            if ("转账说明".equals(content) || "收款备注".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        note = nextContent;
+                        break;
+                    }
+                }
+            }
+
+            // 4. 提取收款时间 (如：2026年04月08日 20:42:01)
+            if ("收款时间".equals(content) || "转账时间".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+
+                    // 避免抓到无关文本，时间格式必然带有 "年" 和 "月"
+                    if (!nextContent.isEmpty() && nextContent.contains("年") && nextContent.contains("月")) {
+                        timeString = nextContent;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 5. 判定触发
+        if (isTransferReceived && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 兜底备注
+            if (note.isEmpty()) note = "微信转账收款";
+
+            // 防抖
+            String signature = "wx_transfer_received-" + amount + "-" + note + "-" + timeString;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 解析真实的微信时间戳
+            long parsedTimestamp = now;
+            String displayTime = "";
+            if (!timeString.isEmpty()) {
+                try {
+                    SimpleDateFormat parseFormat = new SimpleDateFormat("yyyy年MM月dd日 HH:mm:ss", Locale.getDefault());
+                    java.util.Date date = parseFormat.parse(timeString);
+                    if (date != null) {
+                        parsedTimestamp = date.getTime();
+                        SimpleDateFormat displayFormat = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+                        displayTime = displayFormat.format(date);
+                    }
+                } catch (Exception e) {}
+            }
+            if (displayTime.isEmpty()) {
+                SimpleDateFormat displayFormat = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+                displayTime = displayFormat.format(new java.util.Date(now));
+            }
+
+            // 构造记录标识，如："04-08 20:42 捐赠支持"
+            final String recordIdentifier = displayTime + " " + note;
+            final double finalAmount = amount;
+            final long finalTimestamp = parsedTimestamp;
+            final String finalCategory = "转账"; // 收入类的默认分类可以设为转账或红包
+
+            // 明确是存入零钱，自动匹配微信/零钱资产
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.tencent.mm", "零钱");
+
+            // 注意：type = 1 代表这是“收入”
+            handler.post(() -> showConfirmWindow(finalAmount, 1, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
 
             return true;
         }

@@ -69,7 +69,7 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
         String displayAmount = showCurrency ? (symbol + " " + amountStr) : amountStr;
 
         // --- 核心逻辑：自动续费预览账单处理 ---
-        boolean isPreview = "PREVIEW_BILL".equals(t.remark); //
+        boolean isPreview = "PREVIEW_BILL".equals(t.remark);
 
         if (isPreview) {
             // 获取账单对应的日期
@@ -78,15 +78,20 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             LocalDate today = LocalDate.now();
 
             if (billDate.isAfter(today)) {
-                // 没到这个日期的时候，金额颜色是灰色
+                // 没到这个日期的时候，金额颜色是灰色，不显示边框
                 holder.tvAmount.setTextColor(Color.LTGRAY);
+                holder.itemView.setBackgroundResource(0); // 清除背景，防止复用错乱
             } else {
-                // 到了(过了)这个日期后，变为正常颜色（由于续费是支出，使用绿色）
+                // 到了(过了)这个日期后，变为正常颜色（由于续费是支出，使用绿色），并加上红边框提醒
                 holder.tvAmount.setTextColor(context.getColor(R.color.expense_green));
+                holder.itemView.setBackgroundResource(R.drawable.bg_budget_exceed);
             }
             holder.tvAmount.setText("-" + displayAmount);
             holder.tvNote.setAlpha(0.6f); // 预览项文字稍微淡化以示区分
         } else {
+            // 正常入库记录清除背景，防止复用错乱
+            holder.itemView.setBackgroundResource(0);
+
             // 正常入库记录的颜色逻辑
             holder.tvNote.setAlpha(1.0f);
             if (t.type == 2) {
@@ -121,7 +126,7 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             holder.tvNote.setVisibility(View.GONE);
         }
 
-        // --- 修正点：右下角状态指示器 ---
+        // --- 右下角状态指示器 ---
         // 逻辑：如果有文字备注（非预览标识）或有照片，显示绿色，否则红色
         boolean hasRemark = !TextUtils.isEmpty(t.remark) && !isPreview;
         boolean hasPhoto = !TextUtils.isEmpty(t.photoPath);

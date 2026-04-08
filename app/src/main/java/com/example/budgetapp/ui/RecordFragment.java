@@ -520,15 +520,10 @@ public class RecordFragment extends Fragment {
 
         int defaultAssetId = assistantConfig.getDefaultAssetId();
 
+        // 替换 checkAutoRenewalDeduction 中的循环逻辑
         for (RenewalItem item : renewalList) {
-            boolean shouldDeduct = false;
-            if ("Month".equals(item.period)) {
-                shouldDeduct = (today.getDayOfMonth() == item.day);
-            } else if ("Year".equals(item.period)) {
-                shouldDeduct = (today.getMonthValue() == item.month && today.getDayOfMonth() == item.day);
-            }
-
-            if (shouldDeduct) {
+            // 【关键修复】：调用新的辅助方法
+            if (isRenewalDate(item, today)) {
                 executeAutoDeduction(item, defaultAssetId, todayStr);
             }
         }
@@ -889,16 +884,11 @@ public class RecordFragment extends Fragment {
                     .collect(Collectors.toList());
         }
 
+        // 替换 updateDetailDialogData 中的循环逻辑
         List<RenewalItem> renewals = assistantConfig.getRenewalList();
         for (RenewalItem item : renewals) {
-            boolean matchesDate = false;
-            if ("Month".equals(item.period)) {
-                matchesDate = (date.getDayOfMonth() == item.day);
-            } else if ("Year".equals(item.period)) {
-                matchesDate = (date.getMonthValue() == item.month && date.getDayOfMonth() == item.day);
-            }
-
-            if (matchesDate) {
+            // 【关键修复】：调用新的辅助方法
+            if (isRenewalDate(item, date)) {
                 String objectName = item.object;
                 boolean alreadyExecuted = dayList.stream().anyMatch(t ->
                         "自动续费".equals(t.category) && objectName.equals(t.note));
@@ -1682,4 +1672,52 @@ public class RecordFragment extends Fragment {
             return null;
         }
     }
+
+    // 新增：统一定义计算扣费日的逻辑
+    private boolean isRenewalDate(RenewalItem item, LocalDate targetDate) {
+        if ("Month".equals(item.period)) {
+            return targetDate.getDayOfMonth() == item.day;
+        } else if ("Year".equals(item.period)) {
+            return targetDate.getMonthValue() == item.month && targetDate.getDayOfMonth() == item.day;
+        } else if ("Custom".equals(item.period)) {
+            // 安全检查，兼容旧数据
+            int startYear = item.year > 2000 ? item.year : targetDate.getYear();
+            LocalDate startDate;
+            try {
+                startDate = LocalDate.of(startYear, item.month, item.day);
+            } catch (Exception e) {
+                return false;
+            }
+
+            // 如果当前查看的日期在起算日期之前，则不触发
+            if (targetDate.isBefore(startDate)) {
+                return false;
+            }
+
+            int value = item.durationValue > 0 ? item.durationValue : 1;
+
+            if ("Day".equals(item.durationUnit)) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(startDate, targetDate);
+                return days % value == 0;
+            } else if ("Week".equals(item.durationUnit)) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(startDate, targetDate);
+                return days % (7L * value) == 0;
+            } else if ("Month".equals(item.durationUnit)) {
+                // 计算相差的自然月数
+                int diffMonths = (targetDate.getYear() - startDate.getYear()) * 12 + (targetDate.getMonthValue() - startDate.getMonthValue());
+                if (diffMonths >= 0 && diffMonths % value == 0) {
+                    return startDate.plusMonths(diffMonths).equals(targetDate);
+                }
+                return false;
+            } else if ("Year".equals(item.durationUnit)) {
+                int diffYears = targetDate.getYear() - startDate.getYear();
+                if (diffYears >= 0 && diffYears % value == 0) {
+                    return startDate.plusYears(diffYears).equals(targetDate);
+                }
+                return false;
+            }
+        }
+        return false;
+    }
+
 }

@@ -55,9 +55,20 @@
             android:gravity="center"
             android:textColor="@color/text_type_selector"
             android:background="@drawable/selector_tab_bg"/>
+        <RadioButton
+            android:id="@+id/rb_custom"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:button="@null"
+            android:text="自定义"
+            android:gravity="center"
+            android:textColor="@color/text_type_selector"
+            android:background="@drawable/selector_tab_bg"/>
     </RadioGroup>
 
     <TextView
+        android:id="@+id/tv_date_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="扣费日期"
@@ -76,6 +87,50 @@
         android:text="点击选择日期"
         android:textSize="16sp"
         android:textColor="@color/text_primary"/>
+
+    <LinearLayout
+        android:id="@+id/ll_custom_duration"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="持续时长"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/et_duration_value"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_input_field"
+                android:hint="例如：3"
+                android:inputType="number"
+                android:paddingHorizontal="16dp"
+                android:textSize="16sp"
+                android:textColor="@color/text_primary"
+                android:layout_marginEnd="8dp"/>
+
+            <Spinner
+                android:id="@+id/sp_duration_unit"
+                android:layout_width="100dp"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_input_field"
+                android:popupBackground="@drawable/bg_input_field"
+                android:paddingHorizontal="16dp" />
+        </LinearLayout>
+    </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
