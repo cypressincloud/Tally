@@ -285,6 +285,9 @@ public class AssetsFragment extends Fragment {
 
             // 在 updateUI() 的单币种逻辑中：
             for (AssetAccount acc : allAccounts) {
+                // 【修改这里】如果不计入总资产，则跳过统计
+                if (!acc.isIncludedInTotal) continue;
+
                 if (acc.type == 0 || acc.type == 3) totalAsset += acc.amount; // 资产和理财本金都算入总资产
                 else if (acc.type == 1) totalLiability += acc.amount;
                 else if (acc.type == 2) totalLent += acc.amount;
@@ -302,6 +305,9 @@ public class AssetsFragment extends Fragment {
             Map<String, Double> lentMap = new TreeMap<>();
 
             for (AssetAccount acc : allAccounts) {
+                // 【修改这里】如果不计入总资产，则跳过统计
+                if (!acc.isIncludedInTotal) continue;
+
                 String symbol = (acc.currencySymbol != null && !acc.currencySymbol.isEmpty()) ? acc.currencySymbol : "¥";
                 // 多币种逻辑同理：
                 if (acc.type == 0 || acc.type == 3) {
@@ -449,6 +455,16 @@ public class AssetsFragment extends Fragment {
         Button btnSave = view.findViewById(R.id.btn_save);
         Button btnDelete = view.findViewById(R.id.btn_delete);
 
+        // 【新增 1】初始化 Spinner
+        android.widget.Spinner spinnerInclude = view.findViewById(R.id.spinner_include_in_total);
+        android.widget.ArrayAdapter<String> includeAdapter = new android.widget.ArrayAdapter<>(
+                getContext(),
+                R.layout.item_spinner_dropdown,
+                new String[]{"计入总资产", "不计入总资产"}
+        );
+        includeAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spinnerInclude.setAdapter(includeAdapter);
+
         // 理财专用的控件 (更新为 Spinner 和 EditText)
         LinearLayout layoutInvestment = view.findViewById(R.id.layout_investment_details);
         android.widget.Spinner spinnerDepositType = view.findViewById(R.id.spinner_deposit_type);
@@ -500,6 +516,9 @@ public class AssetsFragment extends Fragment {
             etAmount.setText(String.format("%.2f", existing.amount)); // 修改为保留两位小数
             btnCancel.setVisibility(View.GONE);
             btnDelete.setVisibility(View.VISIBLE);
+
+            // 【新增 2】回显是否计入总资产 (0:计入, 1:不计入)
+            spinnerInclude.setSelection(existing.isIncludedInTotal ? 0 : 1);
 
             // 回显理财数据
             if (existing.type == 3) {
@@ -607,6 +626,15 @@ public class AssetsFragment extends Fragment {
                 calculateExpected.run();
             }
 
+            // 【新增 3】如果是新建资产，根据选中的类型自动切换“计入/不计入”的默认状态
+            if (existing == null) {
+                if (selectedId == R.id.rb_asset) {
+                    spinnerInclude.setSelection(0); // 资产默认“计入总资产”
+                } else {
+                    spinnerInclude.setSelection(1); // 负债、借出、理财默认“不计入总资产”
+                }
+            }
+
             tvTitle.setText((existing == null ? "添加" : "修改") + titleSuffix);
             etName.setHint(nameHint);
             etAmount.setHint(amountHint);
@@ -666,6 +694,9 @@ public class AssetsFragment extends Fragment {
             accountToSave.type = finalType;
             accountToSave.currencySymbol = symbol;
             accountToSave.updateTime = System.currentTimeMillis();
+
+            // 【新增 4】保存是否计入总资产的选项
+            accountToSave.isIncludedInTotal = (spinnerInclude.getSelectedItemPosition() == 0);
 
             if (finalType == 3) {
                 // 读取 Spinner 状态

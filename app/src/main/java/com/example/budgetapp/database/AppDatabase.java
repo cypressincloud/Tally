@@ -10,7 +10,7 @@ import androidx.annotation.NonNull;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 16, exportSchema = false)
+@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 17, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract TransactionDao transactionDao();
@@ -118,6 +118,15 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    // 2. 【新增】16 -> 17 的迁移逻辑：增加 isIncludedInTotal 字段
+    static final Migration MIGRATION_16_17 = new Migration(16, 17) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            // boolean 在 SQLite 中用 INTEGER 存储，1 代表 true，0 代表 false
+            database.execSQL("ALTER TABLE asset_accounts ADD COLUMN isIncludedInTotal INTEGER NOT NULL DEFAULT 1");
+        }
+    };
+
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
@@ -130,7 +139,7 @@ public abstract class AppDatabase extends RoomDatabase {
                                     MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                                     MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
                                     MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
-                                    MIGRATION_14_15, MIGRATION_15_16
+                                    MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17
                             )
                             .fallbackToDestructiveMigration()
                             .build();
