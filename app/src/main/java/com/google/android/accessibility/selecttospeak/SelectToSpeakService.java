@@ -225,6 +225,10 @@ public class SelectToSpeakService extends AccessibilityService {
 
                 // ======= 云闪付专属逻辑 =======
                 if ("com.unionpay".equals(packageName)) {
+                    // 1. 适配刚支付成功的页面
+                    if (handleUnionPayPaySuccessPage(rootNode)) return;
+
+                    // 2. 适配历史交易详情页面
                     if (handleUnionPayBillDetailPage(rootNode)) return;
                 }
 
@@ -3289,6 +3293,116 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 注意：type = 1 代表这是“收入”
             handler.post(() -> showConfirmWindow(finalAmount, 1, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配云闪付“支付成功”页面
+     * 锁定首个带 ¥ 的有效金额，向上抓取商户名，向下跳过原价/优惠等干扰项
+     */
+    private boolean handleUnionPayPaySuccessPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isPaySuccess = false;
+        String merchantName = "";
+        String paymentMethod = "";
+        double amount = -1;
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别页面特征
+            if ("支付成功".equals(content)) {
+                isPaySuccess = true;
+            }
+
+            // 2. 提取实付金额（锁定第一个带有 ¥ 或 ￥ 的节点，避开负数）
+            if ((content.contains("¥") || content.contains("￥")) && !content.contains("-") && !content.contains("优惠") && amount == -1) {
+                try {
+                    String cleanAmount = content.replace("¥", "").replace("￥", "").replace(",", "").trim();
+                    amount = Double.parseDouble(cleanAmount);
+
+                    // 3. 顺藤摸瓜提取商户名 (商户名通常紧挨在金额的上方一个节点)
+                    if (i > 0) {
+                        AccessibilityNodeInfo prevNode = allNodes.get(i - 1);
+                        String prevText = prevNode.getText() != null ? prevNode.getText().toString().trim() : "";
+                        String prevDesc = prevNode.getContentDescription() != null ? prevNode.getContentDescription().toString().trim() : "";
+                        String prevContent = !prevText.isEmpty() ? prevText : prevDesc;
+
+                        // 只要上面的节点不是空，且不是"支付成功"这四个字，就认为是商户名
+                        if (!prevContent.isEmpty() && !"支付成功".equals(prevContent)) {
+                            merchantName = prevContent;
+                        }
+                    }
+                } catch (Exception e) {
+                    // 解析失败忽略
+                }
+            }
+
+            // 4. 提取支付方式 (例如：广发银行银联信用卡 [9620])
+            if ("付款方式".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        paymentMethod = nextContent;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 5. 判定触发条件
+        if (isPaySuccess && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 兜底默认值
+            if (merchantName.isEmpty()) merchantName = "云闪付消费";
+
+            // 5分钟防重复录入防抖
+            String signature = "unionpay_success-" + amount + "-" + merchantName;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 构造记录标识，如："04-08 20:20 中国联通APP"
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            final String recordIdentifier = sdf.format(new Date(now)) + " " + merchantName;
+
+            final double finalAmount = amount;
+            final long finalTimestamp = now;
+
+            // 智能分类
+            String defaultCategory = "购物";
+            if (merchantName.contains("联通") || merchantName.contains("移动") || merchantName.contains("电信") || merchantName.contains("话费") || merchantName.contains("充值")) {
+                defaultCategory = "通讯";
+            } else if (merchantName.contains("餐饮") || merchantName.contains("饭") || merchantName.contains("外卖")) {
+                defaultCategory = "餐饮";
+            }
+
+            // 资产模糊匹配，用“广发银行银联信用卡 [9620]”去撞击你的本地数据库配置
+            String assetKeyword = paymentMethod.isEmpty() ? "云闪付" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.unionpay", assetKeyword);
+
+            // 【防止编译报错】：将类别提取为 final 变量以供 Lambda 使用
+            final String finalCategory = defaultCategory;
+
+            // 触发记账弹窗（type = 0 为支出）
+            handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
 
             return true;
         }
