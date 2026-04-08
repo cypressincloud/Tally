@@ -278,52 +278,72 @@ public class AssetsFragment extends Fragment {
         boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
 
         if (!isCurrencyEnabled) {
-            // 单一币种逻辑
+            // ================== 单一币种逻辑 ==================
             double totalAsset = 0;
             double totalLiability = 0;
             double totalLent = 0;
 
-            // 在 updateUI() 的单币种逻辑中：
             for (AssetAccount acc : allAccounts) {
-                // 【修改这里】如果不计入总资产，则跳过统计
-                if (!acc.isIncludedInTotal) continue;
+                // 1. 统计各自的分类总额（不论是否计入总资产，面板上的负债/借出总额应如实显示）
+                if (acc.type == 1) {
+                    totalLiability += acc.amount;
+                } else if (acc.type == 2) {
+                    totalLent += acc.amount;
+                }
 
-                if (acc.type == 0 || acc.type == 3) totalAsset += acc.amount; // 资产和理财本金都算入总资产
-                else if (acc.type == 1) totalLiability += acc.amount;
-                else if (acc.type == 2) totalLent += acc.amount;
+                // 2. 统计顶部的大字“总资产”（根据是否勾选了计入总资产来加减）
+                if (acc.isIncludedInTotal) {
+                    if (acc.type == 0 || acc.type == 3) {
+                        totalAsset += acc.amount; // 资产和理财：增加总资产
+                    } else if (acc.type == 2) {
+                        totalAsset += acc.amount; // 借出（别人欠我的钱）：增加总资产
+                    } else if (acc.type == 1) {
+                        totalAsset -= acc.amount; // 负债（我欠别人的钱）：扣减总资产
+                    }
+                }
             }
 
             // 恢复默认大字体
-            tvTotalAssets.setTextSize(32); 
+            tvTotalAssets.setTextSize(32);
             tvTotalAssets.setText(String.format("%.2f", totalAsset));
             tvTotalLiability.setText(String.format("%.2f", totalLiability));
             tvTotalLent.setText(String.format("%.2f", totalLent));
+
         } else {
-            // 多币种逻辑
+            // ================== 多币种逻辑 ==================
             Map<String, Double> assetMap = new TreeMap<>();
             Map<String, Double> liabilityMap = new TreeMap<>();
             Map<String, Double> lentMap = new TreeMap<>();
 
             for (AssetAccount acc : allAccounts) {
-                // 【修改这里】如果不计入总资产，则跳过统计
-                if (!acc.isIncludedInTotal) continue;
-
                 String symbol = (acc.currencySymbol != null && !acc.currencySymbol.isEmpty()) ? acc.currencySymbol : "¥";
-                // 多币种逻辑同理：
-                if (acc.type == 0 || acc.type == 3) {
-                    assetMap.put(symbol, assetMap.getOrDefault(symbol, 0.0) + acc.amount);
-                } else if (acc.type == 1) {
+
+                // 1. 统计各自的分类总额
+                if (acc.type == 1) {
                     liabilityMap.put(symbol, liabilityMap.getOrDefault(symbol, 0.0) + acc.amount);
                 } else if (acc.type == 2) {
                     lentMap.put(symbol, lentMap.getOrDefault(symbol, 0.0) + acc.amount);
                 }
+
+                // 2. 统计顶部的大字“总资产”
+                if (acc.isIncludedInTotal) {
+                    double currentTotal = assetMap.getOrDefault(symbol, 0.0);
+                    if (acc.type == 0 || acc.type == 3) {
+                        currentTotal += acc.amount; // 资产和理财
+                    } else if (acc.type == 2) {
+                        currentTotal += acc.amount; // 借出：加
+                    } else if (acc.type == 1) {
+                        currentTotal -= acc.amount; // 负债：减
+                    }
+                    assetMap.put(symbol, currentTotal);
+                }
             }
 
-            // 【关键修改】如果包含多个币种，缩小字体
+            // 如果包含多个币种，缩小字体以容纳更多内容
             if (assetMap.size() > 1) {
-                tvTotalAssets.setTextSize(20); // 缩小字体以容纳更多内容
+                tvTotalAssets.setTextSize(20);
             } else {
-                tvTotalAssets.setTextSize(32); // 恢复默认
+                tvTotalAssets.setTextSize(32);
             }
 
             tvTotalAssets.setText(formatMultiCurrency(assetMap));
