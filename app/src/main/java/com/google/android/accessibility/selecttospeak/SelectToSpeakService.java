@@ -1979,6 +1979,7 @@ public class SelectToSpeakService extends AccessibilityService {
     /**
      * 专门适配支付宝支付成功页面（基于最新节点树结构）
      * 提取实际支付金额、收款方（作为记录标识），以及付款方式（模糊匹配资产）
+     * 【升级版】：修复无“收款方”标签时抓取失败的问题，直接从金额下方拦截商户名
      */
     private boolean handleAlipayPaySuccessPage(AccessibilityNodeInfo root) {
         if (root == null) return false;
@@ -1999,16 +2000,30 @@ public class SelectToSpeakService extends AccessibilityService {
             String content = !text.isEmpty() ? text : desc;
 
             // 1. 识别“支付成功”页面特征
-            if ("支付成功".equals(content)) {
+            if ("支付成功".equals(content) || content.startsWith("支付成功")) {
                 isPaySuccess = true;
             }
 
-            // 2. 提取金额（在“支付成功”后出现的纯数字或带小数的数字，如 "0.01"）
+            // 2. 提取金额（在“支付成功”后出现的纯数字或带小数的数字，如 "4.83"）
             if (isPaySuccess && amount == -1) {
                 // 正则匹配：纯数字，可带1到2位小数
                 if (content.matches("^\\d+(\\.\\d{1,2})?$")) {
                     try {
                         amount = Double.parseDouble(content);
+
+                        // 【核心修复】：没有“收款方”标签时，商户名紧跟在纯数字金额的后面
+                        for (int j = i + 1; j < allNodes.size(); j++) {
+                            AccessibilityNodeInfo nextNode = allNodes.get(j);
+                            String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                            String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                            String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+
+                            // 排除空节点、以及带有 ￥、¥ 或 - 符号的优惠券金额干扰项
+                            if (!nextContent.isEmpty() && !nextContent.contains("￥") && !nextContent.contains("¥") && !nextContent.startsWith("-")) {
+                                payeeName = nextContent;
+                                break; // 抓到商户名立刻跳出
+                            }
+                        }
                     } catch (Exception e) {
                         // 解析失败继续找
                     }
@@ -2017,7 +2032,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 3. 提取资产来源 (付款方式)
             if ("付款方式".equals(content)) {
-                // 核心修复：向下遍历，跨过不可见的排版空节点，寻找第一个带有文字的真实节点
+                // 向下遍历，跨过不可见的排版空节点，寻找第一个带有文字的真实节点
                 for (int j = i + 1; j < allNodes.size(); j++) {
                     AccessibilityNodeInfo nextNode = allNodes.get(j);
                     String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
@@ -2030,9 +2045,8 @@ public class SelectToSpeakService extends AccessibilityService {
                 }
             }
 
-            // 4. 提取收款方 (作为记录标识备注)
-            if ("收款方".equals(content)) {
-                // 核心修复：向下遍历，跨过空节点
+            // 4. 兼容老版本提取收款方 (如果页面有明确的“收款方”标签)
+            if ("收款方".equals(content) && payeeName.isEmpty()) {
                 for (int j = i + 1; j < allNodes.size(); j++) {
                     AccessibilityNodeInfo nextNode = allNodes.get(j);
                     String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
@@ -2055,30 +2069,37 @@ public class SelectToSpeakService extends AccessibilityService {
             final String finalPayee = payeeName.isEmpty() ? "支付宝支付" : payeeName;
             final double finalAmount = amount;
 
-            // 防止在页面停留时重复触发弹窗
+            // 防止在页面停留时重复触发弹窗 (5分钟防抖)
             String signature = "alipay_success-" + amount + "-" + finalPayee;
             if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
 
-            // 【构造记录标识】：如 "03-24 00:13 酷到爆(**轩)"
+            // 【构造记录标识】：如 "04-08 14:17 佛山市南海区仙溪村麻辣烫店"
             SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
             final String recordIdentifier = sdf.format(new Date(now)) + " " + finalPayee;
+
+            // 智能分类：带有餐饮相关字眼的自动判定为"餐饮"
+            String defaultCategory = "购物";
+            if (finalPayee.contains("麻辣烫") || finalPayee.contains("店") || finalPayee.contains("餐饮") || finalPayee.contains("吃") || finalPayee.contains("食") || finalPayee.contains("外卖")) {
+                defaultCategory = "餐饮";
+            }
 
             // 【资产匹配】：使用抓取到的付款方式去模糊匹配
             String assetKeyword = paymentMethod.isEmpty() ? "支付宝" : paymentMethod;
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.eg.android.AlipayGphone", assetKeyword);
 
             // 触发记账弹窗 (type: 0 代表支出)
-            handler.post(() -> showConfirmWindow(finalAmount, 0, "购物", recordIdentifier, autoAssetId, "¥"));
+            final String finalCategory = defaultCategory;
+            long finalTimestamp = now;
+            handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
 
             return true;
         }
 
         return false;
     }
-
     /**
      * 【专版专杀】专门适配拼多多“多多钱包”支付密码弹窗页面
      * 提取实际支付金额、付款方式(将拆分的银行卡和尾号拼接)
