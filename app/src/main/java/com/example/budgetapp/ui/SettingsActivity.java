@@ -429,6 +429,73 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+    private final ActivityResultLauncher<String[]> importYimuLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        BackupData data = BackupManager.importFromYimu(this, uri, allAssets);
+
+                        int recordCount = 0;
+                        int newAssetCount = 0;
+
+                        // 1. 添加并保存资产
+                        List<AssetAccount> currentAssets = new ArrayList<>(allAssets);
+                        if (data.assets != null && !data.assets.isEmpty()) {
+                            for (AssetAccount a : data.assets) {
+                                if (!isDuplicateAsset(a, currentAssets)) {
+                                    a.id = 0;
+                                    financeViewModel.addAsset(a);
+                                    currentAssets.add(a);
+                                    newAssetCount++;
+                                }
+                            }
+                        }
+
+                        // 2. 保存更新后的分类
+                        if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
+                            CategoryManager.saveExpenseCategories(this, data.expenseCategories);
+                        }
+                        if (data.incomeCategories != null && !data.incomeCategories.isEmpty()) {
+                            CategoryManager.saveIncomeCategories(this, data.incomeCategories);
+                        }
+                        if (data.subCategoryMap != null && !data.subCategoryMap.isEmpty()) {
+                            for (Map.Entry<String, List<String>> entry : data.subCategoryMap.entrySet()) {
+                                CategoryManager.saveSubCategories(this, entry.getKey(), entry.getValue());
+                            }
+                        }
+
+                        // 3. 添加账单记录
+                        List<Transaction> currentTransactions = new ArrayList<>(allTransactions);
+                        if (data.records != null && !data.records.isEmpty()) {
+                            for (Transaction t : data.records) {
+                                if (!isDuplicateTransaction(t, currentTransactions)) {
+                                    t.id = 0;
+                                    financeViewModel.addTransaction(t);
+                                    currentTransactions.add(t);
+                                    recordCount++;
+                                }
+                            }
+                        }
+
+                        if (recordCount > 0) {
+                            String msg = "成功从一木记账导入 " + recordCount + " 条账单 (已过滤重复)";
+                            if (newAssetCount > 0) {
+                                msg += "\n自动创建了 " + newAssetCount + " 个新资产账户";
+                            }
+                            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(this, "所有账单均已存在，或未找到有效数据", Toast.LENGTH_LONG).show();
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "一木记账导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
     private void showSaveQrConfirmDialog(int resId, String fileName) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_save_qr, null);
@@ -657,6 +724,17 @@ public class SettingsActivity extends AppCompatActivity {
 
         view.findViewById(R.id.tv_import_excel).setOnClickListener(v -> {
             importExcelLauncher.launch(new String[]{
+                    "text/csv",
+                    "text/plain",
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "*/*"
+            });
+            dialog.dismiss();
+        });
+
+        view.findViewById(R.id.tv_import_yimu).setOnClickListener(v -> {
+            importYimuLauncher.launch(new String[]{
                     "text/csv",
                     "text/plain",
                     "application/vnd.ms-excel",

@@ -2,14 +2,16 @@ package com.example.budgetapp;
 
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
+import com.example.budgetapp.database.RenewalItem; // 【新增】导入自动续费类型
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public class BackupData {
-    public int version = 4; 
+    public int version = 5; // 【修改】升级版本号以兼容新数据
     public long createTime;
-    
+
     // 【修改】调整字段顺序：将资产、配置等元数据放在前面
     public List<AssetAccount> assets;
     public List<String> expenseCategories;
@@ -17,6 +19,11 @@ public class BackupData {
     public Map<String, List<String>> subCategoryMap;
     public AssistantConfigData assistantConfig;
     public List<String> autoAssetRules;
+
+    // ================= 新增备份字段 =================
+    public List<RenewalItem> renewalList;
+    public Map<String, String> appPreferences; // 存储所有的SharedPreferences应用偏好开关
+    // ================================================
 
     // 【修改】将数据量最大的交易记录放在最后，方便查看 JSON
     public List<Transaction> records;
