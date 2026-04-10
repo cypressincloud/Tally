@@ -22,6 +22,7 @@ import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -31,6 +32,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -264,7 +266,44 @@ public class QuickAddTileService extends TileService {
 
             if (isAssetEnabled) {
                 spAsset.setVisibility(View.VISIBLE);
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.item_spinner_dropdown);
+                ArrayAdapter<AssetAccount> adapter = new ArrayAdapter<AssetAccount>(this, R.layout.item_spinner_dropdown) {
+                    @NonNull @Override
+                    public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                        View view = super.getView(position, convertView, parent);
+                        applyColor(view, getItem(position));
+                        return view;
+                    }
+
+                    @Override
+                    public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                        View view = super.getDropDownView(position, convertView, parent);
+                        applyColor(view, getItem(position));
+                        return view;
+                    }
+
+                    private void applyColor(View view, AssetAccount asset) {
+                        if (view instanceof TextView && asset != null) {
+                            TextView tv = (TextView) view;
+                            tv.setText(asset.name);
+
+                            // 1. 取消背景色，保持默认透明
+                            tv.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
+                            // 2. 根据用户的设置，单独修改字体颜色
+                            if (asset.colorType == 1) { // 红色
+                                tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.income_red));
+                            } else if (asset.colorType == 2) { // 绿色
+                                tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.expense_green));
+                            } else { // 默认颜色（跟随系统主题）
+                                try {
+                                    tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.text_primary));
+                                } catch (Exception e) {
+                                    tv.setTextColor(android.graphics.Color.BLACK);
+                                }
+                            }
+                        }
+                    }
+                };
                 adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
                 spAsset.setAdapter(adapter);
 
@@ -281,13 +320,13 @@ public class QuickAddTileService extends TileService {
                     if (assets != null) loadedAssets.addAll(assets);
                     if (liabilities != null) loadedAssets.addAll(liabilities);
 
-                    List<String> names = new ArrayList<>();
-                    for (AssetAccount a : loadedAssets) names.add(a.name);
+//                    List<String> names = new ArrayList<>();
+//                    for (AssetAccount a : loadedAssets) names.add(a.name);
 
                     int defaultAssetId = config.getDefaultAssetId();
                     new Handler(Looper.getMainLooper()).post(() -> {
                         adapter.clear();
-                        adapter.addAll(names);
+                        adapter.addAll(loadedAssets); // 修改：直接传入 loadedAssets
                         adapter.notifyDataSetChanged();
                         if (defaultAssetId != -1) {
                             for (int i = 0; i < loadedAssets.size(); i++) {

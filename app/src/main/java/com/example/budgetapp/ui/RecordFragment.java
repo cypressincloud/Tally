@@ -1303,8 +1303,42 @@ public class RecordFragment extends Fragment {
         boolean isAssetEnabled = config.isAssetsEnabled();
 
         List<AssetAccount> assetList = new ArrayList<>();
-        ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner_dropdown);
+        ArrayAdapter<AssetAccount> arrayAdapter = new ArrayAdapter<AssetAccount>(getContext(), R.layout.item_spinner_dropdown) {
+            @NonNull @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                applyColor(view, getItem(position));
+                return view;
+            }
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                applyColor(view, getItem(position));
+                return view;
+            }
+            private void applyColor(View view, AssetAccount asset) {
+                if (view instanceof TextView && asset != null) {
+                    TextView tv = (TextView) view;
+                    tv.setText(asset.name);
 
+                    // 1. 强制背景透明，移除圆角背景块
+                    tv.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
+                    // 2. 仅根据资产设置修改文字颜色
+                    if (asset.colorType == 1) { // 红色
+                        tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.income_red));
+                    } else if (asset.colorType == 2) { // 绿色
+                        tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.expense_green));
+                    } else { // 默认颜色
+                        try {
+                            tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.text_primary));
+                        } catch (Exception e) {
+                            tv.setTextColor(android.graphics.Color.BLACK);
+                        }
+                    }
+                }
+            }
+        };
         if (isAssetEnabled) {
             spAsset.setVisibility(View.VISIBLE);
             AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
@@ -1324,11 +1358,10 @@ public class RecordFragment extends Fragment {
                         }
                     }
                 }
-                List<String> names = assetList.stream().map(a -> a.name).collect(Collectors.toList());
+//                List<String> names = assetList.stream().map(a -> a.name).collect(Collectors.toList());
                 arrayAdapter.clear();
-                arrayAdapter.addAll(names);
+                arrayAdapter.addAll(assetList); // 修改：直接传入 assetList
                 arrayAdapter.notifyDataSetChanged();
-
                 if (existingTransaction != null && existingTransaction.assetId != 0) {
                     for (int i = 0; i < assetList.size(); i++) {
                         if (assetList.get(i).id == existingTransaction.assetId) {
@@ -1585,13 +1618,54 @@ public class RecordFragment extends Fragment {
         Button btnCancel = view.findViewById(R.id.btn_revoke_cancel);
         Button btnConfirm = view.findViewById(R.id.btn_revoke_confirm);
 
-        List<AssetAccount> assetList = new ArrayList<>();
+        List<AssetAccount> assetList = new ArrayList<>(); // 保留第 1618 行这一个定义即可
         AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
         noAsset.id = 0;
 
-        ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(requireContext(), R.layout.item_spinner_dropdown);
+        // 这里直接开始初始化适配器
+        ArrayAdapter<AssetAccount> arrayAdapter = new ArrayAdapter<AssetAccount>(getContext(), R.layout.item_spinner_dropdown) {
+            @NonNull @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                applyColor(view, getItem(position));
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                applyColor(view, getItem(position));
+                return view;
+            }
+
+            private void applyColor(View view, AssetAccount asset) {
+                if (view instanceof TextView && asset != null) {
+                    TextView tv = (TextView) view;
+                    tv.setText(asset.name);
+
+                    // 1. 强制背景透明，移除圆角背景块
+                    tv.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
+                    // 2. 仅根据资产设置修改文字颜色
+                    if (asset.colorType == 1) { // 红色
+                        tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.income_red));
+                    } else if (asset.colorType == 2) { // 绿色
+                        tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.expense_green));
+                    } else { // 默认颜色
+                        try {
+                            tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.text_primary));
+                        } catch (Exception e) {
+                            tv.setTextColor(android.graphics.Color.BLACK);
+                        }
+                    }
+                }
+            }
+        };
+
+        // ========== 【补上这两行代码】 ==========
         arrayAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spRevokeAsset.setAdapter(arrayAdapter);
+        // ========================================
 
         viewModel.getAllAssets().observe(getViewLifecycleOwner(), assets -> {
             assetList.clear();
@@ -1605,7 +1679,7 @@ public class RecordFragment extends Fragment {
             }
             List<String> names = assetList.stream().map(a -> a.name).collect(Collectors.toList());
             arrayAdapter.clear();
-            arrayAdapter.addAll(names);
+            arrayAdapter.addAll(assetList);
             arrayAdapter.notifyDataSetChanged();
 
             int targetIndex = 0;

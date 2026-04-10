@@ -160,12 +160,47 @@ public class AutoAssetActivity extends AppCompatActivity {
         spApp.setAdapter(appAdapter);
 
         // 2. 设置 Asset Spinner
-        List<String> assetNames = new ArrayList<>();
-        for(AssetAccount a : cachedAssets) assetNames.add(a.name);
-        ArrayAdapter<String> assetAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, assetNames);
+        ArrayAdapter<AssetAccount> assetAdapter = new ArrayAdapter<AssetAccount>(this, R.layout.item_spinner_dropdown) {
+            @NonNull @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                applyColor(view, getItem(position));
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                applyColor(view, getItem(position));
+                return view;
+            }
+
+            private void applyColor(View view, AssetAccount asset) {
+                if (view instanceof TextView && asset != null) {
+                    TextView tv = (TextView) view;
+                    tv.setText(asset.name);
+
+                    // 1. 取消背景色，保持默认透明
+                    tv.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
+                    // 2. 根据用户的设置，单独修改字体颜色
+                    if (asset.colorType == 1) { // 红色
+                        tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.income_red));
+                    } else if (asset.colorType == 2) { // 绿色
+                        tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.expense_green));
+                    } else { // 默认颜色（跟随系统主题）
+                        try {
+                            tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.text_primary));
+                        } catch (Exception e) {
+                            tv.setTextColor(android.graphics.Color.BLACK);
+                        }
+                    }
+                }
+            }
+        };
+        assetAdapter.addAll(cachedAssets);
         assetAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spAsset.setAdapter(assetAdapter);
-
         // 3. 回显旧数据
         if (oldRule != null) {
             etKeyword.setText(oldRule.keyword);
