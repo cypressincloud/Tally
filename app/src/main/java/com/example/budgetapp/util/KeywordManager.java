@@ -20,6 +20,8 @@ public class KeywordManager {
     public static final String PKG_TAOBAO = "com.taobao.taobao";
     public static final String PKG_MEITUAN = "com.sankuai.meituan";
 
+    public static final String PKG_UNIONPAY = "com.unionpay"; // 【新增】云闪付包名
+
     // 类型常量
     public static final int TYPE_EXPENSE = 0;
     public static final int TYPE_INCOME = 1;
@@ -36,6 +38,7 @@ public class KeywordManager {
         apps.put(PKG_PINDUODUO, "拼多多");
         apps.put(PKG_DOUYIN, "抖音");
         apps.put(PKG_MEITUAN, "美团");
+        apps.put(PKG_UNIONPAY, "云闪付");
         return apps;
     }
 
