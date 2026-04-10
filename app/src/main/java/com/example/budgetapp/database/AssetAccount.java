@@ -23,7 +23,9 @@ public class AssetAccount {
     // 【新增】资产背景颜色 (0: 默认, 1: 红色, 2: 绿色)
     public int colorType = 0;
 
-    // === 新增理财专属字段 ===
+    // ========== 新增：自定义颜色 HEX 值 ==========
+    public String customColorHex = "";
+    // ==========================================
 
     // === 新增理财专属字段 ===
     public boolean isFixedTerm; // true 定期, false 活期

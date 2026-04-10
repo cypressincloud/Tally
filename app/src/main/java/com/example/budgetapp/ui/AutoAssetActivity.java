@@ -180,7 +180,7 @@ public class AutoAssetActivity extends AppCompatActivity {
                     TextView tv = (TextView) view;
                     tv.setText(asset.name);
 
-                    // 1. 取消背景色，保持默认透明
+                    // 1. 取消背景色，保持默认透明 (如果在Asset列表里，保留圆角逻辑即可)
                     tv.setBackgroundColor(android.graphics.Color.TRANSPARENT);
 
                     // 2. 根据用户的设置，单独修改字体颜色
@@ -188,7 +188,14 @@ public class AutoAssetActivity extends AppCompatActivity {
                         tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.income_red));
                     } else if (asset.colorType == 2) { // 绿色
                         tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.expense_green));
-                    } else { // 默认颜色（跟随系统主题）
+                    } else if (asset.colorType == 3 && asset.customColorHex != null && !asset.customColorHex.isEmpty()) { // 自定义颜色
+                        try {
+                            tv.setTextColor(android.graphics.Color.parseColor(asset.customColorHex));
+                        } catch (Exception e) {
+                            // 格式错误时回退到默认颜色
+                            tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.text_primary));
+                        }
+                    } else { // 默认颜色
                         try {
                             tv.setTextColor(androidx.core.content.ContextCompat.getColor(view.getContext(), R.color.text_primary));
                         } catch (Exception e) {

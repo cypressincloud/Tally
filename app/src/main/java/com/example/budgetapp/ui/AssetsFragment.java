@@ -485,16 +485,40 @@ public class AssetsFragment extends Fragment {
         includeAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerInclude.setAdapter(includeAdapter);
 
-        // ========== 新增代码：初始化颜色 Spinner ==========
+        // 【修改】初始化颜色 Spinner，增加“自定义”
         android.widget.Spinner spinnerColor = view.findViewById(R.id.spinner_asset_color);
         android.widget.ArrayAdapter<String> colorAdapter = new android.widget.ArrayAdapter<>(
                 getContext(),
                 R.layout.item_spinner_dropdown,
-                new String[]{"默认颜色", "红色背景", "绿色背景"}
+                new String[]{"默认颜色", "红色背景", "绿色背景", "自定义"} // <-- 新增自定义
         );
         colorAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerColor.setAdapter(colorAdapter);
-        // =================================================
+
+        // 用来临时保存用户在弹窗中输入的颜色
+        final String[] tempCustomColor = {existing != null && existing.customColorHex != null ? existing.customColorHex : ""};
+
+        spinnerColor.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            boolean isFirstInit = true; // 防止回显数据时自动触发弹窗
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                if (isFirstInit) { isFirstInit = false; return; }
+                if (position == 3) { // 选择了“自定义”
+                    showCustomColorDialog(tempCustomColor[0], new OnColorInputListener() {
+                        @Override
+                        public void onColorSet(String hexColor) {
+                            tempCustomColor[0] = hexColor;
+                        }
+                        @Override
+                        public void onCancel() {
+                            spinnerColor.setSelection(0); // 取消则退回“默认”
+                        }
+                    });
+                }
+            }
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
 
         // 理财专用的控件 (更新为 Spinner 和 EditText)
         LinearLayout layoutInvestment = view.findViewById(R.id.layout_investment_details);
@@ -735,6 +759,7 @@ public class AssetsFragment extends Fragment {
 
             // ========== 新增代码：保存颜色选择 ==========
             accountToSave.colorType = spinnerColor.getSelectedItemPosition();
+            accountToSave.customColorHex = tempCustomColor[0]; // <--- 【新增】
             // ===========================================
 
             if (finalType == 3) {
@@ -842,35 +867,46 @@ public class AssetsFragment extends Fragment {
                 }
 
                 boolean isDefault = (item.id == defaultAssetId);
-                boolean isCustomColor = (item.colorType == 1 || item.colorType == 2);
+                // 只要 colorType 大于 0，都算自定义颜色
+                boolean isCustomColor = (item.colorType == 1 || item.colorType == 2 || item.colorType == 3);
                 normalHolder.itemView.setSelected(isDefault);
 
-                // ========== 1. 背景颜色和圆角处理 (默认资产优先级最高) ==========
+                // ========== 背景颜色和圆角处理 ==========
                 if (isDefault) {
-                    // 最高优先级：如果是默认支付项，强制使用 selector 背景
-                    // 配合上面的 setSelected(true)，系统会自动渲染出主题高亮色
                     normalHolder.itemView.setBackgroundResource(R.drawable.selector_asset_bg);
                 } else if (isCustomColor) {
-                    // 次优先级：非默认项但设置了红绿色
-                    int bgColor = item.colorType == 1 ?
-                            androidx.core.content.ContextCompat.getColor(context, R.color.income_red) :
-                            androidx.core.content.ContextCompat.getColor(context, R.color.expense_green);
+                    int bgColor = android.graphics.Color.TRANSPARENT;
+                    boolean parseSuccess = true;
 
-                    android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
-                    gd.setColor(bgColor);
-                    float radius = 12f * context.getResources().getDisplayMetrics().density;
-                    gd.setCornerRadius(radius);
-                    normalHolder.itemView.setBackground(gd);
+                    if (item.colorType == 1) {
+                        bgColor = androidx.core.content.ContextCompat.getColor(context, R.color.income_red);
+                    } else if (item.colorType == 2) {
+                        bgColor = androidx.core.content.ContextCompat.getColor(context, R.color.expense_green);
+                    } else if (item.colorType == 3) {
+                        try {
+                            bgColor = android.graphics.Color.parseColor(item.customColorHex); // 解析HEX
+                        } catch (Exception e) {
+                            parseSuccess = false; // 如果解析失败(如旧数据脏了)，回退到默认
+                        }
+                    }
+
+                    if (parseSuccess) {
+                        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+                        gd.setColor(bgColor);
+                        float radius = 12f * context.getResources().getDisplayMetrics().density;
+                        gd.setCornerRadius(radius);
+                        normalHolder.itemView.setBackground(gd);
+                    } else {
+                        normalHolder.itemView.setBackgroundResource(R.drawable.selector_asset_bg);
+                    }
                 } else {
-                    // 最低优先级：普通未选中背景
                     normalHolder.itemView.setBackgroundResource(R.drawable.selector_asset_bg);
                 }
 
-                // ========== 2. 字体反色处理 ==========
+                // ========== 字体反色处理 ==========
                 if (isDefault || isCustomColor) {
-                    // 只要是默认支付项或者设置了红绿背景，字体全白
-                    normalHolder.tvName.setTextColor(Color.WHITE);
-                    normalHolder.tvAmount.setTextColor(Color.WHITE);
+                    normalHolder.tvName.setTextColor(android.graphics.Color.WHITE);
+                    normalHolder.tvAmount.setTextColor(android.graphics.Color.WHITE);
                 } else {
                     // 恢复默认字体颜色
                     try {
@@ -916,17 +952,17 @@ public class AssetsFragment extends Fragment {
                 invHolder.tvInfo.setText(info);
 
                 boolean isDefault = (item.id == defaultAssetId);
-                boolean isCustomColor = (item.colorType == 1 || item.colorType == 2);
+                boolean isCustomColor = (item.colorType == 1 || item.colorType == 2 || item.colorType == 3);
                 invHolder.itemView.setSelected(isDefault);
 
-                // ========== 1. 字体反色处理 ==========
+                // ========== 字体反色处理 ==========
                 if (isDefault || isCustomColor) {
-                    invHolder.tvInfo.setTextColor(Color.WHITE);
+                    invHolder.tvInfo.setTextColor(android.graphics.Color.WHITE);
                 } else {
                     invHolder.tvInfo.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_primary));
                 }
 
-                // ========== 2. 背景颜色和透明度处理 ==========
+                // ========== 背景颜色和透明度处理 ==========
                 if (invHolder.itemView instanceof androidx.cardview.widget.CardView) {
                     androidx.cardview.widget.CardView card = (androidx.cardview.widget.CardView) invHolder.itemView;
                     int surfaceColor = androidx.core.content.ContextCompat.getColor(context, R.color.white);
@@ -935,6 +971,12 @@ public class AssetsFragment extends Fragment {
                         surfaceColor = androidx.core.content.ContextCompat.getColor(context, R.color.income_red);
                     } else if (item.colorType == 2) {
                         surfaceColor = androidx.core.content.ContextCompat.getColor(context, R.color.expense_green);
+                    } else if (item.colorType == 3) {
+                        try {
+                            surfaceColor = android.graphics.Color.parseColor(item.customColorHex);
+                        } catch (Exception e) {
+                            // 解析失败保留原来的白色 surfaceColor
+                        }
                     }
 
                     card.setCardBackgroundColor(isCustomBg ?
@@ -1058,4 +1100,95 @@ public class AssetsFragment extends Fragment {
         }
     }
 
+    private interface OnColorInputListener {
+        void onColorSet(String hexColor);
+        void onCancel();
+    }
+
+    // ========== 统一 UI 风格版：自定义颜色弹窗 ==========
+    private void showCustomColorDialog(String currentColor, OnColorInputListener listener) {
+        if (getContext() == null) return;
+
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(getContext());
+        View view = android.view.LayoutInflater.from(getContext()).inflate(R.layout.dialog_custom_color, null);
+        builder.setView(view);
+        android.app.AlertDialog dialog = builder.create();
+
+        // 设置弹窗背景透明，以显示 CardView 的圆角
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        android.widget.EditText etHex = view.findViewById(R.id.et_color_hex);
+        android.widget.GridLayout glPalette = view.findViewById(R.id.gl_palette);
+        android.widget.Button btnCancel = view.findViewById(R.id.btn_cancel);
+        android.widget.Button btnConfirm = view.findViewById(R.id.btn_confirm);
+
+        // 回显历史颜色
+        if (currentColor != null && !currentColor.isEmpty()) {
+            etHex.setText(currentColor);
+        }
+
+        // 预设 Material Design 常用颜色卡 (20种)
+        String[] paletteColors = {
+                "#F44336", "#E91E63", "#9C27B0", "#673AB7", "#3F51B5",
+                "#2196F3", "#03A9F4", "#00BCD4", "#009688", "#4CAF50",
+                "#8BC34A", "#CDDC39", "#FFEB3B", "#FFC107", "#FF9800",
+                "#FF5722", "#795548", "#9E9E9E", "#607D8B", "#000000"
+        };
+
+        // 动态计算色块尺寸 (为了完美塞进固定宽度的弹窗，调小了一点点)
+        float density = getResources().getDisplayMetrics().density;
+        int size = (int) (38 * density);   // 圆圈大小 38dp
+        int margin = (int) (6 * density);  // 圆圈间距 6dp
+
+        for (String colorHex : paletteColors) {
+            android.view.View colorView = new android.view.View(getContext());
+            android.widget.GridLayout.LayoutParams params = new android.widget.GridLayout.LayoutParams();
+            params.width = size;
+            params.height = size;
+            params.setMargins(margin, margin, margin, margin);
+            colorView.setLayoutParams(params);
+
+            // 绘制圆形色块
+            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+            gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            gd.setColor(android.graphics.Color.parseColor(colorHex));
+            gd.setStroke((int)(1 * density), android.graphics.Color.parseColor("#E0E0E0")); // 浅色边框防对比度过低
+            colorView.setBackground(gd);
+
+            // 点击动画及输入框联动
+            colorView.setOnClickListener(v -> {
+                etHex.setText(colorHex);
+                v.animate().scaleX(1.2f).scaleY(1.2f).setDuration(100).withEndAction(() ->
+                        v.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                ).start();
+            });
+
+            glPalette.addView(colorView);
+        }
+
+        btnCancel.setOnClickListener(v -> {
+            listener.onCancel();
+            dialog.dismiss();
+        });
+
+        btnConfirm.setOnClickListener(v -> {
+            String input = etHex.getText().toString().trim();
+            if (!input.isEmpty() && !input.startsWith("#")) {
+                input = "#" + input;
+            }
+            try {
+                android.graphics.Color.parseColor(input);
+                listener.onColorSet(input);
+                dialog.dismiss();
+            } catch (Exception e) {
+                android.widget.Toast.makeText(getContext(), "颜色格式不正确，请使用如 #FF0000", android.widget.Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        dialog.setOnCancelListener(d -> listener.onCancel());
+        dialog.show();
+    }
+    // ==========================================================
 }
