@@ -485,6 +485,17 @@ public class AssetsFragment extends Fragment {
         includeAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerInclude.setAdapter(includeAdapter);
 
+        // ========== 新增代码：初始化颜色 Spinner ==========
+        android.widget.Spinner spinnerColor = view.findViewById(R.id.spinner_asset_color);
+        android.widget.ArrayAdapter<String> colorAdapter = new android.widget.ArrayAdapter<>(
+                getContext(),
+                R.layout.item_spinner_dropdown,
+                new String[]{"默认颜色", "红色背景", "绿色背景"}
+        );
+        colorAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spinnerColor.setAdapter(colorAdapter);
+        // =================================================
+
         // 理财专用的控件 (更新为 Spinner 和 EditText)
         LinearLayout layoutInvestment = view.findViewById(R.id.layout_investment_details);
         android.widget.Spinner spinnerDepositType = view.findViewById(R.id.spinner_deposit_type);
@@ -539,6 +550,10 @@ public class AssetsFragment extends Fragment {
 
             // 【新增 2】回显是否计入总资产 (0:计入, 1:不计入)
             spinnerInclude.setSelection(existing.isIncludedInTotal ? 0 : 1);
+
+            // ========== 新增代码：回显颜色选择 ==========
+            spinnerColor.setSelection(existing.colorType);
+            // ===========================================
 
             // 回显理财数据
             if (existing.type == 3) {
@@ -718,6 +733,10 @@ public class AssetsFragment extends Fragment {
             // 【新增 4】保存是否计入总资产的选项
             accountToSave.isIncludedInTotal = (spinnerInclude.getSelectedItemPosition() == 0);
 
+            // ========== 新增代码：保存颜色选择 ==========
+            accountToSave.colorType = spinnerColor.getSelectedItemPosition();
+            // ===========================================
+
             if (finalType == 3) {
                 // 读取 Spinner 状态
                 accountToSave.isFixedTerm = spinnerDepositType.getSelectedItemPosition() == 0;
@@ -823,12 +842,37 @@ public class AssetsFragment extends Fragment {
                 }
 
                 boolean isDefault = (item.id == defaultAssetId);
+                boolean isCustomColor = (item.colorType == 1 || item.colorType == 2);
                 normalHolder.itemView.setSelected(isDefault);
 
+                // ========== 1. 背景颜色和圆角处理 (默认资产优先级最高) ==========
                 if (isDefault) {
+                    // 最高优先级：如果是默认支付项，强制使用 selector 背景
+                    // 配合上面的 setSelected(true)，系统会自动渲染出主题高亮色
+                    normalHolder.itemView.setBackgroundResource(R.drawable.selector_asset_bg);
+                } else if (isCustomColor) {
+                    // 次优先级：非默认项但设置了红绿色
+                    int bgColor = item.colorType == 1 ?
+                            androidx.core.content.ContextCompat.getColor(context, R.color.income_red) :
+                            androidx.core.content.ContextCompat.getColor(context, R.color.expense_green);
+
+                    android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+                    gd.setColor(bgColor);
+                    float radius = 12f * context.getResources().getDisplayMetrics().density;
+                    gd.setCornerRadius(radius);
+                    normalHolder.itemView.setBackground(gd);
+                } else {
+                    // 最低优先级：普通未选中背景
+                    normalHolder.itemView.setBackgroundResource(R.drawable.selector_asset_bg);
+                }
+
+                // ========== 2. 字体反色处理 ==========
+                if (isDefault || isCustomColor) {
+                    // 只要是默认支付项或者设置了红绿背景，字体全白
                     normalHolder.tvName.setTextColor(Color.WHITE);
                     normalHolder.tvAmount.setTextColor(Color.WHITE);
                 } else {
+                    // 恢复默认字体颜色
                     try {
                         normalHolder.tvName.setTextColor(context.getColor(R.color.text_primary));
                     } catch (Exception e) {
@@ -871,16 +915,31 @@ public class AssetsFragment extends Fragment {
 
                 invHolder.tvInfo.setText(info);
 
-                // 【应用透明度】
+                boolean isDefault = (item.id == defaultAssetId);
+                boolean isCustomColor = (item.colorType == 1 || item.colorType == 2);
+                invHolder.itemView.setSelected(isDefault);
+
+                // ========== 1. 字体反色处理 ==========
+                if (isDefault || isCustomColor) {
+                    invHolder.tvInfo.setTextColor(Color.WHITE);
+                } else {
+                    invHolder.tvInfo.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_primary));
+                }
+
+                // ========== 2. 背景颜色和透明度处理 ==========
                 if (invHolder.itemView instanceof androidx.cardview.widget.CardView) {
                     androidx.cardview.widget.CardView card = (androidx.cardview.widget.CardView) invHolder.itemView;
                     int surfaceColor = androidx.core.content.ContextCompat.getColor(context, R.color.white);
+
+                    if (item.colorType == 1) {
+                        surfaceColor = androidx.core.content.ContextCompat.getColor(context, R.color.income_red);
+                    } else if (item.colorType == 2) {
+                        surfaceColor = androidx.core.content.ContextCompat.getColor(context, R.color.expense_green);
+                    }
+
                     card.setCardBackgroundColor(isCustomBg ?
                             androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230) : surfaceColor);
                 }
-
-                boolean isDefault = (item.id == defaultAssetId);
-                invHolder.itemView.setSelected(isDefault);
             }
 
             holder.itemView.setOnClickListener(v -> listener.onClick(item));

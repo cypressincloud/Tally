@@ -20,6 +20,11 @@ public class AssetAccount {
     // 【新增】是否计入总资产 (默认 true，兼容老数据)
     public boolean isIncludedInTotal = true;
 
+    // 【新增】资产背景颜色 (0: 默认, 1: 红色, 2: 绿色)
+    public int colorType = 0;
+
+    // === 新增理财专属字段 ===
+
     // === 新增理财专属字段 ===
     public boolean isFixedTerm; // true 定期, false 活期
     public int durationMonths;  // 存储时间(个月)
