@@ -92,12 +92,13 @@ public class BackupManager {
         // 【新增】保存自动续费列表
         data.renewalList = config.getRenewalList();
 
-        // 【新增】保存 SharedPreferences 中的应用偏好开关
+        // 【修复】携带原始数据类型保存 SharedPreferences
         SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
-        Map<String, String> prefsMap = new HashMap<>();
+        Map<String, BackupData.PrefItem> prefsMap = new HashMap<>();
         for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
             if (entry.getValue() != null) {
-                prefsMap.put(entry.getKey(), String.valueOf(entry.getValue()));
+                String type = entry.getValue().getClass().getSimpleName();
+                prefsMap.put(entry.getKey(), new BackupData.PrefItem(type, String.valueOf(entry.getValue())));
             }
         }
         data.appPreferences = prefsMap;
@@ -488,19 +489,23 @@ public class BackupManager {
                         new AssistantConfig(context).saveRenewalList(data.renewalList);
                     }
 
-                    // 【新增】恢复应用偏好开关
+                    // 【修复】按照原数据类型恢复，防止类型转换异常崩溃
                     if (data.appPreferences != null) {
                         SharedPreferences.Editor editor = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE).edit();
-                        for (Map.Entry<String, String> entryMap : data.appPreferences.entrySet()) {
-                            String val = entryMap.getValue();
-                            if ("true".equalsIgnoreCase(val) || "false".equalsIgnoreCase(val)) {
-                                editor.putBoolean(entryMap.getKey(), Boolean.parseBoolean(val));
-                            } else {
-                                try {
-                                    editor.putInt(entryMap.getKey(), Integer.parseInt(val));
-                                } catch (NumberFormatException e) {
-                                    editor.putString(entryMap.getKey(), val);
+                        for (Map.Entry<String, BackupData.PrefItem> entryMap : data.appPreferences.entrySet()) {
+                            String key = entryMap.getKey();
+                            BackupData.PrefItem item = entryMap.getValue();
+                            if (item == null || item.value == null) continue;
+                            try {
+                                switch (item.type) {
+                                    case "Boolean": editor.putBoolean(key, Boolean.parseBoolean(item.value)); break;
+                                    case "Integer": editor.putInt(key, Integer.parseInt(item.value)); break;
+                                    case "Float": editor.putFloat(key, Float.parseFloat(item.value)); break;
+                                    case "Long": editor.putLong(key, Long.parseLong(item.value)); break;
+                                    default: editor.putString(key, item.value); break;
                                 }
+                            } catch (Exception e) {
+                                Log.e("BackupManager", "恢复配置异常", e);
                             }
                         }
                         editor.apply();
@@ -615,13 +620,18 @@ public class BackupManager {
         csvBuilder.append("\n\n");
 
         // -------------------------
-        // 6. 应用偏好设置【新增】
+        // 6. 应用偏好设置 (找到这部分，加入类型列)
         // -------------------------
         csvBuilder.append("=== 应用偏好设置 ===\n");
-        csvBuilder.append("键,值\n");
+        csvBuilder.append("键,类型,值\n"); // 【修复】增加"类型"列
         SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
-            csvBuilder.append(escapeCsv(entry.getKey())).append(",").append(escapeCsv(String.valueOf(entry.getValue()))).append("\n");
+            Object val = entry.getValue();
+            if (val == null) continue;
+            String type = val.getClass().getSimpleName();
+            csvBuilder.append(escapeCsv(entry.getKey())).append(",")
+                    .append(escapeCsv(type)).append(",")
+                    .append(escapeCsv(String.valueOf(val))).append("\n");
         }
         csvBuilder.append("\n\n");
 
@@ -798,24 +808,58 @@ public class BackupManager {
             }
         }
 
-        // 【新增】解析应用偏好设置并实时生效
+        // 【修复】按照带类型的三列格式恢复配置。如果是旧版两列格式，则进行智能数据类型推断
         SharedPreferences.Editor editor = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE).edit();
         for (List<String> row : appPrefsRows) {
             if (row.size() < 2) continue;
+
             String key = row.get(0);
-            String val = row.get(1);
-            if ("true".equalsIgnoreCase(val) || "false".equalsIgnoreCase(val)) {
-                editor.putBoolean(key, Boolean.parseBoolean(val));
-            } else {
-                try {
-                    editor.putInt(key, Integer.parseInt(val));
-                } catch (NumberFormatException e) {
+
+            // 兼容旧版本：只有「键、值」两列的情况
+            if (row.size() == 2) {
+                String val = row.get(1);
+                if ("true".equalsIgnoreCase(val) || "false".equalsIgnoreCase(val)) {
+                    editor.putBoolean(key, Boolean.parseBoolean(val));
+                } else if (val.matches("-?\\d+")) {
+                    // 纯整数（识别 Int 或 Long，比如 budget_start_time 是个极大的 Long 时间戳）
+                    try {
+                        long longVal = Long.parseLong(val);
+                        if (longVal >= Integer.MIN_VALUE && longVal <= Integer.MAX_VALUE) {
+                            editor.putInt(key, (int) longVal);
+                        } else {
+                            editor.putLong(key, longVal);
+                        }
+                    } catch (NumberFormatException e) {
+                        editor.putString(key, val);
+                    }
+                } else if (val.matches("-?\\d+\\.\\d+")) {
+                    // 浮点数（识别 Float，比如 budget_cat_交通 的 100.0）
+                    try {
+                        editor.putFloat(key, Float.parseFloat(val));
+                    } catch (NumberFormatException e) {
+                        editor.putString(key, val);
+                    }
+                } else {
+                    // 普通字符串（如 URI）
                     editor.putString(key, val);
                 }
+                continue;
+            }
+
+            // 新版本：包含「键、类型、值」三列的情况
+            String type = row.get(1);
+            String val = row.get(2);
+            try {
+                if ("Boolean".equals(type)) editor.putBoolean(key, Boolean.parseBoolean(val));
+                else if ("Integer".equals(type)) editor.putInt(key, Integer.parseInt(val));
+                else if ("Float".equals(type)) editor.putFloat(key, Float.parseFloat(val));
+                else if ("Long".equals(type)) editor.putLong(key, Long.parseLong(val));
+                else editor.putString(key, val);
+            } catch (Exception e) {
+                Log.e("BackupManager", "Excel解析配置行失败", e);
             }
         }
         editor.apply();
-
         // 解析分类
         for (List<String> row : categoryRows) {
             if (row.size() < 2) continue;

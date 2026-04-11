@@ -114,8 +114,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         // 【修改】适配双背景组合逻辑
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-        int themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-
+        // 【修复】使用安全的读取方法，防止老版本导入导致 ClassCastException
+        int themeMode = getSafeInt(prefs, "theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         int delegateMode = themeMode;
         if (themeMode == 3) {
             String dayUri = prefs.getString("custom_bg_day_uri", null);
@@ -204,7 +204,7 @@ public class MainActivity extends AppCompatActivity {
                 View statsTab = bottomNav.findViewById(R.id.nav_stats);
                 if (statsTab != null) {
                     statsTab.setOnLongClickListener(v -> {
-                        boolean isMinimalist = prefs.getBoolean("minimalist_mode", false);
+                        boolean isMinimalist = getSafeBoolean(prefs, "minimalist_mode", false);
                         
                         if (isMinimalist) {
                             Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
@@ -255,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
     // 【修改】应用自定义背景（完美保留原有透明度适配逻辑，仅新增日/夜双图片判断）
     private void applyCustomBackground() {
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-        int themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        int themeMode = getSafeInt(prefs, "theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         View rootLayout = findViewById(R.id.root_layout);
         View navHostFragment = findViewById(R.id.nav_host_fragment); // 获取碎片容器
 
@@ -454,7 +454,7 @@ public class MainActivity extends AppCompatActivity {
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         if (bottomNav != null) {
             SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-            boolean isBudgetEnabled = prefs.getBoolean("is_budget_enabled", false);
+            boolean isBudgetEnabled = getSafeBoolean(prefs, "is_budget_enabled", false);
 
             // 如果菜单里找到了 nav_budget，就根据开关状态决定它的隐藏/显示
             if (bottomNav.getMenu().findItem(R.id.nav_budget) != null) {
@@ -462,5 +462,37 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
+    // ================== 新增：安全读取 SharedPreferences 的兼容方法 ==================
+    private int getSafeInt(SharedPreferences prefs, String key, int defValue) {
+        try {
+            return prefs.getInt(key, defValue);
+        } catch (ClassCastException e) {
+            // 如果遇到了 String 类型的老数据，尝试强转并自动修复为 Int
+            try {
+                int val = Integer.parseInt(prefs.getString(key, String.valueOf(defValue)));
+                prefs.edit().putInt(key, val).apply(); // 自动修复本地数据
+                return val;
+            } catch (Exception ex) {
+                return defValue;
+            }
+        }
+    }
+
+    private boolean getSafeBoolean(SharedPreferences prefs, String key, boolean defValue) {
+        try {
+            return prefs.getBoolean(key, defValue);
+        } catch (ClassCastException e) {
+            // 如果遇到了 String 类型的老数据，尝试强转并自动修复为 Boolean
+            try {
+                boolean val = Boolean.parseBoolean(prefs.getString(key, String.valueOf(defValue)));
+                prefs.edit().putBoolean(key, val).apply(); // 自动修复本地数据
+                return val;
+            } catch (Exception ex) {
+                return defValue;
+            }
+        }
+    }
+    // ==============================================================================
 
 }
