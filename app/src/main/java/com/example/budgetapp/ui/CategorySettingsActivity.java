@@ -416,6 +416,17 @@ public class CategorySettingsActivity extends AppCompatActivity {
     }
 
     private void saveAndRefresh(boolean isExpense) {
+        List<String> list = isExpense ? expenseList : incomeList;
+
+        // 核心逻辑：确保 "自定义" 始终排在列表的最末尾
+        if (list.contains("自定义")) {
+            list.remove("自定义");
+            list.add("自定义"); // 先移除再添加，自动置于末尾
+        } else {
+            // 如果意外丢失，自动补全到末尾
+            list.add("自定义");
+        }
+
         if (isExpense) {
             CategoryManager.saveExpenseCategories(this, expenseList);
             refreshChips(chipGroupExpense, expenseList, true);

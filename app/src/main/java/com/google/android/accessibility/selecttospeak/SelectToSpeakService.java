@@ -666,7 +666,54 @@ public class SelectToSpeakService extends AccessibilityService {
             if (config == null) config = new AssistantConfig(this);
             if (config.isAssetsEnabled()) {
                 spAsset.setVisibility(View.VISIBLE);
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.item_spinner_dropdown);
+                ArrayAdapter<AssetAccount> adapter = new ArrayAdapter<AssetAccount>(themeContext, R.layout.item_spinner_dropdown) {
+                    @androidx.annotation.NonNull
+                    @Override
+                    public View getView(int position, View convertView, @androidx.annotation.NonNull android.view.ViewGroup parent) {
+                        View view = super.getView(position, convertView, parent);
+                        applyColor(view, getItem(position));
+                        return view;
+                    }
+
+                    @Override
+                    public View getDropDownView(int position, View convertView, @androidx.annotation.NonNull android.view.ViewGroup parent) {
+                        View view = super.getDropDownView(position, convertView, parent);
+                        applyColor(view, getItem(position));
+                        return view;
+                    }
+
+                    private void applyColor(View view, AssetAccount asset) {
+                        if (view instanceof TextView && asset != null) {
+                            TextView tv = (TextView) view;
+                            tv.setText(asset.name);
+                            // 保持背景透明
+                            tv.setBackgroundColor(Color.TRANSPARENT);
+
+                            // 根据设置应用字体颜色
+                            if (asset.colorType == 1) {
+                                tv.setTextColor(ContextCompat.getColor(view.getContext(), R.color.income_red));
+                            } else if (asset.colorType == 2) {
+                                tv.setTextColor(ContextCompat.getColor(view.getContext(), R.color.expense_green));
+                            } else if (asset.colorType == 3 && asset.customColorHex != null && !asset.customColorHex.isEmpty()) {
+                                try {
+                                    tv.setTextColor(Color.parseColor(asset.customColorHex));
+                                } catch (Exception e) {
+                                    try {
+                                        tv.setTextColor(ContextCompat.getColor(view.getContext(), R.color.text_primary));
+                                    } catch (Exception ex) {
+                                        tv.setTextColor(Color.BLACK);
+                                    }
+                                }
+                            } else {
+                                try {
+                                    tv.setTextColor(ContextCompat.getColor(view.getContext(), R.color.text_primary));
+                                } catch (Exception e) {
+                                    tv.setTextColor(Color.BLACK);
+                                }
+                            }
+                        }
+                    }
+                };
                 adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
                 spAsset.setAdapter(adapter);
 
@@ -684,12 +731,13 @@ public class SelectToSpeakService extends AccessibilityService {
                     if (liabilities != null) loadedAssets.addAll(liabilities);
 
                     int targetAssetId = (matchedAssetId > 0) ? matchedAssetId : config.getDefaultAssetId();
-                    List<String> names = new ArrayList<>();
-                    for (AssetAccount a : loadedAssets) names.add(a.name);
+
+                    // 【删除】或注释掉 List<String> names 相关的遍历代码
 
                     handler.post(() -> {
                         adapter.clear();
-                        adapter.addAll(names);
+                        // 【修改】直接把 loadedAssets (实体类列表) 丢给 Adapter
+                        adapter.addAll(loadedAssets);
                         adapter.notifyDataSetChanged();
                         for (int i = 0; i < loadedAssets.size(); i++) {
                             if (loadedAssets.get(i).id == targetAssetId) {
