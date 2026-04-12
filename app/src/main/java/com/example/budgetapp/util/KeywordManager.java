@@ -39,6 +39,7 @@ public class KeywordManager {
         apps.put(PKG_DOUYIN, "抖音");
         apps.put(PKG_MEITUAN, "美团");
         apps.put(PKG_UNIONPAY, "云闪付");
+        apps.put("com.ss.android.ugc.lifeservices", "抖省省");
         return apps;
     }
 

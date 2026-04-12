@@ -232,6 +232,12 @@ public class SelectToSpeakService extends AccessibilityService {
                     if (handleUnionPayBillDetailPage(rootNode)) return;
                 }
 
+                // ======= 抖省省专属逻辑 =======
+                if ("com.ss.android.ugc.lifeservices".equals(packageName)) {
+                    if (handleDouShengShengPaymentPage(rootNode)) return;
+                }
+                // ============================
+
                 scanAndAnalyze(rootNode, packageName);
             } catch (Exception e) {
                 Log.e(TAG, "Scan error", e);
@@ -345,6 +351,7 @@ public class SelectToSpeakService extends AccessibilityService {
         if (pkg.contains("meituan")) return "美团";
         if (pkg.equals("com.aliyun.tongyi")) return "通义千问";
         if (pkg.equals("com.unionpay")) return "云闪付";
+        if (pkg.equals("com.ss.android.ugc.lifeservices")) return "抖省省";
         return "自动记账";
     }
 
@@ -1167,7 +1174,7 @@ public class SelectToSpeakService extends AccessibilityService {
                 defaultCategory = "餐饮";
             }
 
-            // 自动匹配资产 (使用提取到的“中国银行储蓄卡(4260)”等进行模糊匹配)
+            // 自动匹配资产
             String assetKeyword = paymentMethod.isEmpty() ? "支付宝" : paymentMethod;
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.eg.android.AlipayGphone", assetKeyword);
 
@@ -1972,7 +1979,7 @@ public class SelectToSpeakService extends AccessibilityService {
                 } catch (Exception e) {}
             }
 
-            // 4. 提取支付方式 (如：中国银行储蓄卡(4260))
+            // 4. 提取支付方式
             if ("付款方式".equals(content)) {
                 for (int j = i + 1; j < allNodes.size(); j++) {
                     AccessibilityNodeInfo nextNode = allNodes.get(j);
@@ -2219,7 +2226,7 @@ public class SelectToSpeakService extends AccessibilityService {
                 } catch (Exception e) {}
             }
 
-            // 3. 提取并拼接支付方式 (跨越节点将 "中国银行储蓄卡" 和 "(4260)" 拼接)
+            // 3. 提取并拼接支付方式
             if ("支付方式".equals(content)) {
                 StringBuilder pmBuilder = new StringBuilder();
                 for (int j = i + 1; j < allNodes.size(); j++) {
@@ -2264,7 +2271,7 @@ public class SelectToSpeakService extends AccessibilityService {
             final double finalAmount = amount;
             final long finalTimestamp = now;
 
-            // 自动匹配资产：如果成功拼接到了“中国银行储蓄卡(4260)”，就用它去模糊匹配，否则兜底搜索“多多钱包”
+            // 自动匹配资产
             String assetKeyword = paymentMethod.isEmpty() ? "多多钱包" : paymentMethod;
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.xunmeng.pinduoduo", assetKeyword);
 
@@ -3043,7 +3050,7 @@ public class SelectToSpeakService extends AccessibilityService {
             final long finalTimestamp = now;
             final String finalCategory = "购物";
 
-            // 资产模糊匹配：将提取出的 "中国银行储蓄卡 (4260)" 传入模糊匹配引擎
+            // 资产模糊匹配
             String assetKeyword = paymentMethod.isEmpty() ? "抖音" : paymentMethod;
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.ss.android.ugc.aweme", assetKeyword);
 
@@ -3129,7 +3136,7 @@ public class SelectToSpeakService extends AccessibilityService {
             // 美团消费大概率是吃饭、外卖或买菜，分类默认打上"餐饮"
             final String finalCategory = "餐饮";
 
-            // 资产模糊匹配：将提取出的 "中国银行储蓄卡(4260)" 传入模糊匹配引擎
+            // 资产模糊匹配
             String assetKeyword = paymentMethod.isEmpty() ? "美团" : paymentMethod;
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.sankuai.meituan", assetKeyword);
 
@@ -3450,6 +3457,86 @@ public class SelectToSpeakService extends AccessibilityService {
             final String finalCategory = defaultCategory;
 
             // 触发记账弹窗（type = 0 为支出）
+            handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配抖省省支付成功页面
+     * 捕获金额及紧跟在“支付方式”后的资产名称
+     */
+    private boolean handleDouShengShengPaymentPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isPaySuccess = false;
+        double amount = -1;
+        String paymentMethod = "";
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别页面特征：存在“支付成功”文本
+            if ("支付成功".equals(content)) {
+                isPaySuccess = true;
+            }
+
+            // 2. 提取金额：锁定带两位小数的纯数字格式 (如 "4.30")
+            if (content.matches("^\\d+\\.\\d{2}$") && amount == -1) {
+                try {
+                    amount = Double.parseDouble(content);
+                } catch (Exception e) {}
+            }
+
+            // 3. 提取支付方式：寻找 "支付方式" 节点，紧接着的下一个有效节点就是资产名
+            if ("支付方式".equals(content)) {
+                for (int j = i + 1; j < allNodes.size(); j++) {
+                    AccessibilityNodeInfo nextNode = allNodes.get(j);
+                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
+                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
+                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+                    if (!nextContent.isEmpty()) {
+                        paymentMethod = nextContent;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 4. 判定并触发弹窗
+        if (isPaySuccess && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 防抖签名 (5分钟屏蔽期)
+            String signature = "doushengsheng_pay-" + amount + "-" + paymentMethod;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 构造备注
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            final String recordIdentifier = sdf.format(new Date(now)) + " 抖省省消费";
+
+            final double finalAmount = amount;
+            final long finalTimestamp = now;
+            final String finalCategory = "购物";
+
+            // 资产模糊匹配：将提取出的付款方式送入引擎匹配
+            String assetKeyword = paymentMethod.isEmpty() ? "抖音支付" : paymentMethod;
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.ss.android.ugc.lifeservices", assetKeyword);
+
+            // 弹出确认窗口
             handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
 
             return true;
