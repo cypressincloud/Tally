@@ -56,6 +56,12 @@
             android:launchMode="singleTop"/>
 
         <activity
+            android:name=".ui.AboutActivity"
+            android:label="关于"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
+        <activity
             android:name=".ui.SettingsActivity"
             android:label="设置"
             android:theme="@style/Theme.BudgetApp"

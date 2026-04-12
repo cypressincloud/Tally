@@ -374,18 +374,10 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
         findViewById(R.id.btn_default_record_display).setOnClickListener(v -> showDefaultRecordDisplayDialog());
-        findViewById(R.id.btn_user_notice_settings).setOnClickListener(v -> {
-            startActivity(new Intent(this, UserNoticeActivity.class));
-        });
 
         findViewById(R.id.btn_auto_track_log).setOnClickListener(v -> {
             startActivity(new Intent(this, AutoTrackLogActivity.class));
         });
-
-        findViewById(R.id.btn_donate).setOnClickListener(v -> {
-            startActivity(new Intent(this, DonateActivity.class));
-        });
-
 
         View btnPhotoBackup = findViewById(R.id.btn_photo_backup_setting);
         if (btnPhotoBackup != null) {
@@ -408,8 +400,9 @@ public class SettingsActivity extends AppCompatActivity {
             startActivity(new Intent(this, SecuritySettingsActivity.class));
         });
 
-        findViewById(R.id.btn_user_notice_settings).setOnClickListener(v -> {
-            startActivity(new Intent(this, UserNoticeActivity.class));
+        // 新增：点击进入关于页面
+        findViewById(R.id.btn_about).setOnClickListener(v -> {
+            startActivity(new Intent(this, AboutActivity.class));
         });
 
         // 极简模式逻辑
