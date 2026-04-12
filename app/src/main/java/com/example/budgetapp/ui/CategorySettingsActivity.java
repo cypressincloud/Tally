@@ -24,6 +24,7 @@ import com.example.budgetapp.util.CategoryManager;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class CategorySettingsActivity extends AppCompatActivity {
@@ -62,6 +63,21 @@ public class CategorySettingsActivity extends AppCompatActivity {
         switchDetailedCategory = findViewById(R.id.switch_detailed_category);
 
         findViewById(R.id.btn_add_expense).setOnClickListener(v -> showAddDialog(true));
+        // 【新增】绑定排序按钮
+        Button btnSortExpense = findViewById(R.id.btn_sort_expense);
+        if (btnSortExpense != null) {
+            btnSortExpense.setOnClickListener(v -> showReorderDialog(true));
+        }
+
+        // ==========================================
+        // 【新增】绑定收入排序按钮
+        Button btnSortIncome = findViewById(R.id.btn_sort_income);
+        if (btnSortIncome != null) {
+            // 传入 false 代表当前操作的是收入列表
+            btnSortIncome.setOnClickListener(v -> showReorderDialog(false));
+        }
+        // ==========================================
+
         findViewById(R.id.btn_add_income).setOnClickListener(v -> showAddDialog(false));
 
         // 二级分类开关绑定（增加判空保护）
@@ -435,4 +451,128 @@ public class CategorySettingsActivity extends AppCompatActivity {
             refreshChips(chipGroupIncome, incomeList, false);
         }
     }
+
+    // ================== 以下为新增的排序功能相关方法 ==================
+
+    // 弹出排序对话框（优化版 UI）
+    private void showReorderDialog(boolean isExpense) {
+        List<String> list = isExpense ? expenseList : incomeList;
+
+        // 过滤掉“自定义”，保持它永远在最后
+        List<String> sortableList = new ArrayList<>();
+        for (String cat : list) {
+            if (!"自定义".equals(cat)) {
+                sortableList.add(cat);
+            }
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        // 使用新建的统一风格 XML
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_sort_categories, null);
+        builder.setView(view);
+
+        AlertDialog dialog = builder.create();
+        // 设置窗口背景透明，才能透出 CardView 的圆角
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        TextView tvTitle = view.findViewById(R.id.tv_dialog_title);
+        tvTitle.setText(isExpense ? "排序支出分类" : "排序收入分类");
+
+        android.widget.LinearLayout container = view.findViewById(R.id.ll_sort_container);
+
+        // 渲染列表
+        buildReorderList(container, sortableList, isExpense);
+
+        // 绑定完成按钮
+        Button btnConfirm = view.findViewById(R.id.btn_confirm);
+        btnConfirm.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
+    // 动态构建更美观的列表项
+    // 动态构建包含已有圆角背景的列表项
+    private void buildReorderList(android.widget.LinearLayout container, List<String> sortableList, boolean isExpense) {
+        container.removeAllViews();
+
+        int marginV = (int) (6 * getResources().getDisplayMetrics().density); // 项与项之间的间距
+        int paddingContent = (int) (14 * getResources().getDisplayMetrics().density); // 稍微加大一点内边距让 16dp 圆角看起来更协调
+
+        for (int i = 0; i < sortableList.size(); i++) {
+            final int index = i;
+            String cat = sortableList.get(i);
+
+            // 每一个分类的外层容器
+            android.widget.LinearLayout itemLayout = new android.widget.LinearLayout(this);
+            android.widget.LinearLayout.LayoutParams itemParams = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            itemParams.setMargins(0, marginV, 0, marginV);
+            itemLayout.setLayoutParams(itemParams);
+
+            itemLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            itemLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            itemLayout.setPadding(paddingContent, paddingContent, paddingContent, paddingContent);
+
+            // 【关键修改】复用项目原本就有的 bg_input_field 圆角背景！
+            itemLayout.setBackgroundResource(R.drawable.bg_input_field);
+
+            // 1. 分类名称
+            android.widget.TextView tv = new android.widget.TextView(this);
+            tv.setText(cat);
+            tv.setTextSize(15);
+            tv.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
+            android.widget.LinearLayout.LayoutParams tvParams = new android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            itemLayout.addView(tv, tvParams);
+
+            // 2. 上移操作
+            android.widget.TextView btnUp = new android.widget.TextView(this);
+            btnUp.setText("上移");
+            btnUp.setTextSize(13);
+            btnUp.setPadding(20, 10, 20, 10);
+            if (index > 0) {
+                btnUp.setTextColor(ContextCompat.getColor(this, R.color.app_yellow));
+                btnUp.setOnClickListener(v -> {
+                    java.util.Collections.swap(sortableList, index, index - 1);
+                    updateOriginalListAndRefresh(isExpense, sortableList);
+                    buildReorderList(container, sortableList, isExpense);
+                });
+            } else {
+                btnUp.setTextColor(android.graphics.Color.parseColor("#CCCCCC"));
+            }
+            itemLayout.addView(btnUp);
+
+            // 3. 下移操作
+            android.widget.TextView btnDown = new android.widget.TextView(this);
+            btnDown.setText("下移");
+            btnDown.setTextSize(13);
+            btnDown.setPadding(20, 10, 10, 10);
+            if (index < sortableList.size() - 1) {
+                btnDown.setTextColor(ContextCompat.getColor(this, R.color.app_yellow));
+                btnDown.setOnClickListener(v -> {
+                    java.util.Collections.swap(sortableList, index, index + 1);
+                    updateOriginalListAndRefresh(isExpense, sortableList);
+                    buildReorderList(container, sortableList, isExpense);
+                });
+            } else {
+                btnDown.setTextColor(android.graphics.Color.parseColor("#CCCCCC"));
+            }
+            itemLayout.addView(btnDown);
+
+            container.addView(itemLayout);
+        }
+    }
+    // 同步更新主列表并保存
+    private void updateOriginalListAndRefresh(boolean isExpense, List<String> sortedSubList) {
+        List<String> targetList = isExpense ? expenseList : incomeList;
+        targetList.clear();
+        targetList.addAll(sortedSubList);
+
+        // 调用我们之前修改过的 saveAndRefresh 方法
+        // 它会自动发现“自定义”不见了，然后在最末尾安全地将“自定义”补齐，并保存到数据库和刷新主界面标签
+        saveAndRefresh(isExpense);
+    }
+
 }

@@ -164,14 +164,34 @@
                         android:layout_height="wrap_content"
                         app:chipSpacing="10dp"/>
 
-                    <Button
-                        android:id="@+id/btn_add_expense"
-                        style="@style/Widget.MaterialComponents.Button.TextButton"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="+ 添加支出分类"
-                        android:textColor="@color/app_yellow"
-                        android:layout_marginTop="12dp"/>
+                        android:orientation="horizontal"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical">
+
+                        <Button
+                            android:id="@+id/btn_add_expense"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="+ 添加支出分类"
+                            android:textColor="@color/app_yellow"/>
+
+                        <Space
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1" />
+
+                        <Button
+                            android:id="@+id/btn_sort_expense"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="排序"
+                            android:textColor="@color/app_yellow"/>
+                    </LinearLayout>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
@@ -203,14 +223,34 @@
                         android:layout_height="wrap_content"
                         app:chipSpacing="10dp"/>
 
-                    <Button
-                        android:id="@+id/btn_add_income"
-                        style="@style/Widget.MaterialComponents.Button.TextButton"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="+ 添加收入分类"
-                        android:textColor="@color/app_yellow"
-                        android:layout_marginTop="12dp"/>
+                        android:orientation="horizontal"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical">
+
+                        <Button
+                            android:id="@+id/btn_add_income"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="+ 添加收入分类"
+                            android:textColor="@color/app_yellow"/>
+
+                        <Space
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1" />
+
+                        <Button
+                            android:id="@+id/btn_sort_income"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="排序"
+                            android:textColor="@color/app_yellow"/>
+                    </LinearLayout>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
