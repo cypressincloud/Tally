@@ -776,6 +776,26 @@ public class SettingsActivity extends AppCompatActivity {
         });
         // ==============================
 
+        // --- 新增：导出分类预设 JSON ---
+        View tvExportCategory = view.findViewById(R.id.tv_export_category_json);
+        if (tvExportCategory != null) {
+            tvExportCategory.setOnClickListener(v -> {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
+                String fileName = "Tally_分类预设_" + sdf.format(new Date()) + ".json";
+                exportCategoryJsonLauncher.launch(fileName);
+                dialog.dismiss();
+            });
+        }
+
+        // --- 新增：导入分类预设 JSON ---
+        View tvImportCategory = view.findViewById(R.id.tv_import_category_json);
+        if (tvImportCategory != null) {
+            tvImportCategory.setOnClickListener(v -> {
+                importCategoryJsonLauncher.launch(new String[]{"application/json", "text/plain", "*/*"});
+                dialog.dismiss();
+            });
+        }
+
         view.findViewById(R.id.btn_cancel_backup).setOnClickListener(v -> dialog.dismiss());
 
         dialog.show();
@@ -972,4 +992,126 @@ public class SettingsActivity extends AppCompatActivity {
 
         dialog.show();
     }
+
+    // --- 新增：导出分类预设为 JSON ---
+    private final ActivityResultLauncher<String> exportCategoryJsonLauncher = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("application/json"),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        org.json.JSONObject root = new org.json.JSONObject();
+                        root.put("version", 1);
+
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                        root.put("backup_date", sdf.format(new Date()));
+
+                        // 获取当前的一级分类（请确保 CategoryManager 中有对应的 get 方法）
+                        // 注意：如果你的获取方法名不同，请在此处修改
+                        List<String> expenses = CategoryManager.getExpenseCategories(this);
+                        List<String> incomes = CategoryManager.getIncomeCategories(this);
+
+                        if (expenses == null) expenses = new ArrayList<>();
+                        if (incomes == null) incomes = new ArrayList<>();
+
+                        root.put("expenseCategories", new org.json.JSONArray(expenses));
+                        root.put("incomeCategories", new org.json.JSONArray(incomes));
+
+                        // 遍历一级分类，获取对应的二级分类并组装
+                        org.json.JSONObject subCatsObj = new org.json.JSONObject();
+                        for (String exp : expenses) {
+                            List<String> subs = CategoryManager.getSubCategories(this, exp);
+                            if (subs != null && !subs.isEmpty()) {
+                                subCatsObj.put(exp, new org.json.JSONArray(subs));
+                            }
+                        }
+                        for (String inc : incomes) {
+                            List<String> subs = CategoryManager.getSubCategories(this, inc);
+                            if (subs != null && !subs.isEmpty()) {
+                                subCatsObj.put(inc, new org.json.JSONArray(subs));
+                            }
+                        }
+                        root.put("subCategoryMap", subCatsObj);
+
+                        // 将 JSON 字符串写入文件
+                        try (java.io.OutputStream os = getContentResolver().openOutputStream(uri)) {
+                            if (os != null) {
+                                // 使用 4 个空格缩进格式化 JSON 以提高可读性
+                                os.write(root.toString(4).getBytes(StandardCharsets.UTF_8));
+                                os.flush();
+                                Toast.makeText(this, "分类预设导出成功", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
+    // --- 新增：从 JSON 导入分类预设 ---
+    private final ActivityResultLauncher<String[]> importCategoryJsonLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        // 读取文件内容
+                        java.io.InputStream is = getContentResolver().openInputStream(uri);
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            sb.append(line);
+                        }
+                        reader.close();
+                        if (is != null) is.close();
+
+                        // 解析 JSON
+                        org.json.JSONObject root = new org.json.JSONObject(sb.toString());
+
+                        // 恢复支出分类
+                        if (root.has("expenseCategories")) {
+                            org.json.JSONArray expArray = root.getJSONArray("expenseCategories");
+                            List<String> expenses = new ArrayList<>();
+                            for (int i = 0; i < expArray.length(); i++) {
+                                expenses.add(expArray.getString(i));
+                            }
+                            CategoryManager.saveExpenseCategories(this, expenses);
+                        }
+
+                        // 恢复收入分类
+                        if (root.has("incomeCategories")) {
+                            org.json.JSONArray incArray = root.getJSONArray("incomeCategories");
+                            List<String> incomes = new ArrayList<>();
+                            for (int i = 0; i < incArray.length(); i++) {
+                                incomes.add(incArray.getString(i));
+                            }
+                            CategoryManager.saveIncomeCategories(this, incomes);
+                        }
+
+                        // 恢复二级分类映射
+                        if (root.has("subCategoryMap")) {
+                            org.json.JSONObject subCatsObj = root.getJSONObject("subCategoryMap");
+                            java.util.Iterator<String> keys = subCatsObj.keys();
+                            while (keys.hasNext()) {
+                                String parentCategory = keys.next();
+                                org.json.JSONArray subArray = subCatsObj.getJSONArray(parentCategory);
+                                List<String> subCategories = new ArrayList<>();
+                                for (int i = 0; i < subArray.length(); i++) {
+                                    subCategories.add(subArray.getString(i));
+                                }
+                                CategoryManager.saveSubCategories(this, parentCategory, subCategories);
+                            }
+                        }
+
+                        Toast.makeText(this, "分类预设导入成功", Toast.LENGTH_SHORT).show();
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "分类预设导入失败: 请检查文件格式", Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
 }

@@ -1513,7 +1513,7 @@ public class RecordFragment extends Fragment {
             btnDelete.setVisibility(View.GONE);
             tvRevoke.setVisibility(View.GONE);
             SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA);
-            etNote.setText(noteSdf.format(calendar.getTime()) + " manual");
+            etNote.setText(noteSdf.format(calendar.getTime()));
         }
 
         btnSave.setOnClickListener(v -> {

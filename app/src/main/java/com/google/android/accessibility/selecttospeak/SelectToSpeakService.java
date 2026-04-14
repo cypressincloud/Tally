@@ -432,7 +432,7 @@ public class SelectToSpeakService extends AccessibilityService {
             lastContentSignature = signature;
 
             SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-            final String timeNote = sdf.format(new Date(now)) + " auto";
+            final String timeNote = sdf.format(new Date(now));
 
             handler.post(() -> showConfirmWindow(finalAmount, finalType, finalCategory, timeNote, finalAssetId, finalCurrency));
         }
@@ -500,7 +500,7 @@ public class SelectToSpeakService extends AccessibilityService {
         if (now - lastWindowDismissTime < 2500) return;
 
         SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-        final String timeNote = sdf.format(new Date(now)) + " auto";
+        final String timeNote = sdf.format(new Date(now));
 
         // 获取默认货币符号
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);

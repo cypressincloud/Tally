@@ -259,7 +259,7 @@ public class QuickAddTileService extends TileService {
             });
 
             SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-            etNote.setText(sdf.format(new Date()) + " shortcut");
+            etNote.setText(sdf.format(new Date()));
 
             AssistantConfig config = new AssistantConfig(this);
             boolean isAssetEnabled = config.isAssetsEnabled();
