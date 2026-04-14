@@ -28,18 +28,17 @@ abstract class DetailsItem {
     abstract int getType();
 }
 
-// 在 DetailsAdapter.java 中修改 HeaderItem 类
 class HeaderItem extends DetailsItem {
     String dateStr;
     float income;
     float expense;
-    float balance; // 🌟 新增
+    float balance;
 
     HeaderItem(String dateStr, float income, float expense, float balance) {
         this.dateStr = dateStr;
         this.income = income;
         this.expense = expense;
-        this.balance = balance; // 🌟 新增
+        this.balance = balance;
     }
     @Override int getType() { return TYPE_HEADER; }
 }
@@ -98,13 +97,60 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         Context context = holder.itemView.getContext();
-
-        // 🌟 新增：获取当前是否为自定义背景模式
         SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
 
-        int surfaceColor = ContextCompat.getColor(context, R.color.white);
+        // 🌟 1. 定位当前项在“当天独立卡片”中的位置 (顶部、底部、或中间)
+        boolean isTop = (getItemViewType(position) == DetailsItem.TYPE_HEADER);
+        boolean isBottom = false;
 
+        if (position == items.size() - 1) {
+            isBottom = true;
+        } else {
+            // 如果下一项是新的 Header，说明当前项是今天卡片的收尾
+            isBottom = (items.get(position + 1).getType() == DetailsItem.TYPE_HEADER);
+        }
+
+        // 🌟 2. 动态生成对标 assets_field 的卡片背景
+        android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+        shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+
+        // 严格遵循 assets_field 的 16dp 圆角规范
+        float radius = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 16, context.getResources().getDisplayMetrics());
+
+        // 根据卡片位置动态分配圆角 (拼接逻辑：左上, 右上, 右下, 左下)
+        if (isTop && isBottom) {
+            shape.setCornerRadii(new float[]{radius, radius, radius, radius, radius, radius, radius, radius});
+        } else if (isTop) {
+            shape.setCornerRadii(new float[]{radius, radius, radius, radius, 0, 0, 0, 0});
+        } else if (isBottom) {
+            shape.setCornerRadii(new float[]{0, 0, 0, 0, radius, radius, radius, radius});
+        } else {
+            shape.setCornerRadii(new float[]{0, 0, 0, 0, 0, 0, 0, 0}); // 夹在中间的账单没有圆角，做到无缝衔接
+        }
+
+        // 严格遵循 assets_field 的 @color/white 背景色
+        int surfaceColor = ContextCompat.getColor(context, R.color.white);
+        if (isCustomBg) {
+            // 如果是透明背景模式，使用 90% 透明度的白色
+            surfaceColor = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
+        }
+        shape.setColor(surfaceColor);
+        holder.itemView.setBackground(shape);
+
+        // 🌟 3. 设置卡片间距 (与统计板块对齐)
+        RecyclerView.LayoutParams params = (RecyclerView.LayoutParams) holder.itemView.getLayoutParams();
+        int marginH = (int) android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 16, context.getResources().getDisplayMetrics());
+        // 每天卡片顶部留 16dp 间距，底部留 8dp 间距
+        int marginTop = isTop ? (int) android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 16, context.getResources().getDisplayMetrics()) : 0;
+        int marginBottom = isBottom ? (int) android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 8, context.getResources().getDisplayMetrics()) : 0;
+
+        params.setMargins(marginH, marginTop, marginH, marginBottom);
+        holder.itemView.setLayoutParams(params);
+
+        // ==========================================
+        // 以下为视图数据绑定逻辑
+        // ==========================================
         if (getItemViewType(position) == DetailsItem.TYPE_HEADER) {
             HeaderItem header = (HeaderItem) items.get(position);
             HeaderViewHolder hvh = (HeaderViewHolder) holder;
@@ -113,34 +159,23 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             hvh.tvExpense.setText(header.expense > 0 ? "支: " + String.format("%.2f", header.expense) : "");
             hvh.tvBalance.setText("结: " + String.format("%.2f", header.balance));
 
-            // 🌟 1. 设置日期头透明度 (90% 透明度, Alpha: 230)
-            if (isCustomBg) {
-                int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
-                hvh.itemView.setBackgroundColor(translucentSurface);
-            } else {
-                hvh.itemView.setBackgroundResource(R.color.bar_background);
-            }
-
         } else {
             TransactionItem item = (TransactionItem) items.get(position);
             Transaction t = item.transaction;
             TransactionViewHolder tvh = (TransactionViewHolder) holder;
 
-            // ... (这里保留你原来所有的金额、颜色、分类、备注等 UI 赋值逻辑) ...
             String amountStr = String.format("%.2f", t.amount);
             if (t.type == 2) {
-                // 🌟 资产转移：主题色 (黄色)，不带正负号
                 tvh.tvAmount.setText(amountStr);
                 tvh.tvAmount.setTextColor(ContextCompat.getColor(context, R.color.app_yellow));
             } else if (t.type == 1) {
-                // 收入：红色，带加号
                 tvh.tvAmount.setText("+" + amountStr);
                 tvh.tvAmount.setTextColor(ContextCompat.getColor(context, R.color.income_red));
             } else {
-                // 支出：绿色，带减号
                 tvh.tvAmount.setText("-" + amountStr);
                 tvh.tvAmount.setTextColor(ContextCompat.getColor(context, R.color.expense_green));
             }
+
             tvh.tvCategory.setText(t.category);
             if (!TextUtils.isEmpty(t.subCategory)) {
                 tvh.tvSubCategory.setText(t.subCategory);
@@ -154,9 +189,11 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             } else {
                 tvh.tvNote.setVisibility(View.GONE);
             }
+
             String assetName = (t.assetId != 0) ? assetMap.get(t.assetId) : null;
             boolean hasRemarkOrPhoto = !TextUtils.isEmpty(t.remark) || !TextUtils.isEmpty(t.photoPath);
             int statusColor = hasRemarkOrPhoto ? ContextCompat.getColor(context, R.color.expense_green) : ContextCompat.getColor(context, R.color.income_red);
+
             if (assetName != null) {
                 tvh.viewIndicator.setVisibility(View.GONE);
                 tvh.tvAssetName.setVisibility(View.VISIBLE);
@@ -167,32 +204,7 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 tvh.viewIndicator.setVisibility(View.VISIBLE);
                 tvh.viewIndicator.setBackgroundColor(statusColor);
             }
-            // ... (上面是保留的原代码) ...
 
-            // 🌟 2. 为明细账单设置 80% (Alpha: 204) 透明度淡灰色卡片背景
-            if (isCustomBg) {
-                android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
-                shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-                int lightGray = androidx.core.content.ContextCompat.getColor(context, R.color.white);
-                int translucentGray = androidx.core.graphics.ColorUtils.setAlphaComponent(lightGray, 230);
-                shape.setColor(translucentGray);
-
-                // 增加一点圆角 (12dp) 让它更高级
-                float radius = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 0, context.getResources().getDisplayMetrics());
-                shape.setCornerRadius(radius);
-
-                // 增加缩进间距 (上下 4dp, 左右 12dp)，让列表项独立成卡片，底层图片从缝隙透出
-                int insetV = (int) android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 0, context.getResources().getDisplayMetrics());
-                int insetH = (int) android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 0, context.getResources().getDisplayMetrics());
-                android.graphics.drawable.InsetDrawable insetDrawable = new android.graphics.drawable.InsetDrawable(shape, insetH, insetV, insetH, insetV);
-
-                tvh.itemView.setBackground(insetDrawable);
-            } else {
-                // 恢复系统默认：无背景
-                tvh.itemView.setBackgroundColor(Color.TRANSPARENT);
-            }
-
-            // 🌟 解除拦截，将转移记录的点击事件也透传给 Fragment 处理
             holder.itemView.setOnClickListener(v -> {
                 if (listener != null) listener.onTransactionClick(t);
             });
@@ -202,15 +214,14 @@ public class DetailsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     @Override
     public int getItemCount() { return items.size(); }
 
-    // 在 DetailsAdapter.java 的 HeaderViewHolder 中添加变量
     static class HeaderViewHolder extends RecyclerView.ViewHolder {
-        TextView tvDate, tvIncome, tvExpense, tvBalance; // 🌟 新增 tvBalance
+        TextView tvDate, tvIncome, tvExpense, tvBalance;
         HeaderViewHolder(View v) {
             super(v);
             tvDate = v.findViewById(R.id.tv_date);
             tvIncome = v.findViewById(R.id.tv_income);
             tvExpense = v.findViewById(R.id.tv_expense);
-            tvBalance = v.findViewById(R.id.tv_balance); // 🌟 新增
+            tvBalance = v.findViewById(R.id.tv_balance);
         }
     }
 
