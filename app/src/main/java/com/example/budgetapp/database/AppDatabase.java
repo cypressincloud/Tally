@@ -10,7 +10,7 @@ import androidx.annotation.NonNull;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 19, exportSchema = false)
+@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 20, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract TransactionDao transactionDao();
@@ -143,6 +143,14 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    static final Migration MIGRATION_19_20 = new Migration(19, 20) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            // 为旧表增加新列，默认值给空字符串以避免旧数据为 null 导致的异常
+            database.execSQL("ALTER TABLE transactions ADD COLUMN targetObject TEXT DEFAULT ''");
+        }
+    };
+
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
@@ -156,7 +164,7 @@ public abstract class AppDatabase extends RoomDatabase {
                                     MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
                                     MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                                     MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
-                                    MIGRATION_17_18, MIGRATION_18_19
+                                    MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20
                             )
                             .fallbackToDestructiveMigration()
                             .build();

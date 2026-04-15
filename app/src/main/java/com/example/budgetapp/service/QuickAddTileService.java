@@ -161,6 +161,8 @@ public class QuickAddTileService extends TileService {
             Button btnTakePhoto = floatView.findViewById(R.id.btn_window_take_photo);
             Button btnViewPhoto = floatView.findViewById(R.id.btn_window_view_photo);
 
+            EditText etTarget = floatView.findViewById(R.id.et_window_target);
+
             etAmount.setText("");
             etAmount.requestFocus();
             rgType.check(R.id.rb_window_expense);
@@ -242,19 +244,35 @@ public class QuickAddTileService extends TileService {
 
             rgType.setOnCheckedChangeListener((group, checkedId) -> {
                 if (checkedId == R.id.rb_window_income) {
+                    rvCategory.setVisibility(View.VISIBLE);
+                    etTarget.setVisibility(View.GONE);
                     categoryAdapter.updateData(incomeCategories);
                     String first = incomeCategories.isEmpty() ? "自定义" : incomeCategories.get(0);
                     categoryAdapter.setSelectedCategory(first);
                     selectedCategory[0] = first;
                     selectedSubCategory = null;
                     etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
-                } else {
+                } else if (checkedId == R.id.rb_window_expense) {
+                    rvCategory.setVisibility(View.VISIBLE);
+                    etTarget.setVisibility(View.GONE);
                     categoryAdapter.updateData(expenseCategories);
                     String first = expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0);
                     categoryAdapter.setSelectedCategory(first);
                     selectedCategory[0] = first;
                     selectedSubCategory = null;
                     etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
+                } else if (checkedId == R.id.rb_window_liability) {
+                    rvCategory.setVisibility(View.GONE);
+                    etCategory.setVisibility(View.GONE);
+                    etTarget.setVisibility(View.VISIBLE);
+                    etTarget.setHint("负债对象");
+                    selectedCategory[0] = "借入"; // 负债对应资金流入(借入)
+                } else if (checkedId == R.id.rb_window_loan) {
+                    rvCategory.setVisibility(View.GONE);
+                    etCategory.setVisibility(View.GONE);
+                    etTarget.setVisibility(View.VISIBLE);
+                    etTarget.setHint("借出对象");
+                    selectedCategory[0] = "借出"; // 借出对应资金流出
                 }
             });
 
@@ -359,10 +377,26 @@ public class QuickAddTileService extends TileService {
                     double finalAmount = Double.parseDouble(amountStr);
                     String finalNote = etNote.getText().toString();
                     String finalRemark = etRemark.getText().toString().trim();
-                    int finalType = (rgType.getCheckedRadioButtonId() == R.id.rb_window_income) ? 1 : 0;
+
+                    int checkedId = rgType.getCheckedRadioButtonId();
+                    int finalType = 0;
+                    if (checkedId == R.id.rb_window_income) finalType = 1;
+                    else if (checkedId == R.id.rb_window_liability) finalType = 3;
+                    else if (checkedId == R.id.rb_window_loan) finalType = 4;
 
                     String finalCat = selectedCategory[0];
-                    if ("自定义".equals(finalCat)) {
+                    String targetObject = null;
+                    int liabilityLoanType = -1;
+
+                    if (checkedId == R.id.rb_window_liability) {
+                        targetObject = etTarget.getText().toString().trim();
+                        if (targetObject.isEmpty()) { Toast.makeText(this, "请输入负债对象", Toast.LENGTH_SHORT).show(); return; }
+                        liabilityLoanType = 1; // 1代表负债资产
+                    } else if (checkedId == R.id.rb_window_loan) {
+                        targetObject = etTarget.getText().toString().trim();
+                        if (targetObject.isEmpty()) { Toast.makeText(this, "请输入借出对象", Toast.LENGTH_SHORT).show(); return; }
+                        liabilityLoanType = 2; // 2代表借出资产
+                    } else if ("自定义".equals(finalCat)) {
                         String customInput = etCategory.getText().toString().trim();
                         if (!customInput.isEmpty()) {
                             finalCat = customInput;
@@ -382,7 +416,8 @@ public class QuickAddTileService extends TileService {
 
                     String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
-                    saveToDatabase(finalAmount, finalType, finalCat, selectedSubCategory, finalNote, finalRemark, assetId, symbol, currentPhotoPath[0]);
+                    // 【修改】将 targetObject 和 liabilityLoanType 传给底层方法
+                    saveToDatabase(finalAmount, finalType, finalCat, selectedSubCategory, finalNote, finalRemark, assetId, symbol, currentPhotoPath[0], targetObject, liabilityLoanType);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "记账成功", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -570,7 +605,7 @@ public class QuickAddTileService extends TileService {
         }
     }
 
-    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath) {
+    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath, String targetObject, int liabilityLoanType) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
 
@@ -585,18 +620,41 @@ public class QuickAddTileService extends TileService {
             t.assetId = assetId;
             t.currencySymbol = currencySymbol;
             t.photoPath = photoPath;
+            t.targetObject = targetObject;
             db.transactionDao().insert(t);
 
+            // 1. 同步影响【对方资产】（负债/借出对象）
+            if (targetObject != null && !targetObject.isEmpty() && liabilityLoanType != -1) {
+                List<AssetAccount> targets = db.assetAccountDao().getAssetsByTypeSync(liabilityLoanType);
+                AssetAccount existingTarget = null;
+                if (targets != null) {
+                    for (AssetAccount a : targets) {
+                        if (a.name.equals(targetObject)) {
+                            existingTarget = a;
+                            break;
+                        }
+                    }
+                }
+                if (existingTarget != null) {
+                    existingTarget.amount += amount; // 无论负债还是借出，账户总额都增加
+                    db.assetAccountDao().update(existingTarget);
+                } else {
+                    AssetAccount newTarget = new AssetAccount(targetObject, 0, liabilityLoanType);
+                    newTarget.amount = amount;
+                    db.assetAccountDao().insert(newTarget);
+                }
+            }
+
+            // 2. 同步影响【己方资产】（使用的支付/收款账户）
             if (assetId != 0) {
                 AssetAccount asset = db.assetAccountDao().getAssetByIdSync(assetId);
                 if (asset != null) {
-                    // 【修改】区分资产和负债的计算逻辑
                     if (asset.type == 0) {
-                        if (type == 1) asset.amount += amount;
-                        else asset.amount -= amount;
-                    } else if (asset.type == 1) {
-                        if (type == 1) asset.amount -= amount; // 收入还款，负债减少
-                        else asset.amount += amount; // 支出刷卡，负债增加
+                        if (type == 1) asset.amount += amount; // 收到钱
+                        else asset.amount -= amount;           // 给出钱
+                    } else if (asset.type == 1 || asset.type == 2) {
+                        if (type == 1) asset.amount -= amount; // 收到钱还负债/借出
+                        else asset.amount += amount;           // 信用卡刷卡支出
                     }
                     db.assetAccountDao().update(asset);
                 }

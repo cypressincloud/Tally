@@ -32,6 +32,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.budgetapp.database.AppDatabase;
 import com.example.budgetapp.database.RenewalItem;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -548,7 +549,7 @@ public class RecordFragment extends Fragment {
                         if (a.id == t.assetId) {
                             if (a.type == 0) {
                                 a.amount -= amount;
-                            } else if (a.type == 1) {
+                            } else if (a.type == 1 || a.type == 2) { // 【修改这里】兼容借出
                                 a.amount += amount;
                             }
                             viewModel.updateAsset(a);
@@ -1067,6 +1068,9 @@ public class RecordFragment extends Fragment {
         EditText etNote = dialogView.findViewById(R.id.et_note);
         Spinner spAsset = dialogView.findViewById(R.id.sp_asset);
 
+        // 【新增】绑定对象输入框
+        EditText etTargetObject = dialogView.findViewById(R.id.et_target_object);
+
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
@@ -1360,7 +1364,8 @@ public class RecordFragment extends Fragment {
                 assetList.add(noAsset);
                 if (assets != null) {
                     for (AssetAccount a : assets) {
-                        if (a.type == 0 || a.type == 1) {
+                        // 【修改这里】加入 a.type == 2
+                        if (a.type == 0 || a.type == 1 || a.type == 2) {
                             assetList.add(a);
                         }
                     }
@@ -1411,18 +1416,42 @@ public class RecordFragment extends Fragment {
         tvDate.setClickable(false);
         tvDate.setFocusable(false);
 
+        // 【修改】RadioGroup 切换监听逻辑，加入震动反馈与动态显示隐藏
         rgType.setOnCheckedChangeListener((g, id) -> {
-            boolean switchToExpense = (id == R.id.rb_expense);
-            isExpense[0] = switchToExpense;
-            List<String> targetCategories = switchToExpense ? expenseCategories : incomeCategories;
-            String defaultCat = targetCategories.isEmpty() ? "自定义" : targetCategories.get(0);
-            categoryAdapter.updateData(targetCategories);
-            categoryAdapter.setSelectedCategory(defaultCat);
-            selectedCategory[0] = defaultCat;
-            if ("自定义".equals(defaultCat)) {
-                etCustomCategory.setVisibility(View.VISIBLE);
-            } else {
+            // 触发清脆震动反馈
+            g.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+
+            if (id == R.id.rb_liability || id == R.id.rb_lend) {
+                // 选择负债或借出时，显示对象输入框，隐藏分类选择
+                etTargetObject.setVisibility(View.VISIBLE);
+                rvCategory.setVisibility(View.GONE);
                 etCustomCategory.setVisibility(View.GONE);
+
+                if (id == R.id.rb_liability) {
+                    etTargetObject.setHint("负债对象");
+                    selectedCategory[0] = "借入";
+                } else {
+                    etTargetObject.setHint("借出对象");
+                    selectedCategory[0] = "借出";
+                }
+            } else {
+                // 选择收入或支出时，恢复普通的分类选择界面
+                etTargetObject.setVisibility(View.GONE);
+                etTargetObject.setText(""); // 清空输入
+                rvCategory.setVisibility(View.VISIBLE);
+
+                boolean switchToExpense = (id == R.id.rb_expense);
+                isExpense[0] = switchToExpense;
+                List<String> targetCategories = switchToExpense ? expenseCategories : incomeCategories;
+                String defaultCat = targetCategories.isEmpty() ? "自定义" : targetCategories.get(0);
+                categoryAdapter.updateData(targetCategories);
+                categoryAdapter.setSelectedCategory(defaultCat);
+                selectedCategory[0] = defaultCat;
+                if ("自定义".equals(defaultCat)) {
+                    etCustomCategory.setVisibility(View.VISIBLE);
+                } else {
+                    etCustomCategory.setVisibility(View.GONE);
+                }
             }
         });
 
@@ -1432,28 +1461,49 @@ public class RecordFragment extends Fragment {
             if (existingTransaction.remark != null) etRemark.setText(existingTransaction.remark);
             if (existingTransaction.note != null) etNote.setText(existingTransaction.note);
 
+            // 【完全修复：合并类型判断，防止后续代码覆盖“负债/借出”的选中状态和输入框内容】
             if (existingTransaction.type == 1) {
                 rgType.check(R.id.rb_income);
                 isExpense[0] = false;
                 categoryAdapter.updateData(incomeCategories);
+                String currentCat = existingTransaction.category;
+                if (incomeCategories.contains(currentCat)) {
+                    categoryAdapter.setSelectedCategory(currentCat);
+                    selectedCategory[0] = currentCat;
+                    etCustomCategory.setVisibility(View.GONE);
+                } else {
+                    categoryAdapter.setSelectedCategory("自定义");
+                    selectedCategory[0] = "自定义";
+                    etCustomCategory.setVisibility(View.VISIBLE);
+                    etCustomCategory.setText(currentCat);
+                }
+            } else if (existingTransaction.type == 3) {
+                // 负债回显，不再走下方的分类逻辑以免导致UI串台
+                rgType.check(R.id.rb_liability);
+                if (existingTransaction.targetObject != null) {
+                    etTargetObject.setText(existingTransaction.targetObject);
+                }
+            } else if (existingTransaction.type == 4) {
+                // 借出回显，不再走下方的分类逻辑
+                rgType.check(R.id.rb_lend);
+                if (existingTransaction.targetObject != null) {
+                    etTargetObject.setText(existingTransaction.targetObject);
+                }
             } else {
                 rgType.check(R.id.rb_expense);
                 isExpense[0] = true;
                 categoryAdapter.updateData(expenseCategories);
-            }
-
-            String currentCat = existingTransaction.category;
-            List<String> currentList = isExpense[0] ? expenseCategories : incomeCategories;
-
-            if (currentList.contains(currentCat)) {
-                categoryAdapter.setSelectedCategory(currentCat);
-                selectedCategory[0] = currentCat;
-                etCustomCategory.setVisibility(View.GONE);
-            } else {
-                categoryAdapter.setSelectedCategory("自定义");
-                selectedCategory[0] = "自定义";
-                etCustomCategory.setVisibility(View.VISIBLE);
-                etCustomCategory.setText(currentCat);
+                String currentCat = existingTransaction.category;
+                if (expenseCategories.contains(currentCat)) {
+                    categoryAdapter.setSelectedCategory(currentCat);
+                    selectedCategory[0] = currentCat;
+                    etCustomCategory.setVisibility(View.GONE);
+                } else {
+                    categoryAdapter.setSelectedCategory("自定义");
+                    selectedCategory[0] = "自定义";
+                    etCustomCategory.setVisibility(View.VISIBLE);
+                    etCustomCategory.setText(currentCat);
+                }
             }
 
             btnDelete.setVisibility(View.VISIBLE);
@@ -1489,10 +1539,22 @@ public class RecordFragment extends Fragment {
                 }
 
                 // 构建一个临时账单对象，实时读取当前输入框里的最新数据
+                // 【修复】构建临时账单对象时，精准识别 4 种类型并携带对象名称
                 Transaction tempTx = new Transaction();
                 tempTx.id = existingTransaction.id;
                 tempTx.amount = Double.parseDouble(amountStr);
-                tempTx.type = rgType.getCheckedRadioButtonId() == R.id.rb_income ? 1 : 0;
+
+                int checkedId = rgType.getCheckedRadioButtonId();
+                if (checkedId == R.id.rb_income) tempTx.type = 1;
+                else if (checkedId == R.id.rb_expense) tempTx.type = 0;
+                else if (checkedId == R.id.rb_liability) tempTx.type = 3;
+                else if (checkedId == R.id.rb_lend) tempTx.type = 4;
+
+                // 只有当类型是负债(3)或借出(4)时，才赋值对象名称，保证底层能精准删库
+                if (tempTx.type == 3 || tempTx.type == 4) {
+                    tempTx.targetObject = etTargetObject.getText().toString().trim();
+                }
+
                 tempTx.photoPath = currentPhotoPath[0]; // 同步最新的照片状态
 
                 // 实时读取当前在下拉框中选择的资产
@@ -1517,16 +1579,37 @@ public class RecordFragment extends Fragment {
         }
 
         btnSave.setOnClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+
             String amountStr = etAmount.getText().toString();
             if (!amountStr.isEmpty()) {
                 double amount = Double.parseDouble(amountStr);
-                int type = rgType.getCheckedRadioButtonId() == R.id.rb_income ? 1 : 0;
 
+                // 1. 判断类型
+                int type = 0;
+                int checkedId = rgType.getCheckedRadioButtonId();
+                if (checkedId == R.id.rb_income) type = 1;
+                else if (checkedId == R.id.rb_expense) type = 0;
+                else if (checkedId == R.id.rb_liability) type = 3;
+                else if (checkedId == R.id.rb_lend) type = 4;
+
+                // 2. 判断分类与对象名
                 String category = selectedCategory[0];
-                if ("自定义".equals(category)) {
-                    category = etCustomCategory.getText().toString().trim();
-                    if (category.isEmpty()) {
-                        Toast.makeText(getContext(), "请输入自定义分类", Toast.LENGTH_SHORT).show();
+                if (type == 0 || type == 1) {
+                    if ("自定义".equals(category)) {
+                        category = etCustomCategory.getText().toString().trim();
+                        if (category.isEmpty()) {
+                            Toast.makeText(getContext(), "请输入自定义分类", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                    }
+                }
+
+                String targetObj = "";
+                if (type == 3 || type == 4) {
+                    targetObj = etTargetObject.getText().toString().trim();
+                    if (targetObj.isEmpty()) {
+                        Toast.makeText(getContext(), "请输入负债/借出对象", Toast.LENGTH_SHORT).show();
                         return;
                     }
                 }
@@ -1542,41 +1625,81 @@ public class RecordFragment extends Fragment {
                         selectedAssetId = assetList.get(selectedPos).id;
                     }
                 }
-
                 String currencySymbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
+                // ================== 新增/保存逻辑 ==================
                 if (existingTransaction == null) {
                     Transaction t = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     t.assetId = selectedAssetId;
                     t.currencySymbol = currencySymbol;
                     t.subCategory = selectedSubCategory[0];
                     t.photoPath = currentPhotoPath[0];
-                    viewModel.addTransaction(t);
+                    t.targetObject = targetObj; // 保存对象名称
 
-                    if (selectedAssetId != 0) {
-                        for (AssetAccount asset : assetList) {
-                            if (asset.id == selectedAssetId) {
-                                if (asset.type == 0) {
-                                    if (type == 1) asset.amount += amount;
-                                    else asset.amount -= amount;
-                                } else if (asset.type == 1) {
-                                    if (type == 1) asset.amount -= amount;
-                                    else asset.amount += amount;
+                    // 使用事务保证账单和多资产同步更新
+                    final int finalAssetId = selectedAssetId;
+                    final String finalTargetObj = targetObj;
+                    final int finalType = type;
+
+                    AppDatabase.databaseWriteExecutor.execute(() -> {
+                        AppDatabase db = AppDatabase.getDatabase(getContext());
+                        db.runInTransaction(() -> {
+                            // a. 插入流水
+                            db.transactionDao().insert(t);
+
+                            // b. 更新原资产金额 (例如：微信/支付宝)
+                            if (finalAssetId != 0) {
+                                AssetAccount originalAsset = db.assetAccountDao().getAssetByIdSync(finalAssetId);
+                                if (originalAsset != null) {
+                                    if (finalType == 0 || finalType == 4) {
+                                        // 支出 / 借出：原资产余额减少
+                                        originalAsset.amount -= amount;
+                                    } else if (finalType == 1 || finalType == 3) {
+                                        // 收入 / 借入(负债)：原资产余额增加
+                                        originalAsset.amount += amount;
+                                    }
+                                    originalAsset.updateTime = System.currentTimeMillis();
+                                    db.assetAccountDao().update(originalAsset);
                                 }
-                                viewModel.updateAsset(asset);
-                                break;
                             }
+
+                            // c. 同步到资产模块对应的【负债】或【借出】板块
+                            if (finalType == 3 || finalType == 4) {
+                                int targetAssetType = (finalType == 3) ? 1 : 2; // 1:负债板块, 2:借出板块
+                                AssetAccount targetAccount = db.assetAccountDao().getAssetByNameAndType(finalTargetObj, targetAssetType);
+
+                                if (targetAccount == null) {
+                                    // 该对象尚未建立资产账户，自动创建
+                                    targetAccount = new AssetAccount(finalTargetObj, amount, targetAssetType);
+                                    targetAccount.updateTime = System.currentTimeMillis();
+                                    db.assetAccountDao().insert(targetAccount);
+                                } else {
+                                    // 对象已存在，直接累加欠款/借出金额
+                                    targetAccount.amount += amount;
+                                    targetAccount.updateTime = System.currentTimeMillis();
+                                    db.assetAccountDao().update(targetAccount);
+                                }
+                            }
+                        });
+
+                        // 通知ViewModel刷新UI
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                viewModel.setDateRange(currentStartMillis, currentEndMillis); // 触发列表刷新
+                            });
                         }
-                    }
+                    });
+
                 } else {
+                    // [修改模式原有逻辑]
                     Transaction updateT = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     updateT.id = existingTransaction.id;
                     updateT.assetId = selectedAssetId;
                     updateT.currencySymbol = currencySymbol;
                     updateT.subCategory = selectedSubCategory[0];
                     updateT.photoPath = currentPhotoPath[0];
+                    updateT.targetObject = targetObj;
 
-                    // 改为调用同步资产的方法，传入旧账单对象和新构建的账单对象
                     viewModel.updateTransactionWithAssetSync(existingTransaction, updateT);
                 }
                 dialog.dismiss();
@@ -1686,7 +1809,8 @@ public class RecordFragment extends Fragment {
             assetList.add(noAsset);
             if (assets != null) {
                 for (AssetAccount a : assets) {
-                    if (a.type == 0 || a.type == 1) {
+                    // 【修改这里】加入 a.type == 2
+                    if (a.type == 0 || a.type == 1 || a.type == 2) {
                         assetList.add(a);
                     }
                 }

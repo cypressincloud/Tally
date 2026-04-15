@@ -32,4 +32,7 @@ public interface AssetAccountDao {
 
     @Query("UPDATE asset_accounts SET amount = amount - :deductAmount WHERE id = :id AND amount >= :deductAmount")
     int decreaseBalanceSafe(int id, float deductAmount);
+
+    @Query("SELECT * FROM asset_accounts WHERE name = :name AND type = :type LIMIT 1")
+    AssetAccount getAssetByNameAndType(String name, int type);
 }

@@ -81,61 +81,90 @@ public class FinanceViewModel extends AndroidViewModel {
     }
 
     /**
-     * 【新增】同步修改历史账单及对应的资产余额
-     * 解决修改历史账单金额、类型或账户时，资产未同步变化的问题。
+     * 【增强】同步修改历史账单及对应的双边资产余额
      */
     public void updateTransactionWithAssetSync(Transaction oldTx, Transaction newTx) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            // 1. 处理资产变更
-            if (oldTx.assetId == newTx.assetId && oldTx.assetId != 0) {
-                // 资产账户未变，计算并应用差额
-                AssetAccount asset = assetDao.getAssetByIdSync(oldTx.assetId);
-                if (asset != null) {
-                    revertAssetBalance(asset, oldTx); // 先撤回旧金额
-                    applyAssetBalance(asset, newTx);  // 再应用新金额
-                    assetDao.update(asset);
-                }
-            } else {
-                // 资产账户发生了改变，分别撤回旧账户金额，追加到新账户
-                if (oldTx.assetId != 0) {
-                    AssetAccount oldAsset = assetDao.getAssetByIdSync(oldTx.assetId);
-                    if (oldAsset != null) {
-                        revertAssetBalance(oldAsset, oldTx);
-                        assetDao.update(oldAsset);
+            database.runInTransaction(() -> {
+                // 1. 处理己方支付账户（如微信、支付宝）的资产变更
+                if (oldTx.assetId == newTx.assetId && oldTx.assetId != 0) {
+                    AssetAccount asset = assetDao.getAssetByIdSync(oldTx.assetId);
+                    if (asset != null) {
+                        revertAssetBalance(asset, oldTx); // 先撤回旧金额
+                        applyAssetBalance(asset, newTx);  // 再应用新金额
+                        assetDao.update(asset);
+                    }
+                } else {
+                    if (oldTx.assetId != 0) {
+                        AssetAccount oldAsset = assetDao.getAssetByIdSync(oldTx.assetId);
+                        if (oldAsset != null) {
+                            revertAssetBalance(oldAsset, oldTx);
+                            assetDao.update(oldAsset);
+                        }
+                    }
+                    if (newTx.assetId != 0) {
+                        AssetAccount newAsset = assetDao.getAssetByIdSync(newTx.assetId);
+                        if (newAsset != null) {
+                            applyAssetBalance(newAsset, newTx);
+                            assetDao.update(newAsset);
+                        }
                     }
                 }
-                if (newTx.assetId != 0) {
-                    AssetAccount newAsset = assetDao.getAssetByIdSync(newTx.assetId);
-                    if (newAsset != null) {
-                        applyAssetBalance(newAsset, newTx);
-                        assetDao.update(newAsset);
+
+                // 2. 处理对方资产（负债/借出对象）的变更
+                // a) 撤回旧对象的金额
+                if (oldTx.type == 3 || oldTx.type == 4) {
+                    if (oldTx.targetObject != null && !oldTx.targetObject.isEmpty()) {
+                        int oldTargetType = (oldTx.type == 3) ? 1 : 2;
+                        AssetAccount oldTargetAccount = assetDao.getAssetByNameAndType(oldTx.targetObject, oldTargetType);
+                        if (oldTargetAccount != null) {
+                            oldTargetAccount.amount -= oldTx.amount;
+                            assetDao.update(oldTargetAccount);
+                        }
                     }
                 }
-            }
-            // 2. 最终更新数据库中的账单记录
-            transactionDao.update(newTx);
+                // b) 追加新对象的金额
+                if (newTx.type == 3 || newTx.type == 4) {
+                    if (newTx.targetObject != null && !newTx.targetObject.isEmpty()) {
+                        int newTargetType = (newTx.type == 3) ? 1 : 2;
+                        AssetAccount newTargetAccount = assetDao.getAssetByNameAndType(newTx.targetObject, newTargetType);
+                        if (newTargetAccount == null) {
+                            newTargetAccount = new AssetAccount(newTx.targetObject, newTx.amount, newTargetType);
+                            assetDao.insert(newTargetAccount);
+                        } else {
+                            newTargetAccount.amount += newTx.amount;
+                            assetDao.update(newTargetAccount);
+                        }
+                    }
+                }
+
+                // 3. 最终更新数据库中的账单记录
+                transactionDao.update(newTx);
+            });
         });
     }
 
-    // 【新增辅助方法】撤回账单对资产的影响
+    // 【增强】撤回账单对己方资产的影响 (兼容 0支出, 1收入, 3负债, 4借出)
     private void revertAssetBalance(AssetAccount asset, Transaction tx) {
-        if (asset.type == 0) { // 普通资产：撤回支出余额增加，撤回收入余额减少
-            if (tx.type == 0) asset.amount += tx.amount;
-            else if (tx.type == 1) asset.amount -= tx.amount;
-        } else if (asset.type == 1) { // 负债账户(信用卡)：撤回支出负债减少，撤回收入负债增加
-            if (tx.type == 0) asset.amount -= tx.amount;
-            else if (tx.type == 1) asset.amount += tx.amount;
+        if (asset.type == 0 || asset.type == 2) {
+            // 普通资产/借出账户：撤回支出(0)和借出(4)余额增加，撤回收入(1)和负债借入(3)余额减少
+            if (tx.type == 0 || tx.type == 4) asset.amount += tx.amount;
+            else if (tx.type == 1 || tx.type == 3) asset.amount -= tx.amount;
+        } else if (asset.type == 1) {
+            // 负债账户(信用卡)：撤回支出(0)和借出(4)负债减少，撤回收入(1)和负债借入(3)负债增加
+            if (tx.type == 0 || tx.type == 4) asset.amount -= tx.amount;
+            else if (tx.type == 1 || tx.type == 3) asset.amount += tx.amount;
         }
     }
 
-    // 【新增辅助方法】应用账单对资产的影响
+    // 【增强】应用账单对己方资产的影响 (兼容 0支出, 1收入, 3负债, 4借出)
     private void applyAssetBalance(AssetAccount asset, Transaction tx) {
-        if (asset.type == 0) { // 普通资产：支出余额减少，收入余额增加
-            if (tx.type == 0) asset.amount -= tx.amount;
-            else if (tx.type == 1) asset.amount += tx.amount;
-        } else if (asset.type == 1) { // 负债账户(信用卡)：支出负债增加，收入负债减少
-            if (tx.type == 0) asset.amount += tx.amount;
-            else if (tx.type == 1) asset.amount -= tx.amount;
+        if (asset.type == 0 || asset.type == 2) {
+            if (tx.type == 0 || tx.type == 4) asset.amount -= tx.amount;
+            else if (tx.type == 1 || tx.type == 3) asset.amount += tx.amount;
+        } else if (asset.type == 1) {
+            if (tx.type == 0 || tx.type == 4) asset.amount += tx.amount;
+            else if (tx.type == 1 || tx.type == 3) asset.amount -= tx.amount;
         }
     }
 
@@ -186,29 +215,52 @@ public class FinanceViewModel extends AndroidViewModel {
     // ================= 业务逻辑：撤回与自动续费 =================
 
     /**
-     * 撤回账单功能
+     * 【增强】撤回账单功能
      * @param transaction 要删除的账单
-     * @param targetAssetId 关联要恢复余额的资产ID
+     * @param targetAssetId 关联要恢复余额的己方资产ID
      */
     public void revokeTransaction(Transaction transaction, int targetAssetId) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            // 1. 删除账单
-            transactionDao.delete(transaction);
+            database.runInTransaction(() -> {
+                // 1. 删除交易流水
+                transactionDao.delete(transaction);
 
-            // 2. 如果选择了有效资产，则根据账单类型反向操作余额
-            if (targetAssetId != 0) {
-                AssetAccount asset = assetDao.getAssetByIdSync(targetAssetId);
-                if (asset != null) {
-                    if (asset.type == 0) { // 普通资产
-                        if (transaction.type == 0) asset.amount += transaction.amount; // 撤回支出，钱回来
-                        else if (transaction.type == 1) asset.amount -= transaction.amount; // 撤回收入，钱减掉
-                    } else if (asset.type == 1) { // 负债账户 (信用卡等)
-                        if (transaction.type == 0) asset.amount -= transaction.amount; // 撤回消费，负债减少
-                        else if (transaction.type == 1) asset.amount += transaction.amount; // 撤回还款，负债增加
+                // 2. 撤回己方支付账户余额 (如微信、支付宝)
+                if (targetAssetId != 0) {
+                    AssetAccount asset = assetDao.getAssetByIdSync(targetAssetId);
+                    if (asset != null) {
+                        if (asset.type == 0 || asset.type == 2) {
+                            // 普通资产/借出账户：撤回支出(0)或借出(4)余额增加，撤回收入(1)或负债借入(3)余额减少
+                            if (transaction.type == 0 || transaction.type == 4) asset.amount += transaction.amount;
+                            else if (transaction.type == 1 || transaction.type == 3) asset.amount -= transaction.amount;
+                        } else if (asset.type == 1) {
+                            // 负债账户(信用卡)：撤回支出(0)/借出(4)负债减少，撤回收入(1)/借入(3)负债增加
+                            if (transaction.type == 0 || transaction.type == 4) asset.amount -= transaction.amount;
+                            else if (transaction.type == 1 || transaction.type == 3) asset.amount += transaction.amount;
+                        }
+                        assetDao.update(asset);
                     }
-                    assetDao.update(asset);
                 }
-            }
+
+                // 3. 撤回对方资产 (负债/借出对象) 并自动删除归零账户
+                if (transaction.type == 3 || transaction.type == 4) {
+                    if (transaction.targetObject != null && !transaction.targetObject.isEmpty()) {
+                        int targetAssetType = (transaction.type == 3) ? 1 : 2; // 3->负债区(1), 4->借出区(2)
+                        AssetAccount targetAccount = assetDao.getAssetByNameAndType(transaction.targetObject, targetAssetType);
+                        if (targetAccount != null) {
+                            // 撤回时，扣除这笔交易带来的欠款/借出金额
+                            targetAccount.amount -= transaction.amount;
+
+                            // 【预期效果实现】：如果撤回后，该对象欠款/借款金额归零（处理浮点精度 <= 0.01），则直接删除该资产
+                            if (targetAccount.amount <= 0.01) {
+                                assetDao.delete(targetAccount);
+                            } else {
+                                assetDao.update(targetAccount);
+                            }
+                        }
+                    }
+                }
+            });
         });
     }
 
@@ -226,7 +278,7 @@ public class FinanceViewModel extends AndroidViewModel {
                 if (asset.type == 0 && asset.amount >= renewal.amount) {
                     asset.amount -= renewal.amount;
                     canProcess = true;
-                } else if (asset.type == 1) { // 负债账户直接累加
+                } else if (asset.type == 1 || asset.type == 2) { // 【修改这里】兼容借出
                     asset.amount += renewal.amount;
                     canProcess = true;
                 }

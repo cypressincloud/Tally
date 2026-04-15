@@ -569,6 +569,7 @@ public class SelectToSpeakService extends AccessibilityService {
             RadioGroup rgType = floatView.findViewById(R.id.rg_window_type);
             RecyclerView rvCategory = floatView.findViewById(R.id.rv_window_category);
             EditText etCategory = floatView.findViewById(R.id.et_window_category);
+            EditText etTarget = floatView.findViewById(R.id.et_window_target);
             EditText etNote = floatView.findViewById(R.id.et_window_note);
             EditText etRemark = floatView.findViewById(R.id.et_window_remark);
             Spinner spAsset = floatView.findViewById(R.id.sp_asset);
@@ -661,13 +662,37 @@ public class SelectToSpeakService extends AccessibilityService {
                 rgType.check(R.id.rb_window_expense);
             }
             rgType.setOnCheckedChangeListener((group, checkedId) -> {
-                List<String> newList = (checkedId == R.id.rb_window_income) ? incomeCategories : expenseCategories;
-                categoryAdapter.updateData(newList);
-                String first = newList.isEmpty() ? "自定义" : newList.get(0);
-                categoryAdapter.setSelectedCategory(first);
-                selectedCategory[0] = first;
-                selectedSubCategory = null;
-                etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
+                if (checkedId == R.id.rb_window_income) {
+                    rvCategory.setVisibility(View.VISIBLE);
+                    etTarget.setVisibility(View.GONE);
+                    categoryAdapter.updateData(incomeCategories);
+                    String first = incomeCategories.isEmpty() ? "自定义" : incomeCategories.get(0);
+                    categoryAdapter.setSelectedCategory(first);
+                    selectedCategory[0] = first;
+                    selectedSubCategory = null;
+                    etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
+                } else if (checkedId == R.id.rb_window_expense) {
+                    rvCategory.setVisibility(View.VISIBLE);
+                    etTarget.setVisibility(View.GONE);
+                    categoryAdapter.updateData(expenseCategories);
+                    String first = expenseCategories.isEmpty() ? "自定义" : expenseCategories.get(0);
+                    categoryAdapter.setSelectedCategory(first);
+                    selectedCategory[0] = first;
+                    selectedSubCategory = null;
+                    etCategory.setVisibility("自定义".equals(first) ? View.VISIBLE : View.GONE);
+                } else if (checkedId == R.id.rb_window_liability) {
+                    rvCategory.setVisibility(View.GONE);
+                    etCategory.setVisibility(View.GONE);
+                    etTarget.setVisibility(View.VISIBLE);
+                    etTarget.setHint("输入负债对象*");
+                    selectedCategory[0] = "借入";
+                } else if (checkedId == R.id.rb_window_loan) {
+                    rvCategory.setVisibility(View.GONE);
+                    etCategory.setVisibility(View.GONE);
+                    etTarget.setVisibility(View.VISIBLE);
+                    etTarget.setHint("输入借出对象*");
+                    selectedCategory[0] = "借出";
+                }
             });
 
             if (config == null) config = new AssistantConfig(this);
@@ -763,10 +788,26 @@ public class SelectToSpeakService extends AccessibilityService {
                     double finalAmountValue = Double.parseDouble(etAmount.getText().toString());
                     String finalNoteText = etNote.getText().toString();
                     String finalRemarkText = etRemark.getText().toString().trim();
-                    int finalTypeInt = (rgType.getCheckedRadioButtonId() == R.id.rb_window_income) ? 1 : 0;
+
+                    int checkedId = rgType.getCheckedRadioButtonId();
+                    int finalTypeInt = 0;
+                    if (checkedId == R.id.rb_window_income) finalTypeInt = 1;
+                    else if (checkedId == R.id.rb_window_liability) finalTypeInt = 3;
+                    else if (checkedId == R.id.rb_window_loan) finalTypeInt = 4;
 
                     String finalCatName = selectedCategory[0];
-                    if ("自定义".equals(finalCatName)) {
+                    String targetObject = null;
+                    int liabilityLoanType = -1;
+
+                    if (checkedId == R.id.rb_window_liability) {
+                        targetObject = etTarget.getText().toString().trim();
+                        if (targetObject.isEmpty()) { Toast.makeText(this, "请输入负债对象", Toast.LENGTH_SHORT).show(); return; }
+                        liabilityLoanType = 1;
+                    } else if (checkedId == R.id.rb_window_loan) {
+                        targetObject = etTarget.getText().toString().trim();
+                        if (targetObject.isEmpty()) { Toast.makeText(this, "请输入借出对象", Toast.LENGTH_SHORT).show(); return; }
+                        liabilityLoanType = 2;
+                    } else if ("自定义".equals(finalCatName)) {
                         String customInput = etCategory.getText().toString().trim();
                         finalCatName = !customInput.isEmpty() ? customInput : (finalTypeInt == 1 ? "退款" : "其他");
                     }
@@ -778,8 +819,8 @@ public class SelectToSpeakService extends AccessibilityService {
 
                     String finalSymbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
-                    // 【修改点 B】：点击保存时，将 transactionTime 传给底层数据库
-                    saveToDatabase(finalAmountValue, finalTypeInt, finalCatName, selectedSubCategory, finalNoteText, finalRemarkText, assetIdInt, finalSymbol, currentPhotoPath[0], transactionTime);
+                    // 【核心】：带上对方资产信息
+                    saveToDatabase(finalAmountValue, finalTypeInt, finalCatName, selectedSubCategory, finalNoteText, finalRemarkText, assetIdInt, finalSymbol, currentPhotoPath[0], transactionTime, targetObject, liabilityLoanType);
 
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "已记账", Toast.LENGTH_SHORT).show();
@@ -979,18 +1020,24 @@ public class SelectToSpeakService extends AccessibilityService {
     }
 
 
-    // 1. 新增的兼容方法（供其他实时记账功能使用，默认当前时间）
+    // 兼容方法 1：无交易时间，无对方资产对象 (9 个参数，供极简调用使用)
     private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath) {
-        saveToDatabase(amount, type, category, subCategory, note, remark, assetId, currencySymbol, photoPath, System.currentTimeMillis());
+        saveToDatabase(amount, type, category, subCategory, note, remark, assetId, currencySymbol, photoPath, System.currentTimeMillis(), null, -1);
+    }
+
+    // 兼容方法 2：有交易时间，无对方资产对象 (10 个参数，专治报错的那一行)
+    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath, long transactionTime) {
+        // 直接调用 12 个参数的核心方法，后两个传 null 和 -1 代表普通收支，不涉及负债/借出
+        saveToDatabase(amount, type, category, subCategory, note, remark, assetId, currencySymbol, photoPath, transactionTime, null, -1);
     }
 
     // 2. 修改现有的 saveToDatabase 方法（增加 long transactionTime 参数）
-    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath, long transactionTime) {
+    // 核心入库方法
+    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath, long transactionTime, String targetObject, int liabilityLoanType) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
 
             Transaction t = new Transaction();
-            // 【关键修改】：使用传入的真实账单时间，不再使用 System.currentTimeMillis()
             t.date = transactionTime;
             t.type = type;
             t.category = category;
@@ -1001,16 +1048,39 @@ public class SelectToSpeakService extends AccessibilityService {
             t.assetId = assetId;
             t.currencySymbol = currencySymbol;
             t.photoPath = photoPath;
+            t.targetObject = targetObject;
             dao.insert(t);
 
-            // ... 下面的资产扣除逻辑保持不变 ...
+            // 1. 同步目标资产(如存在)
+            if (targetObject != null && !targetObject.isEmpty() && liabilityLoanType != -1) {
+                List<AssetAccount> targets = db.assetAccountDao().getAssetsByTypeSync(liabilityLoanType);
+                AssetAccount existingTarget = null;
+                if (targets != null) {
+                    for (AssetAccount a : targets) {
+                        if (a.name.equals(targetObject)) {
+                            existingTarget = a;
+                            break;
+                        }
+                    }
+                }
+                if (existingTarget != null) {
+                    existingTarget.amount += amount;
+                    db.assetAccountDao().update(existingTarget);
+                } else {
+                    AssetAccount newTarget = new AssetAccount(targetObject, 0, liabilityLoanType);
+                    newTarget.amount = amount;
+                    db.assetAccountDao().insert(newTarget);
+                }
+            }
+
+            // 2. 同步己方资产
             if (assetId != 0) {
                 AssetAccount asset = db.assetAccountDao().getAssetByIdSync(assetId);
                 if (asset != null) {
                     if (asset.type == 0) {
                         if (type == 1) asset.amount += amount;
                         else asset.amount -= amount;
-                    } else if (asset.type == 1) {
+                    } else if (asset.type == 1 || asset.type == 2) {
                         if (type == 1) asset.amount -= amount;
                         else asset.amount += amount;
                     }

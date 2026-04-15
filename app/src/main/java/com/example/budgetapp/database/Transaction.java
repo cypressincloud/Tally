@@ -26,6 +26,9 @@ public class Transaction {
     public String photoPath;
     // 【新增】二级分类
     public String subCategory;
+    // 【新增】负债/借出对象
+    public String targetObject;
+
 
     public Transaction() {
     }

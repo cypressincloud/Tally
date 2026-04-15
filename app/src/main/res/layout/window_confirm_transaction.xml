@@ -72,7 +72,7 @@
                             android:textColor="@color/text_type_selector"
                             android:textSize="16sp"
                             android:textStyle="bold"
-                            android:layout_marginEnd="8dp"/>
+                            android:layout_marginEnd="4dp"/>
 
                         <RadioButton
                             android:id="@+id/rb_window_income"
@@ -86,7 +86,37 @@
                             android:textColor="@color/text_type_selector"
                             android:textSize="16sp"
                             android:textStyle="bold"
-                            android:layout_marginStart="8dp"/>
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"/>
+
+                        <RadioButton
+                            android:id="@+id/rb_window_liability"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:text="负债"
+                            android:gravity="center"
+                            android:button="@null"
+                            android:background="@drawable/bg_type_selector"
+                            android:textColor="@color/text_type_selector"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"/>
+
+                        <RadioButton
+                            android:id="@+id/rb_window_loan"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:text="借出"
+                            android:gravity="center"
+                            android:button="@null"
+                            android:background="@drawable/bg_type_selector"
+                            android:textColor="@color/text_type_selector"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:layout_marginStart="4dp"/>
                     </RadioGroup>
 
                     <Spinner
@@ -98,6 +128,20 @@
                         android:gravity="center_vertical"
                         android:paddingHorizontal="12dp"
                         android:layout_marginBottom="16dp"/>
+
+                    <EditText
+                        android:id="@+id/et_window_target"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:hint="输入负债/借出对象*"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textColorHint="?android:attr/textColorHint"
+                        android:textSize="16sp"
+                        android:background="@drawable/bg_input_field"
+                        android:paddingHorizontal="18dp"
+                        android:paddingVertical="10dp"
+                        android:layout_marginBottom="16dp"
+                        android:visibility="gone"/>
 
                     <LinearLayout
                         android:layout_width="match_parent"
