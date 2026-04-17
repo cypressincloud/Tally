@@ -220,7 +220,8 @@ public class SelectToSpeakService extends AccessibilityService {
 
                 // ======= 通义千问 / AI充值专属逻辑 =======
                 if ("com.aliyun.tongyi".equals(packageName)) {
-                    if (handleQwenPaySuccessPage(rootNode)) return;
+                    // 1. 【新增】适配千问代下单“确认付款”页面
+                    if (handleQwenPaymentConfirmPage(rootNode)) return;
                 }
 
                 // ======= 云闪付专属逻辑 =======
@@ -2365,94 +2366,6 @@ public class SelectToSpeakService extends AccessibilityService {
     }
 
     /**
-     * 【专版专杀】专门适配通义千问等AI应用的“充值/支付已完成”页面
-     * 提取实际支付金额(如 45.00)、充值说明作为备注
-     */
-    private boolean handleQwenPaySuccessPage(AccessibilityNodeInfo root) {
-        if (root == null) return false;
-
-        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
-        flattenNodes(root, allNodes); // 展平节点树
-
-        boolean isQwenPay = false;
-        double amount = -1;
-        String note = "千问消费";
-
-        for (int i = 0; i < allNodes.size(); i++) {
-            AccessibilityNodeInfo node = allNodes.get(i);
-            String text = node.getText() != null ? node.getText().toString().trim() : "";
-            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
-            String content = !text.isEmpty() ? text : desc;
-
-            // 1. 识别核心特征：支付已完成
-            if ("支付已完成".equals(content) || "已完成支付".equals(content)) {
-                isQwenPay = true;
-            }
-
-            // 2. 提取金额：寻找 "小计 ¥" 或者类似标识，金额在它的下一个节点
-            if ("小计 ¥".equals(content) || "小计¥".equals(content)) {
-                for (int j = i + 1; j < allNodes.size(); j++) {
-                    AccessibilityNodeInfo nextNode = allNodes.get(j);
-                    String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
-                    String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
-                    String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
-
-                    if (!nextContent.isEmpty()) {
-                        try {
-                            amount = Double.parseDouble(nextContent.trim());
-                            break;
-                        } catch (Exception e) {}
-                    }
-                }
-            }
-
-            // 3. 提取备注说明 (如: 已成功充值话费50元...)
-            if (content.startsWith("已成功充值") || content.contains("充值话费")) {
-                // 如果文字太长，做个截断处理，保持记账界面的清爽
-                if (content.length() > 20) {
-                    note = content.substring(0, 18) + "...";
-                } else {
-                    note = content;
-                }
-            }
-        }
-
-        // 判定：确认是支付完成页，且成功抓取到了 45.00 这笔金额
-        if (isQwenPay && amount > 0) {
-            long now = System.currentTimeMillis();
-            if (now - lastWindowDismissTime < 2500) return true;
-
-            // 防重复录入签名
-            String signature = "qwen_pay-" + amount + "-" + note;
-            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
-
-            lastRecordTime = now;
-            lastContentSignature = signature;
-
-            // 构造记录标识，例如："03-30 10:10 已成功充值话费50元..."
-            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-            String displayTime = sdf.format(new Date(now));
-            final String recordIdentifier = displayTime + " " + note;
-
-            final double finalAmount = amount;
-            final long finalTimestamp = now;
-
-            // 智能分类：充话费默认分到“通讯”，其他则设为“购物”
-            String defaultCategory = note.contains("话费") ? "通讯" : "购物";
-
-            // 资产模糊匹配 (考虑到通常是拉起支付宝完成的充值，这里默认搜支付宝)
-            int autoAssetId = AutoAssetManager.matchAsset(this, "com.alibaba.android.qwen", "支付宝");
-
-            // 触发记账确认窗口
-            handler.post(() -> showConfirmWindow(finalAmount, 0, defaultCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
      * 【专版专杀】专门适配微信“扫二维码付款”或“个人转账”的账单详情页
      * 核心特征为含有“转账单号”、“收款方备注”等标签
      */
@@ -3617,6 +3530,93 @@ public class SelectToSpeakService extends AccessibilityService {
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.ss.android.ugc.lifeservices", assetKeyword);
 
             // 弹出确认窗口
+            handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 【专版专杀】专门适配通义千问“确认付款”代下单页面
+     * 从 Desc 提取 [支付金额5.20元]，并自动剥离代下单商户名作为备注
+     */
+    private boolean handleQwenPaymentConfirmPage(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+
+        List<AccessibilityNodeInfo> allNodes = new ArrayList<>();
+        flattenNodes(root, allNodes); // 展平节点树
+
+        boolean isQwenConfirm = false;
+        double amount = -1;
+        String note = "千问代下单";
+
+        for (int i = 0; i < allNodes.size(); i++) {
+            AccessibilityNodeInfo node = allNodes.get(i);
+            String text = node.getText() != null ? node.getText().toString().trim() : "";
+            String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
+            // 优先检查 text，如果为空再检查 desc
+            String content = !text.isEmpty() ? text : desc;
+
+            // 1. 识别核心特征：包含“确认付款”按钮
+            if ("确认付款".equals(content)) {
+                isQwenConfirm = true;
+            }
+
+            // 2. 提取金额：精准锁定 Desc 中的“支付金额X.XX元”
+            if (desc.contains("支付金额") && desc.contains("元") && amount == -1) {
+                try {
+                    // 正则提取：匹配“支付金额”和“元”中间的数字
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("支付金额(\\d+(?:\\.\\d{1,2})?)元").matcher(desc);
+                    if (m.find()) {
+                        amount = Double.parseDouble(m.group(1)); // 完美抓出 5.20
+                    }
+                } catch (Exception e) {}
+            }
+
+            // 3. 提取备注：剥离诸如“我正在 淘宝闪购帮你下单，请确认”中的商户名
+            if (content.contains("帮你下单")) {
+                try {
+                    // 替换掉固定句式，只留下纯净的商户名
+                    String cleanNote = content.replace("我正在", "")
+                            .replace("帮你下单，请确认", "")
+                            .replace("帮你下单", "")
+                            .trim();
+                    if (!cleanNote.isEmpty()) {
+                        note = cleanNote; // 抓取出 "淘宝闪购"
+                    }
+                } catch (Exception e) {}
+            }
+        }
+
+        // 4. 判定：确认是付款确认页，且成功抓取到了实付金额
+        if (isQwenConfirm && amount > 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastWindowDismissTime < 2500) return true;
+
+            // 防重复录入签名 (采用 5分钟/300000ms 防抖机制)
+            String signature = "qwen_confirm-" + amount + "-" + note;
+            if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
+
+            lastRecordTime = now;
+            lastContentSignature = signature;
+
+            // 构造记录标识，例如："04-17 15:44 淘宝闪购"
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            String displayTime = sdf.format(new Date(now));
+            final String recordIdentifier = displayTime + " " + note;
+
+            final double finalAmount = amount;
+            final long finalTimestamp = now;
+
+            // 默认分类分配为购物
+            final String finalCategory = "购物";
+
+            // 资产模糊匹配，用“通义千问”去匹配数据库资产
+            int autoAssetId = AutoAssetManager.matchAsset(this, "com.aliyun.tongyi", "通义千问");
+
+            // 触发记账确认窗口
             handler.post(() -> showConfirmWindow(finalAmount, 0, finalCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
 
             return true;
