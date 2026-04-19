@@ -287,6 +287,138 @@ public class BackupManager {
     }
 
     // ============================================================================================
+    // 小青账账单导入 (支持 CSV)
+    // ============================================================================================
+    // 1. 公开的入口方法：负责双重编码尝试
+    public static BackupData importFromXiaoqing(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
+        // 第一次尝试：使用 GBK (ANSI) 编码解析
+        BackupData data = parseXiaoqingCsvWithEncoding(context, uri, "GBK", allAssets);
+
+        // 如果解析出来的记录为空，说明编码可能不对，第二次尝试：使用 UTF-8
+        if (data.records == null || data.records.isEmpty()) {
+            data = parseXiaoqingCsvWithEncoding(context, uri, "UTF-8", allAssets);
+        }
+        return data;
+    }
+
+    // 2. 私有的核心解析方法：注意这里的参数列表必须包含 String charsetName
+    private static BackupData parseXiaoqingCsvWithEncoding(Context context, Uri uri, String charsetName, List<AssetAccount> allAssets) throws Exception {
+        List<Transaction> transactions = new ArrayList<>();
+        List<AssetAccount> newAssetsToCreate = new ArrayList<>();
+        Map<String, Integer> newAssetMap = new HashMap<>();
+
+        // 获取分类配置
+        List<String> expCats = new ArrayList<>(CategoryManager.getExpenseCategories(context));
+        List<String> incCats = new ArrayList<>(CategoryManager.getIncomeCategories(context));
+        Map<String, List<String>> subCatMap = new HashMap<>();
+
+        int maxAssetId = 0;
+        if (allAssets != null) {
+            for (AssetAccount a : allAssets) {
+                if (a.id > maxAssetId) maxAssetId = a.id;
+            }
+        }
+
+        // 注意：这里的 charsetName 来源于方法参数
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, charsetName))) {
+
+            String line;
+            boolean isDataSection = false;
+            // 小青账日期格式: 2026-4-17 16:57
+            SimpleDateFormat parserSdf = new SimpleDateFormat("yyyy-M-d H:m", Locale.getDefault());
+            SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+
+            int typeIdx = -1, amtIdx = -1, catIdx = -1, subCatIdx = -1, dateIdx = -1, remarkIdx = -1, accIdx = -1;
+
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("\ufeff")) line = line.substring(1);
+                if (TextUtils.isEmpty(line.trim())) continue;
+
+                // 识别表头
+                if (!isDataSection && line.contains("收支类型") && line.contains("记账日期")) {
+                    isDataSection = true;
+                    List<String> headers = parseCsvLine(line);
+                    for (int i = 0; i < headers.size(); i++) {
+                        String h = headers.get(i).trim();
+                        if ("收支类型".equals(h)) typeIdx = i;
+                        else if ("金额".equals(h)) amtIdx = i;
+                        else if ("分类".equals(h)) catIdx = i;
+                        else if ("子分类".equals(h)) subCatIdx = i;
+                        else if ("记账日期".equals(h)) dateIdx = i;
+                        else if ("备注信息".equals(h)) remarkIdx = i;
+                        else if ("账户名称".equals(h)) accIdx = i;
+                    }
+                    continue;
+                }
+
+                if (!isDataSection) continue;
+
+                List<String> tokens = parseCsvLine(line);
+                // 确保索引有效
+                if (tokens.size() <= Math.max(dateIdx, amtIdx)) continue;
+
+                Transaction t = new Transaction();
+
+                // 类型与金额
+                t.type = "收入".equals(tokens.get(typeIdx).trim()) ? 1 : 0;
+                t.amount = Math.abs(parseDoubleSafe(tokens.get(amtIdx).trim()));
+
+                // 时间与标识
+                String dateStr = tokens.get(dateIdx).trim();
+                Date dateObj;
+                try {
+                    dateObj = parserSdf.parse(dateStr);
+                    t.date = (dateObj != null) ? dateObj.getTime() : System.currentTimeMillis();
+                } catch (Exception e) {
+                    dateObj = new Date();
+                    t.date = dateObj.getTime();
+                }
+
+                String remark = (remarkIdx != -1 && remarkIdx < tokens.size()) ? tokens.get(remarkIdx).trim() : "";
+                t.remark = remark;
+                String noteRemark = TextUtils.isEmpty(remark) ? "auto" : remark;
+                t.note = noteSdf.format(dateObj) + " " + noteRemark; // 格式: MM-dd HH:mm 备注
+
+                // 分类与账户逻辑
+                String category = tokens.get(catIdx).trim();
+                if (TextUtils.isEmpty(category)) category = "其它";
+                String subCategory = (subCatIdx != -1 && subCatIdx < tokens.size()) ? tokens.get(subCatIdx).trim() : "";
+
+                List<String> targetList = (t.type == 1) ? incCats : expCats;
+                if (!targetList.contains(category)) targetList.add(category);
+                if (!TextUtils.isEmpty(subCategory)) {
+                    List<String> subs = subCatMap.get(category);
+                    if (subs == null) {
+                        subs = new ArrayList<>(CategoryManager.getSubCategories(context, category));
+                        subCatMap.put(category, subs);
+                    }
+                    if (!subs.contains(subCategory)) subs.add(subCategory);
+                }
+                t.category = category; t.subCategory = subCategory;
+
+                String accountName = (accIdx != -1 && accIdx < tokens.size()) ? tokens.get(accIdx).trim() : "默认账户";
+                int matchedId = matchAssetId(accountName, allAssets);
+                if (matchedId == 0 && !TextUtils.isEmpty(accountName)) {
+                    if (newAssetMap.containsKey(accountName)) { t.assetId = newAssetMap.get(accountName); }
+                    else {
+                        maxAssetId++; AssetAccount na = new AssetAccount(accountName, 0.0, 0);
+                        na.id = maxAssetId; newAssetsToCreate.add(na);
+                        newAssetMap.put(accountName, maxAssetId); t.assetId = maxAssetId;
+                    }
+                } else { t.assetId = matchedId; }
+                transactions.add(t);
+            }
+        }
+
+        BackupData result = new BackupData(transactions, newAssetsToCreate);
+        result.expenseCategories = expCats;
+        result.incomeCategories = incCats;
+        result.subCategoryMap = subCatMap;
+        return result;
+    }
+
+    // ============================================================================================
     // 蜜蜂记账账单导入 (支持 CSV)
     // ============================================================================================
     public static BackupData importFromBeeCount(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
