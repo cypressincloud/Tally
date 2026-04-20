@@ -1,6 +1,8 @@
 package com.example.budgetapp;
 
+import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -32,6 +34,7 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
+import com.example.budgetapp.widget.TodaySummaryWidget;
 import com.google.android.accessibility.selecttospeak.SelectToSpeakService;
 import com.example.budgetapp.ui.SettingsActivity;
 import com.example.budgetapp.util.AssistantConfig;
@@ -48,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
     private FinanceViewModel financeViewModel;
     private List<Transaction> allTransactions = new ArrayList<>();
     private List<AssetAccount> allAssets = new ArrayList<>();
+
 
     // 导出功能保留在此处作为备份逻辑
     private final ActivityResultLauncher<String> exportLauncher = registerForActivityResult(

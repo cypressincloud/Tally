@@ -155,6 +155,61 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
+        <receiver
+            android:name=".widget.TodaySummaryWidget"
+            android:exported="true"
+            android:label="@string/widget_name_today"> <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_summary_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MonthSummaryWidget"
+            android:exported="true"
+            android:label="@string/widget_name_month"> <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/month_summary_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.CombinedSummaryWidget"
+            android:exported="true"
+            android:label="@string/widget_name_combined"> <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/combined_summary_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.OvertimeSummaryWidget"
+            android:exported="true"
+            android:label="@string/widget_name_overtime"> <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/overtime_summary_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.TodayBudgetWidget"
+            android:exported="true"
+            android:label="@string/widget_name_budget"> <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_budget_widget_info" />
+        </receiver>
+
 <!--        <service android:name=".service.NotificationMonitorService"-->
 <!--            android:label="退款通知监听"-->
 <!--            android:exported="true"-->

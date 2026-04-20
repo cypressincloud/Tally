@@ -1,6 +1,11 @@
 package com.example.budgetapp.viewmodel;
 
 import android.app.Application;
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
@@ -15,6 +20,8 @@ import com.example.budgetapp.database.GoalDao;
 import com.example.budgetapp.database.RenewalItem;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.database.TransactionDao;
+import com.example.budgetapp.widget.MonthSummaryWidget;
+import com.example.budgetapp.widget.TodaySummaryWidget;
 
 import java.util.List;
 
@@ -68,16 +75,24 @@ public class FinanceViewModel extends AndroidViewModel {
     }
 
     public void addTransaction(Transaction transaction) {
-        AppDatabase.databaseWriteExecutor.execute(() -> transactionDao.insert(transaction));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            transactionDao.insert(transaction);
+            notifyWidgetUpdate(); // 【新增】
+        });
     }
 
     public void deleteTransaction(Transaction transaction) {
-        AppDatabase.databaseWriteExecutor.execute(() -> transactionDao.delete(transaction));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            transactionDao.delete(transaction);
+            notifyWidgetUpdate(); // 【新增】
+        });
     }
 
-    // 保留原方法，供只修改照片、备注等不涉及金额变动的场景使用
     public void updateTransaction(Transaction transaction) {
-        AppDatabase.databaseWriteExecutor.execute(() -> transactionDao.update(transaction));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            transactionDao.update(transaction);
+            notifyWidgetUpdate(); // 【新增】
+        });
     }
 
     /**
@@ -141,6 +156,7 @@ public class FinanceViewModel extends AndroidViewModel {
                 // 3. 最终更新数据库中的账单记录
                 transactionDao.update(newTx);
             });
+            notifyWidgetUpdate(); // 【新增】事务完成后通知刷新
         });
     }
 
@@ -261,6 +277,7 @@ public class FinanceViewModel extends AndroidViewModel {
                     }
                 }
             });
+            notifyWidgetUpdate(); // 【新增】撤回完成后通知刷新
         });
     }
 
@@ -295,6 +312,7 @@ public class FinanceViewModel extends AndroidViewModel {
                 transaction.date = System.currentTimeMillis();
                 transaction.assetId = assetId;
                 transactionDao.insert(transaction);
+                notifyWidgetUpdate(); // 【新增】
             }
         });
     }
@@ -342,6 +360,7 @@ public class FinanceViewModel extends AndroidViewModel {
             transaction.assetId = fromAccount.id; // 关联转出账户
 
             transactionDao.insert(transaction);
+            notifyWidgetUpdate(); // 【新增】
         });
     }
 
@@ -380,6 +399,11 @@ public class FinanceViewModel extends AndroidViewModel {
      */
     public LiveData<List<Transaction>> getFilteredTransactions(long start, long end, Integer type, String category) {
         return transactionDao.getFilteredTransactionsLive(start, end, type, category);
+    }
+
+    // ================= 通知桌面小组件刷新 =================
+    private void notifyWidgetUpdate() {
+        com.example.budgetapp.widget.WidgetUtils.updateAllWidgets(getApplication());
     }
 
 }

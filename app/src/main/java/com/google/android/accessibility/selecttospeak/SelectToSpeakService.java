@@ -1088,7 +1088,11 @@ public class SelectToSpeakService extends AccessibilityService {
                     db.assetAccountDao().update(asset);
                 }
             }
-        });
+
+            // 👇👇👇 一键刷新所有桌面小组件 👇👇👇
+            com.example.budgetapp.widget.WidgetUtils.updateAllWidgets(getApplicationContext());
+
+        }); // 这里是 execute 的结尾大括号
     }
 
     /**

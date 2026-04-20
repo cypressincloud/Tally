@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Tally</string>
+    <string name="widget_name_today">今日财务概览</string>
+    <string name="widget_name_month">本月财务汇总</string>
+    <string name="widget_name_combined">财务全景仪表盘</string>
+    <string name="widget_name_overtime">加班薪资统计</string>
+    <string name="widget_name_budget">今日预算卡片</string>
 </resources>

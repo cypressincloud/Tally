@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:id="@+id/widget_root"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_widget_card"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="6dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="今日预算"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary" />
+
+            <TextView
+                android:id="@+id/tv_widget_budget_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="¥0.00"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_widget_budget_amount"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:text="¥0.00"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:maxLines="1" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="2dp">
+
+            <ProgressBar
+                android:id="@+id/pb_widget_budget_safe"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:progressDrawable="@drawable/layer_budget_progress"
+                android:progressTint="@color/expense_green"
+                android:max="100" />
+
+            <ProgressBar
+                android:id="@+id/pb_widget_budget_exceed"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:progressDrawable="@drawable/layer_budget_progress"
+                android:progressTint="@color/income_red"
+                android:visibility="gone"
+                android:max="100" />
+        </FrameLayout>
+
+    </LinearLayout>
+</FrameLayout>

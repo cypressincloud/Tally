@@ -650,15 +650,19 @@ public class QuickAddTileService extends TileService {
                 AssetAccount asset = db.assetAccountDao().getAssetByIdSync(assetId);
                 if (asset != null) {
                     if (asset.type == 0) {
-                        if (type == 1) asset.amount += amount; // 收到钱
-                        else asset.amount -= amount;           // 给出钱
+                        if (type == 1) asset.amount += amount;
+                        else asset.amount -= amount;
                     } else if (asset.type == 1 || asset.type == 2) {
-                        if (type == 1) asset.amount -= amount; // 收到钱还负债/借出
-                        else asset.amount += amount;           // 信用卡刷卡支出
+                        if (type == 1) asset.amount -= amount;
+                        else asset.amount += amount;
                     }
                     db.assetAccountDao().update(asset);
                 }
             }
-        });
+
+            // 👇👇👇 一键刷新所有桌面小组件 👇👇👇
+            com.example.budgetapp.widget.WidgetUtils.updateAllWidgets(getApplicationContext());
+
+        }); // 这里是 execute 的结尾大括号
     }
 }

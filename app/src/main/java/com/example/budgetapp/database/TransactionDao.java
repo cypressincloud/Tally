@@ -32,6 +32,14 @@ public interface TransactionDao {
     @Query("DELETE FROM transactions")
     void deleteAll();
 
+    // 【新增】小组件使用：同步查询指定时间段加班总收入
+    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班'")
+    Double getOvertimeTotalAmountSync(long start, long end);
+
+    // 【新增】小组件使用：同步查询指定时间段所有加班记录（用于计算时长）
+    @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班'")
+    List<Transaction> getOvertimeTransactionsSync(long start, long end);
+
     @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end")
     List<Transaction> getTransactionsByRange(long start, long end);
 
@@ -55,6 +63,10 @@ public interface TransactionDao {
             "AND (:category IS NULL OR category LIKE '%' || :category || '%' OR subCategory LIKE '%' || :category || '%') " +
             "ORDER BY date DESC")
     LiveData<List<Transaction>> getFilteredTransactionsLive(long start, long end, Integer type, String category);
+
+    // 【新增】供桌面小组件使用：同步聚合查询指定时间的收入或支出总和
+    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = :type AND category != '资产互转'")
+    Double getTotalAmountByTypeSync(long start, long end, int type);
 
     // 3. 聚合查询：直接让数据库计算指定时间段的收入或支出总和 (返回 Double 防止没数据时报错)
     @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = :type AND category != '资产互转'")
