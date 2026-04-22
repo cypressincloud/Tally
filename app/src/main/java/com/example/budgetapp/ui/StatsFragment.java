@@ -967,9 +967,15 @@ public class StatsFragment extends Fragment {
             refreshData();
         });
 
-        btnPrev.setOnClickListener(v -> changeDate(-1));
-        btnNext.setOnClickListener(v -> changeDate(1));
+        btnPrev.setOnClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); // 增加震动反馈
+            changeDate(-1);
+        });
 
+        btnNext.setOnClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); // 增加震动反馈
+            changeDate(1);
+        });
         tvDateRange.setOnClickListener(v -> {
             // 添加 CLOCK_TICK 清脆振动反馈
             v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
@@ -978,33 +984,66 @@ public class StatsFragment extends Fragment {
     }
 
     private void changeDate(int offset) {
+        // 1. 定义需要执行动画的三个数据区块
+        View[] animateViews = {layoutTrend, layoutExpense, layoutSummary};
+
+        float screenWidth = scrollView.getWidth();
+        if (screenWidth == 0) screenWidth = 1080;
+
+        // 计算滑出目标位移：点击“下一周期”则向左滑出 (-screenWidth)，反之向右
+        float targetX = (offset > 0) ? -screenWidth : screenWidth;
+
+        // 2. 第一阶段：旧数据滑出并淡出 (时长 150ms)
+        int visibleCount = 0;
+        for (View v : animateViews) {
+            if (v != null && v.getVisibility() == View.VISIBLE) {
+                visibleCount++;
+                v.animate()
+                        .translationX(targetX)
+                        .alpha(0f)
+                        .setDuration(150)
+                        .start();
+            }
+        }
+
+        // 3. 第二阶段：在数据滑出后的回调中更新内容
+        // 使用主布局的延时或其中一个 View 的 endAction 来确保同步
+        if (layoutTrend != null) {
+            layoutTrend.postDelayed(() -> {
+                // --- 核心：在这里更新日期逻辑，顶部的 tvDateRange 会立即变化，但它是静止的 ---
+                if (currentMode == 0) selectedDate = selectedDate.plusYears(offset);
+                else if (currentMode == 1) selectedDate = selectedDate.plusMonths(offset);
+                else selectedDate = selectedDate.plusWeeks(offset);
+
+                updateDateRangeDisplay(); // 标题文字更新
+                refreshData();           // 图表数据更新
+
+                // 4. 第三阶段：将新数据布局瞬移到反方向，然后减速滑入 (时长 300ms)
+                for (View v : animateViews) {
+                    if (v != null && v.getVisibility() == View.VISIBLE) {
+                        v.setTranslationX(-targetX * 0.5f); // 预位移
+                        v.animate()
+                                .translationX(0f)
+                                .alpha(1f)
+                                .setDuration(300)
+                                .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                                .start();
+                    }
+                }
+            }, 150);
+        }
+    }
+
+    /**
+     * 提取的纯数据逻辑更新方法
+     */
+    private void performDateUpdate(int offset) {
         if (currentMode == 0) selectedDate = selectedDate.plusYears(offset);
         else if (currentMode == 1) selectedDate = selectedDate.plusMonths(offset);
         else selectedDate = selectedDate.plusWeeks(offset);
 
-        // 先同步更新顶部文字和下方图表数据
         updateDateRangeDisplay();
         refreshData();
-
-        // ================= 新增：仅对数据区块执行平滑动画 =================
-        if (getContext() != null) {
-            // 判断动画滑入方向
-            int animResId = (offset == 1) ? R.anim.slide_in_right : R.anim.slide_in_left;
-            android.view.animation.Animation anim = android.view.animation.AnimationUtils.loadAnimation(getContext(), animResId);
-
-            // 分别对三大块数据区域（折线图区、饼图区、文字总结区）应用动画
-            // 这样不管你的 scrollView 结构如何，顶部的年月日控件都绝对不会跟着滑动
-            if (layoutTrend != null && layoutTrend.getVisibility() == View.VISIBLE) {
-                layoutTrend.startAnimation(anim);
-            }
-            if (layoutExpense != null && layoutExpense.getVisibility() == View.VISIBLE) {
-                layoutExpense.startAnimation(anim);
-            }
-            if (layoutSummary != null && layoutSummary.getVisibility() == View.VISIBLE) {
-                layoutSummary.startAnimation(anim);
-            }
-        }
-        // ==============================================================================
     }
 
     private void updateDateRangeDisplay() {
