@@ -103,7 +103,8 @@ public class SelectToSpeakService extends AccessibilityService {
             "com.jingdong.app.mall",             // 京东
             "com.aliyun.tongyi",                 // 通义千问
             "com.unionpay",                      // 云闪付
-            "com.ss.android.ugc.lifeservices"    // 抖省省
+            "com.ss.android.ugc.lifeservices",   // 抖省省
+            "com.taobao.idlefish"                // 闲鱼
     ));
 
     // 内部类，用于同时记录数值和识别到的符号
@@ -1139,7 +1140,7 @@ public class SelectToSpeakService extends AccessibilityService {
     }
 
     /**
-     * 专门适配支付宝“账单详情”页面 (包含常规账单与免密支付/外卖账单/二手交易收款)
+     * 专门适配支付宝“账单详情”页面 (包含常规账单与免密支付/外卖账单/二手交易收款/淘宝订单)
      * 提取实际的交易时间、商品说明/收款方、付款方式(资产)，并自动识别支出/收入，将账单记录在实际发生的时间
      */
     private boolean handleAlipayBillDetailPage(AccessibilityNodeInfo root) {
@@ -1150,6 +1151,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
         boolean isBillDetail = false;
         String merchantInfo = "";
+        String fallbackTitle = "";
         String timeString = "";
         String paymentMethod = "";
         double amount = -1;
@@ -1161,26 +1163,28 @@ public class SelectToSpeakService extends AccessibilityService {
             String desc = node.getContentDescription() != null ? node.getContentDescription().toString().trim() : "";
             String content = !text.isEmpty() ? text : desc;
 
-            // 1. 识别页面特征 【新增支持 "交易订单号"】
+            // 1. 识别页面特征
             if ("账单详情".equals(content) || "商家订单号".equals(content) || "订单号".equals(content) || "交易详情".equals(content) || "交易订单号".equals(content)) {
                 isBillDetail = true;
             }
 
             // 2. 提取金额和收支类型
+            boolean amountFoundThisTurn = false;
             if (content.startsWith("支出") && content.endsWith("元")) {
                 try {
                     String cleanAmount = content.replace("支出", "").replace("元", "").replace(",", "").trim();
                     amount = Double.parseDouble(cleanAmount);
                     type = 0;
+                    amountFoundThisTurn = true;
                 } catch (Exception e) {}
             } else if (content.startsWith("收入") && content.endsWith("元")) {
                 try {
                     String cleanAmount = content.replace("收入", "").replace("元", "").replace(",", "").trim();
                     amount = Double.parseDouble(cleanAmount);
                     type = 1;
+                    amountFoundThisTurn = true;
                 } catch (Exception e) {}
             } else if (content.matches("^[+-]?\\d+(\\.\\d+)?元$") && amount == -1) {
-                // 适配 "0元", "1.5元" 这种纯数字+元的格式
                 try {
                     String cleanAmount = content.replace("元", "").replace("+", "").trim();
                     amount = Double.parseDouble(cleanAmount);
@@ -1189,15 +1193,28 @@ public class SelectToSpeakService extends AccessibilityService {
                         amount = Math.abs(amount);
                         type = 0;
                     }
+                    amountFoundThisTurn = true;
                 } catch (Exception e) {}
+            } else if (content.matches("^[-+]?\\d+(\\.\\d{1,2})?$") && amount == -1 && !content.equals("1") && !content.equals("0")) {
+                if (content.startsWith("+") || content.startsWith("-") || content.contains(".")) {
+                    try {
+                        String cleanAmount = content.replace("+", "").replace("-", "").replace(",", "").trim();
+                        amount = Double.parseDouble(cleanAmount);
+                        type = content.startsWith("+") ? 1 : 0;
+                        amountFoundThisTurn = true;
+                    } catch (Exception e) {}
+                }
             }
-            // 【核心新增补丁】：支持纯数字带加减号，没有“元”字的场景 (如: "+300.00")
-            else if (content.matches("^[-+]?\\d+(\\.\\d{1,2})?$") && amount == -1) {
-                try {
-                    String cleanAmount = content.replace("+", "").replace("-", "").replace(",", "").trim();
-                    amount = Double.parseDouble(cleanAmount);
-                    type = content.startsWith("+") ? 1 : 0;
-                } catch (Exception e) {}
+
+            // 【核心补丁 1】：抓取金额正上方的节点作为兜底标题 (如 "裕华**店")
+            if (amountFoundThisTurn && i > 0 && fallbackTitle.isEmpty()) {
+                AccessibilityNodeInfo prevNode = allNodes.get(i - 1);
+                String prevText = prevNode.getText() != null ? prevNode.getText().toString().trim() : "";
+                String prevDesc = prevNode.getContentDescription() != null ? prevNode.getContentDescription().toString().trim() : "";
+                String prevContent = !prevText.isEmpty() ? prevText : prevDesc;
+                if (!prevContent.isEmpty() && !prevContent.contains("账单详情") && !prevContent.contains("返回")) {
+                    fallbackTitle = prevContent;
+                }
             }
 
             // 3. 提取支付方式 (用于模糊匹配资产)
@@ -1214,16 +1231,21 @@ public class SelectToSpeakService extends AccessibilityService {
                 }
             }
 
-            // 4. 提取商品说明 或 收款方全称 【新增支持 "交易说明"】
-            if ("商品说明".equals(content) || "收款方全称".equals(content) || "管理自动扣款".equals(content) || "交易说明".equals(content)) {
-                for (int j = i + 1; j < allNodes.size(); j++) {
+            // 4. 提取商品说明/交易详情
+            // 【核心补丁 2】：添加对 "交易详情" 标签的识别，并过滤淘宝图片乱码
+            if ("商品说明".equals(content) || "收款方全称".equals(content) || "管理自动扣款".equals(content) || "交易说明".equals(content) || "交易详情".equals(content)) {
+                for (int j = i + 1; j < Math.min(allNodes.size(), i + 5); j++) {
                     AccessibilityNodeInfo nextNode = allNodes.get(j);
                     String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
                     String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
                     String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
+
                     if (!nextContent.isEmpty()) {
-                        // 如果之前抓到了收款方全称，现在又遇到了商品说明或交易说明，我们优先使用更详细的说明
-                        if (merchantInfo.isEmpty() || "商品说明".equals(content) || "交易说明".equals(content)) {
+                        // 屏蔽淘宝图片ID特征码，防止抓到 "O1CN019h..." 这种乱码
+                        if (nextContent.contains("!!") || nextContent.startsWith("O1CN")) {
+                            continue;
+                        }
+                        if (merchantInfo.isEmpty() || "商品说明".equals(content) || "交易说明".equals(content) || "交易详情".equals(content)) {
                             merchantInfo = nextContent;
                         }
                         break;
@@ -1231,14 +1253,14 @@ public class SelectToSpeakService extends AccessibilityService {
                 }
             }
 
-            // 5. 提取支付时间 【新增支持 "收款时间"】
+            // 5. 提取支付时间
             if ("支付时间".equals(content) || "创建时间".equals(content) || "收款时间".equals(content)) {
                 for (int j = i + 1; j < allNodes.size(); j++) {
                     AccessibilityNodeInfo nextNode = allNodes.get(j);
                     String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
                     String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
                     String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
-                    if (!nextContent.isEmpty()) {
+                    if (!nextContent.isEmpty() && nextContent.contains("-") && nextContent.contains(":")) {
                         timeString = nextContent;
                         break;
                     }
@@ -1256,22 +1278,26 @@ public class SelectToSpeakService extends AccessibilityService {
             long now = System.currentTimeMillis();
             if (now - lastWindowDismissTime < 2500) return true;
 
-            // 兜底默认值
-            if (merchantInfo.isEmpty()) merchantInfo = "支付宝账单";
+            // 【核心补丁 3】：确定最终商户名 (优先使用商品长说明，如果没有则使用店名兜底)
+            if (merchantInfo.isEmpty() && !fallbackTitle.isEmpty()) {
+                merchantInfo = fallbackTitle;
+            }
+            if (merchantInfo.isEmpty()) {
+                merchantInfo = "支付宝账单";
+            }
 
-            // 防重复录入签名 (加入了type防止同金额的支出收入冲突)
+            // 防重复录入签名
             String signature = "alipay_bill-" + amount + "-" + type + "-" + merchantInfo + "-" + timeString;
             if (now - lastRecordTime < 300000 && signature.equals(lastContentSignature)) return true;
 
             lastRecordTime = now;
             lastContentSignature = signature;
 
-            // 解析抓取到的支付宝真实时间，计算真实的时间戳
+            // 解析真实时间
             long parsedTimestamp = now;
             String displayTime = "";
             if (!timeString.isEmpty()) {
                 try {
-                    // 支付宝的时间格式是 "yyyy-MM-dd HH:mm:ss"
                     SimpleDateFormat parseFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
                     java.util.Date date = parseFormat.parse(timeString);
                     if (date != null) {
@@ -1287,26 +1313,25 @@ public class SelectToSpeakService extends AccessibilityService {
                 displayTime = displayFormat.format(new java.util.Date(now));
             }
 
-            // 构造记录标识，如："03-27 13:33 隆江猪脚饭" 或 "04-16 18:01 iphone se3"
             final String recordIdentifier = displayTime + " " + merchantInfo;
-
             final double finalAmount = amount;
             final int finalType = type;
             final long finalTimestamp = parsedTimestamp;
 
-            // 智能选择默认分类 (增加闲鱼二手交易词汇识别)
+            // 智能分类 (增加了对日用品和超市的识别)
             String defaultCategory = (finalType == 0) ? "购物" : "其他收入";
             if (merchantInfo.contains("美团") || merchantInfo.contains("饿了么") || merchantInfo.contains("餐饮") || merchantInfo.contains("饭")) {
                 defaultCategory = "餐饮";
             } else if (merchantInfo.contains("闲鱼") || merchantInfo.contains("机")) {
                 defaultCategory = (finalType == 1) ? "二手交易" : "购物";
+            } else if (merchantInfo.contains("超市") || merchantInfo.contains("店") || merchantInfo.contains("皂") || merchantInfo.contains("百货")) {
+                defaultCategory = "购物";
             }
 
-            // 自动匹配资产
+            // 资产模糊匹配
             String assetKeyword = paymentMethod.isEmpty() ? "支付宝" : paymentMethod;
             int autoAssetId = AutoAssetManager.matchAsset(this, "com.eg.android.AlipayGphone", assetKeyword);
 
-            // 触发记账确认窗口
             String finalDefaultCategory = defaultCategory;
             handler.post(() -> showConfirmWindow(finalAmount, finalType, finalDefaultCategory, recordIdentifier, autoAssetId, "¥", finalTimestamp));
 
@@ -1315,6 +1340,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
         return false;
     }
+
     // ================= 微信适配测试代码 开始 =================
     private void debugWeChatNodeTree(AccessibilityNodeInfo root) {
         if (root == null) return;
