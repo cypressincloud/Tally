@@ -147,6 +147,7 @@ public class AssetsFragment extends Fragment {
         android.widget.Spinner spinnerFrom = view.findViewById(R.id.spinner_from_account);
         android.widget.Spinner spinnerTo = view.findViewById(R.id.spinner_to_account);
         EditText etAmount = view.findViewById(R.id.et_transfer_amount);
+        EditText etDiscount = view.findViewById(R.id.et_transfer_discount);
         EditText etNote = view.findViewById(R.id.et_transfer_note);
         Button btnCancel = view.findViewById(R.id.btn_cancel);
         Button btnConfirm = view.findViewById(R.id.btn_confirm);
@@ -210,12 +211,32 @@ public class AssetsFragment extends Fragment {
                 return;
             }
 
+            // 【新增】：解析优惠金额
+            double discount = 0;
+            String discountStr = etDiscount.getText().toString().trim();
+            if (!discountStr.isEmpty()) {
+                try {
+                    discount = Double.parseDouble(discountStr);
+                    if (discount < 0) {
+                        Toast.makeText(getContext(), "优惠金额不能为负数", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (discount >= amount) {
+                        Toast.makeText(getContext(), "优惠金额不能大于或等于转账金额", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    Toast.makeText(getContext(), "优惠金额格式不正确", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+
             // 获取实际账户时，索引需要减 1（因为第 0 项是虚拟的提示词）
             AssetAccount fromAccount = allAccounts.get(fromIndex - 1);
             AssetAccount toAccount = allAccounts.get(toIndex - 1);
             String note = etNote.getText().toString().trim();
 
-            viewModel.transferAsset(fromAccount, toAccount, amount, note);
+            viewModel.transferAsset(fromAccount, toAccount, amount, discount, note);
             Toast.makeText(getContext(), "资产转移成功", Toast.LENGTH_SHORT).show();
             dialog.dismiss();
         });

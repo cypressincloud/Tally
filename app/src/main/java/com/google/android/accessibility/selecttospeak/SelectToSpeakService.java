@@ -322,16 +322,28 @@ public class SelectToSpeakService extends AccessibilityService {
 
         String packageName = event.getPackageName().toString();
 
-        // 🌟 1. 核心拦截：如果既不在白名单内，也不包含 "meituan"，直接抛弃事件，不作任何处理！
-        boolean isTargetApp = TARGET_PACKAGES.contains(packageName) || packageName.contains("meituan");
-        if (!isTargetApp) {
-            return;
-        }
-
-        // 🌟 2. 自己的应用包名也跳过（防止在自己 App 内错误识别或循环嵌套）
+        // 1. 自己的应用包名始终跳过（防止在自己 App 内无限循环或套娃）
         if ("com.example.budgetapp".equals(packageName)) {
             return;
         }
+
+        // 🌟 2. 动态拦截核心逻辑：先读取日志开关状态
+        boolean isLogEnabled = false;
+        try {
+            // 读取是否开启了“任意应用节点抓取”
+            isLogEnabled = com.example.budgetapp.util.AutoTrackLogManager.isLogEnabled(this);
+        } catch (Exception e) {
+            // 忽略读取异常
+        }
+
+        // 🌟 3. 如果【没有开启】日志功能，则执行严格的包名白名单拦截（省电、防误杀）
+        if (!isLogEnabled) {
+            boolean isTargetApp = TARGET_PACKAGES.contains(packageName) || packageName.contains("meituan");
+            if (!isTargetApp) {
+                return; // 既不在白名单，也没开日志，直接抛弃事件！
+            }
+        }
+        // 如果 isLogEnabled 为 true，代码会顺畅往下走，放行所有应用的事件
 
         if (config == null) config = new AssistantConfig(this);
         if (!config.isEnabled()) return;

@@ -54,6 +54,19 @@
             android:textSize="16sp" />
 
         <EditText
+            android:id="@+id/et_transfer_discount"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_input_field"
+            android:hint="优惠金额"
+            android:inputType="numberDecimal"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:paddingHorizontal="16dp"
+            android:textSize="16sp" />
+
+        <EditText
             android:id="@+id/et_transfer_note"
             android:layout_width="match_parent"
             android:layout_height="56dp"

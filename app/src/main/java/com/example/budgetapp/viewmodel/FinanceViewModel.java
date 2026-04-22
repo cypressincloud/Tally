@@ -321,25 +321,28 @@ public class FinanceViewModel extends AndroidViewModel {
     // (在 ViewModel 中新增转移方法)
 
     /**
-     * 资产转移：处理余额增减，并生成一条转账记录
+     * 资产转移：处理余额增减（包含优惠逻辑），并生成一条转账记录
      */
-    public void transferAsset(AssetAccount fromAccount, AssetAccount toAccount, double amount, String note) {
+    public void transferAsset(AssetAccount fromAccount, AssetAccount toAccount, double amount, double discount, String note) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
-            // 1. 处理转出账户余额
+            // 实际扣款金额 = 设定转账金额 - 优惠金额
+            double actualDeduct = amount - discount;
+
+            // 1. 处理转出账户余额 (以实际扣款金额计算)
             if (fromAccount.type == 1) {
                 // 从负债账户转出（例如用信用卡取现借出），意味着负债增加
-                fromAccount.amount += amount;
+                fromAccount.amount += actualDeduct;
             } else {
                 // 从资产(0)、借出(2)、理财(3)转出，余额减少
-                fromAccount.amount -= amount;
+                fromAccount.amount -= actualDeduct;
             }
 
-            // 2. 处理转入账户余额
+            // 2. 处理转入账户余额 (目标账户全额入账或全额抵扣负债)
             if (toAccount.type == 1) {
-                // 转入负债账户（例如还信用卡），负债减少
+                // 转入负债账户（例如还信用卡），负债减少目标全额
                 toAccount.amount -= amount;
             } else {
-                // 转入资产(0)、借出(2)、理财(3)，余额增加
+                // 转入资产(0)、借出(2)、理财(3)，余额增加全额
                 toAccount.amount += amount;
             }
 
@@ -349,21 +352,23 @@ public class FinanceViewModel extends AndroidViewModel {
 
             // 3. 生成对应的账单明细
             Transaction transaction = new Transaction();
-            transaction.amount = amount;
-            // ⚠️使用 2 代表转账，避免转账被混淆统计入常规的“支出(0)”或“收入(1)”中
-            // 需要确保你的 DetailsAdapter 和 StatsFragment 支持或过滤 type = 2 的情况
-            transaction.type = 2;
+            transaction.amount = actualDeduct; // 账单记录实际支出的金额
+            transaction.type = 2; // 转账
             transaction.category = "资产互转";
+
             String noteContent = fromAccount.name + " -> " + toAccount.name;
-            transaction.note = noteContent + (note.isEmpty() ? "" : " (" + note + ")");
+            // 如果存在优惠，在备注里标明原单金额和优惠
+            if (discount > 0) {
+                noteContent += " (账单:" + amount + " 优惠:" + discount + ")";
+            }
+            transaction.note = noteContent + (note.isEmpty() ? "" : " | 备注: " + note);
             transaction.date = System.currentTimeMillis();
             transaction.assetId = fromAccount.id; // 关联转出账户
 
             transactionDao.insert(transaction);
-            notifyWidgetUpdate(); // 【新增】
+            notifyWidgetUpdate();
         });
     }
-
 // ================= 新增：动态按需加载 API =================
 
     /**

@@ -105,7 +105,7 @@
                     android:id="@+id/switch_capture"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:track="@drawable/switch_track_custom"
+                    android:background="@null"  android:track="@drawable/switch_track_custom"
                     android:thumb="@drawable/switch_thumb_custom"
                     android:theme="@style/Theme.AppCompat.Light"/>
             </LinearLayout>

@@ -4,5 +4,4 @@
     android:accessibilityFlags="flagDefault|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="100"
-    android:canRetrieveWindowContent="true"
-    android:packageNames="com.eg.android.AlipayGphone,com.tencent.mm,com.xunmeng.pinduoduo,com.ss.android.ugc.aweme,com.jingdong.app.mall,com.aliyun.tongyi,com.unionpay,com.ss.android.ugc.lifeservices,com.sankuai.meituan,com.meituan.takeout" />
+    android:canRetrieveWindowContent="true" />
