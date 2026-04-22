@@ -4,6 +4,7 @@
     android:id="@+id/settings_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:importantForAccessibility="noHideDescendants"
     android:orientation="vertical"
     android:background="@color/bar_background"
     android:padding="16dp">

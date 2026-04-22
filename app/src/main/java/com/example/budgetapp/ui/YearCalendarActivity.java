@@ -18,7 +18,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AppDatabase;
-import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.database.TransactionDao;
 
 import java.time.Instant;
@@ -28,7 +27,6 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -47,10 +45,7 @@ public class YearCalendarActivity extends AppCompatActivity {
     private int touchSlop;
     private boolean isAnimating = false;
 
-    // 【新增 1】年份数据缓存，使用 ConcurrentHashMap 保证多线程安全
-    private final Map<Integer, Map<Integer, Map<Integer, Double>>> yearStatsCache = new ConcurrentHashMap<>();
-
-    // 【新增 2】单线程池，专门用于后台去数据库捞数据，防止频繁 new Thread 造成资源浪费
+    // 单线程池，专门用于后台去数据库捞数据
     private final ExecutorService dbExecutor = Executors.newSingleThreadExecutor();
 
     @Override
@@ -181,34 +176,29 @@ public class YearCalendarActivity extends AppCompatActivity {
         }
     }
 
-    // 【修改】核心逻辑：先读缓存，没缓存再查数据库，最后执行预加载
     private void loadData(int direction, int targetYear) {
-        if (yearStatsCache.containsKey(targetYear)) {
-            // 缓存命中：直接在主线程渲染，无需等待数据库！
-            renderData(direction, targetYear, yearStatsCache.get(targetYear));
-            prefetchAdjacentYears(targetYear);
-        } else {
-            // 缓存未命中：交由线程池去数据库查询
-            dbExecutor.execute(() -> {
-                Map<Integer, Map<Integer, Double>> stats = fetchYearStatsFromDb(targetYear);
-                // 存入缓存
-                yearStatsCache.put(targetYear, stats);
-                runOnUiThread(() -> {
-                    renderData(direction, targetYear, stats);
-                    prefetchAdjacentYears(targetYear);
-                });
-            });
-        }
+        dbExecutor.execute(() -> {
+            // 获取时间范围
+            ZoneId zoneId = ZoneId.systemDefault();
+            long start = LocalDate.of(targetYear, 1, 1).atStartOfDay(zoneId).toInstant().toEpochMilli();
+            long end = LocalDate.of(targetYear, 12, 31).atTime(LocalTime.MAX).atZone(zoneId).toInstant().toEpochMilli();
+
+            // 🌟 调用新的优化 SQL，只拿有数据的月份列表 (如 [1, 3, 10] 表示 1,3,10月有账单)
+            List<Integer> monthsWithData = AppDatabase.getDatabase(this).transactionDao().getMonthsWithDataSync(start, end);
+
+            if (!isFinishing() && !isDestroyed()) {
+                runOnUiThread(() -> renderData(direction, targetYear, monthsWithData));
+            }
+        });
     }
 
-    // 【修改】使用轻量级对象查询，极大降低内存占用
+    // 使用轻量级对象查询，极大降低内存占用
     private Map<Integer, Map<Integer, Double>> fetchYearStatsFromDb(int year) {
         ZoneId zoneId = ZoneId.systemDefault();
         long start = LocalDate.of(year, 1, 1).atStartOfDay(zoneId).toInstant().toEpochMilli();
         long end = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX).atZone(zoneId).toInstant().toEpochMilli();
 
         TransactionDao dao = AppDatabase.getDatabase(this).transactionDao();
-        // 🌟 核心优化：只查 date, type, amount 三个字段，且已在 SQL 层排除了转账记录
         List<com.example.budgetapp.database.TransactionMinimal> transactions = dao.getMinimalTransactionsSync(start, end);
 
         Map<Integer, Map<Integer, Double>> stats = new HashMap<>();
@@ -228,21 +218,9 @@ public class YearCalendarActivity extends AppCompatActivity {
         return stats;
     }
 
-    // 【新增】后台静默预加载相邻年份（上一年、下一年）
-    private void prefetchAdjacentYears(int centerYear) {
-        dbExecutor.execute(() -> {
-            if (!yearStatsCache.containsKey(centerYear - 1)) {
-                yearStatsCache.put(centerYear - 1, fetchYearStatsFromDb(centerYear - 1));
-            }
-            if (!yearStatsCache.containsKey(centerYear + 1)) {
-                yearStatsCache.put(centerYear + 1, fetchYearStatsFromDb(centerYear + 1));
-            }
-        });
-    }
-
-    // 【抽离】将数据渲染并推入屏幕的 UI 动画逻辑单独拿出来
-    private void renderData(int direction, int year, Map<Integer, Map<Integer, Double>> stats) {
-        YearCalendarAdapter adapter = new YearCalendarAdapter(year, stats, viewPool);
+    // 将数据渲染并推入屏幕的 UI 动画逻辑
+    private void renderData(int direction, int year, List<Integer> monthsWithData) {
+        YearCalendarAdapter adapter = new YearCalendarAdapter(year, monthsWithData, viewPool);
         adapter.setOnMonthClickListener((y, m) -> {
             Intent resultIntent = new Intent();
             resultIntent.putExtra("year", y);
@@ -278,7 +256,10 @@ public class YearCalendarActivity extends AppCompatActivity {
         super.onDestroy();
         // Activity 销毁时释放线程池资源
         if (!dbExecutor.isShutdown()) {
-            dbExecutor.shutdownNow();
+            // 🌟 核心修复：绝对不能使用 shutdownNow() 强制中断！
+            // 强制中断正在读取 Room 数据库的线程会直接锁死整个数据库连接，导致退回主页后死锁。
+            // 改用 shutdown()，允许正在查询的任务正常跑完，但不再接受新任务。
+            dbExecutor.shutdown();
         }
     }
 }

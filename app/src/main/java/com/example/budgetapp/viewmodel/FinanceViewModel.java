@@ -408,9 +408,4 @@ public class FinanceViewModel extends AndroidViewModel {
         com.example.budgetapp.widget.WidgetUtils.updateAllWidgets(getApplication());
     }
 
-    // ================= 通知桌面小组件刷新 =================
-    private void notifyWidgetUpdate() {
-        com.example.budgetapp.widget.WidgetUtils.updateAllWidgets(getApplication());
-    }
-
 }

@@ -173,9 +173,9 @@ public class RecordFragment extends Fragment {
                         } else if (dx < -screenWidth * 0.2f) {
                             finishSwipeAnimation(rv, -screenWidth, 0, 1); // 拉出下个月
                         } else {
-                            // 距离不够，回弹
+                            // 距离不够，平滑恢复原位（删除了多余的 Overshoot 回弹效果）
                             rv.animate().translationX(0f).alpha(1f).setDuration(250)
-                                    .setInterpolator(new android.view.animation.OvershootInterpolator()).start();
+                                    .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
                         }
                         isHorizontalSwipe = false;
                         break;

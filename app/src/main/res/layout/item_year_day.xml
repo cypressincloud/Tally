@@ -15,12 +15,4 @@
         android:textColor="?android:attr/textColorPrimary"
         android:includeFontPadding="false"/>
 
-    <View
-        android:id="@+id/view_indicator"
-        android:layout_width="8dp"
-        android:layout_height="1.5dp"
-        android:layout_marginTop="0.5dp"
-        android:background="#FF0000"
-        android:visibility="invisible"/>
-
 </LinearLayout>

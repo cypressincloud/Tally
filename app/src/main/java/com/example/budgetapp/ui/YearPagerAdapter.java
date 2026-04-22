@@ -1,7 +1,6 @@
 package com.example.budgetapp.ui;
 
 import android.content.Context;
-import android.util.LruCache;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,12 +9,10 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AppDatabase;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,67 +26,33 @@ public class YearPagerAdapter extends RecyclerView.Adapter<YearPagerAdapter.Year
     // 线程池管理
     private final ExecutorService executor = Executors.newFixedThreadPool(3);
 
-    // 1. 扩大缓存容量，确保可以覆盖 getItemCount() 定义的大部分年份
-    private final LruCache<Integer, Map<Integer, Map<Integer, Double>>> dataCache = new LruCache<>(100);
-
     public YearPagerAdapter(Context context, int startYear) {
         this.context = context.getApplicationContext();
         this.startYear = startYear;
     }
 
     /**
-     * 主动预热缓存：在后台线程中预加载所有年份的数据
+     * 🌟 优化：直接查询该年份哪些月份有数据，返回 1-12 的月份列表
      */
-    public void preloadAllYears() {
-        executor.execute(() -> {
-            try {
-                int totalCount = getItemCount();
-                for (int i = 0; i < totalCount; i++) {
-                    int year = startYear + (i - 500);
-                    // 如果缓存中还没有，则进行加载
-                    if (dataCache.get(year) == null) {
-                        loadDataToCacheOnly(year);
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
-
-    /**
-     * 仅执行数据查询并放入缓存，不涉及任何 UI 操作
-     */
-    private void loadDataToCacheOnly(int year) {
+    private List<Integer> fetchMonthsWithData(int year) {
         ZoneId zoneId = ZoneId.systemDefault();
         long start = LocalDate.of(year, 1, 1).atStartOfDay(zoneId).toInstant().toEpochMilli();
         long end = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX).atZone(zoneId).toInstant().toEpochMilli();
 
-        var dao = AppDatabase.getDatabase(context).transactionDao();
-        // 🌟 核心优化：使用轻量级对象
-        var transactions = dao.getMinimalTransactionsSync(start, end);
-
-        Map<Integer, Map<Integer, Double>> stats = new HashMap<>();
-        if (transactions != null) {
-            for (var t : transactions) {
-                LocalDate date = Instant.ofEpochMilli(t.date).atZone(zoneId).toLocalDate();
-                int m = date.getMonthValue();
-                int d = date.getDayOfMonth();
-                // SQL中已过滤转账，这里直接计算净值
-                stats.computeIfAbsent(m, k -> new HashMap<>())
-                        .merge(d, t.type == 1 ? t.amount : -t.amount, Double::sum);
-            }
-        }
-        dataCache.put(year, stats);
+        // 调用优化后的 DAO 方法，只返回存在记录的月份
+        return AppDatabase.getDatabase(context).transactionDao().getMonthsWithDataSync(start, end);
     }
 
     public void setOnMonthClickListener(YearCalendarAdapter.OnMonthClickListener listener) {
         this.monthClickListener = listener;
     }
 
+    /**
+     * 🌟 优化：改为平滑关闭，防止强制中断导致数据库死锁
+     */
     public void shutdownExecutor() {
         if (!executor.isShutdown()) {
-            executor.shutdownNow();
+            executor.shutdown();
         }
     }
 
@@ -105,32 +68,30 @@ public class YearPagerAdapter extends RecyclerView.Adapter<YearPagerAdapter.Year
         int year = startYear + (position - 500);
         holder.itemView.setTag(year);
 
-        Map<Integer, Map<Integer, Double>> cachedData = dataCache.get(year);
-        if (cachedData != null) {
-            updateUI(holder, year, cachedData);
-        } else {
-            holder.rvYearList.setAdapter(null);
-            loadYearDataAsync(holder, year);
-        }
+        // 每次绑定时先清空，防止旧视图闪现
+        holder.rvYearList.setAdapter(null);
+        loadYearDataAsync(holder, year);
     }
 
     private void loadYearDataAsync(YearViewHolder holder, int year) {
         executor.execute(() -> {
-            loadDataToCacheOnly(year);
-            Map<Integer, Map<Integer, Double>> stats = dataCache.get(year);
+            // 🌟 获取有数据的月份列表
+            List<Integer> monthsWithData = fetchMonthsWithData(year);
 
             holder.itemView.post(() -> {
                 Object tag = holder.itemView.getTag();
+                // 校验 Tag 确保异步回调时 ViewHolder 没被复用
                 if (tag != null && (int) tag == year) {
-                    updateUI(holder, year, stats);
+                    updateUI(holder, year, monthsWithData);
                 }
             });
         });
     }
 
-    private void updateUI(YearViewHolder holder, int year, Map<Integer, Map<Integer, Double>> stats) {
+    private void updateUI(YearViewHolder holder, int year, List<Integer> monthsWithData) {
         if (holder.rvYearList != null) {
-            YearCalendarAdapter adapter = new YearCalendarAdapter(year, stats, sharedPool);
+            // 🌟 按照新的构造函数传入 List<Integer>
+            YearCalendarAdapter adapter = new YearCalendarAdapter(year, monthsWithData, sharedPool);
             adapter.setOnMonthClickListener(monthClickListener);
             holder.rvYearList.setAdapter(adapter);
         }

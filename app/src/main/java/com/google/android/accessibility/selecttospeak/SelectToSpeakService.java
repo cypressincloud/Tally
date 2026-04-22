@@ -302,6 +302,10 @@ public class SelectToSpeakService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        // 🌟 如果事件来自自己的应用包名，直接跳过，不执行扫描逻辑
+        if ("com.example.budgetapp".equals(event.getPackageName())) {
+            return;
+        }
         if (config == null) config = new AssistantConfig(this);
         if (!config.isEnabled()) return;
 

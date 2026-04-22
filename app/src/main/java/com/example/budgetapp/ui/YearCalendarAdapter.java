@@ -3,6 +3,7 @@ package com.example.budgetapp.ui;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -20,18 +21,16 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapter.MonthViewHolder> {
 
     private int year;
-    private final Map<Integer, Map<Integer, Double>> yearData;
-    private final RecyclerView.RecycledViewPool viewPool; // 共享池
+    // 🌟 优化：不再存储全量金额数据，只存储有记账记录的月份列表 (例如 [1, 3, 5])
+    private final List<Integer> monthsWithData;
+    private final RecyclerView.RecycledViewPool viewPool;
     private OnMonthClickListener listener;
 
-    // 颜色缓存
     private Integer cachedThemeColor = null;
     private Integer cachedDefaultTextColor = null;
 
@@ -43,29 +42,20 @@ public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapte
         this.listener = listener;
     }
 
-    public YearCalendarAdapter(int year, Map<Integer, Map<Integer, Double>> yearData, RecyclerView.RecycledViewPool viewPool) {
+    // 🌟 构造函数同步修改为接收 List<Integer>
+    public YearCalendarAdapter(int year, List<Integer> monthsWithData, RecyclerView.RecycledViewPool viewPool) {
         this.year = year;
-        this.yearData = yearData;
+        this.monthsWithData = monthsWithData != null ? monthsWithData : new ArrayList<>();
         this.viewPool = viewPool;
-    }
-
-    // ================= 核心优化：外层数据热更新 =================
-    public void updateData(int newYear, Map<Integer, Map<Integer, Double>> newStats) {
-        this.year = newYear;
-        this.yearData.clear();
-        this.yearData.putAll(newStats);
-        notifyDataSetChanged();
     }
 
     @NonNull
     @Override
     public MonthViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_year_month, parent, false);
-
         if (cachedThemeColor == null) {
             initColors(parent.getContext());
         }
-
         return new MonthViewHolder(view, viewPool);
     }
 
@@ -85,12 +75,25 @@ public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapte
         int month = position + 1;
         holder.tvMonthName.setText(month + "月");
 
-        // 1. 父布局点击
+        // 1. 设置指示器小圆点背景
+        GradientDrawable dotShape = new GradientDrawable();
+        dotShape.setShape(GradientDrawable.OVAL);
+        dotShape.setColor(cachedThemeColor);
+        holder.monthIndicator.setBackground(dotShape);
+
+        // 🌟 2. 核心逻辑：直接检查当前月份是否在有数据的列表中
+        if (monthsWithData.contains(month)) {
+            holder.monthIndicator.setVisibility(View.VISIBLE);
+        } else {
+            holder.monthIndicator.setVisibility(View.INVISIBLE);
+        }
+
+        // 3. 事件处理：点击月份跳转
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onMonthClick(year, month);
         });
 
-        // 2. 拦截子View触摸，手动触发父布局点击
+        // 拦截子网格触摸，使其响应父布局点击
         holder.rvMonthGrid.setOnTouchListener((v, event) -> {
             if (event.getAction() == MotionEvent.ACTION_UP) {
                 holder.itemView.performClick();
@@ -98,21 +101,15 @@ public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapte
             return true;
         });
 
-        Map<Integer, Double> monthStats = yearData.getOrDefault(month, new HashMap<>());
-
-        // 生成固定 42 个格子的数据
+        // 4. 加载日期网格（不再需要传入统计数据，仅展示日期）
         List<LocalDate> days = generateDaysForMonth(year, month);
-
-        // ================= 核心优化：子适配器视图复用 =================
-        // 获取现有的 Adapter，如果存在就只刷新数据，绝不重建视图，防止卡死主线程！
         MonthGridAdapter gridAdapter = (MonthGridAdapter) holder.rvMonthGrid.getAdapter();
         if (gridAdapter == null) {
-            gridAdapter = new MonthGridAdapter(days, monthStats, cachedThemeColor, cachedDefaultTextColor);
+            gridAdapter = new MonthGridAdapter(days, cachedThemeColor, cachedDefaultTextColor);
             holder.rvMonthGrid.setLayoutManager(new GridLayoutManager(holder.itemView.getContext(), 7));
             holder.rvMonthGrid.setAdapter(gridAdapter);
         } else {
-            // 仅仅更新底层数据，不重新 inflate XML
-            gridAdapter.updateData(days, monthStats);
+            gridAdapter.updateData(days);
         }
     }
 
@@ -121,68 +118,50 @@ public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapte
         return 12;
     }
 
-    // 填充至固定 42 个格子 (6行)
     private List<LocalDate> generateDaysForMonth(int year, int month) {
         List<LocalDate> list = new ArrayList<>();
         YearMonth yearMonth = YearMonth.of(year, month);
-
-        // 计算月初偏移
         LocalDate firstDay = yearMonth.atDay(1);
         int dayOfWeek = firstDay.getDayOfWeek().getValue();
-        int offset = dayOfWeek - 1; // Mon=1 -> 0, Sun=7 -> 6
+        int offset = dayOfWeek - 1;
 
-        // 1. 填充月初空白
-        for (int i = 0; i < offset; i++) {
-            list.add(null);
-        }
-
-        // 2. 填充实际日期
+        for (int i = 0; i < offset; i++) list.add(null);
         int length = yearMonth.lengthOfMonth();
-        for (int i = 1; i <= length; i++) {
-            list.add(yearMonth.atDay(i));
-        }
-
-        // 3. 填充剩余空白，直到总数达到 42 (6行 * 7列)
-        while (list.size() < 42) {
-            list.add(null);
-        }
-
+        for (int i = 1; i <= length; i++) list.add(yearMonth.atDay(i));
+        while (list.size() < 42) list.add(null);
         return list;
     }
 
     static class MonthViewHolder extends RecyclerView.ViewHolder {
         TextView tvMonthName;
+        View monthIndicator;
         RecyclerView rvMonthGrid;
 
         public MonthViewHolder(@NonNull View itemView, RecyclerView.RecycledViewPool pool) {
             super(itemView);
             tvMonthName = itemView.findViewById(R.id.tv_month_name);
+            monthIndicator = itemView.findViewById(R.id.view_month_indicator);
             rvMonthGrid = itemView.findViewById(R.id.rv_month_grid);
-
             rvMonthGrid.setRecycledViewPool(pool);
             rvMonthGrid.setNestedScrollingEnabled(false);
         }
     }
 
+    // 🌟 内部日期适配器精简：去除了所有的统计数据引用
     static class MonthGridAdapter extends RecyclerView.Adapter<MonthGridAdapter.DayViewHolder> {
         private final List<LocalDate> days;
-        private final Map<Integer, Double> dailyStats;
         private final int themeColor;
         private final int defaultTextColor;
 
-        public MonthGridAdapter(List<LocalDate> days, Map<Integer, Double> dailyStats, int themeColor, int defaultTextColor) {
+        public MonthGridAdapter(List<LocalDate> days, int themeColor, int defaultTextColor) {
             this.days = new ArrayList<>(days);
-            this.dailyStats = new HashMap<>(dailyStats);
             this.themeColor = themeColor;
             this.defaultTextColor = defaultTextColor;
         }
 
-        // ================= 核心优化：子适配器的数据热更新 =================
-        public void updateData(List<LocalDate> newDays, Map<Integer, Double> newStats) {
+        public void updateData(List<LocalDate> newDays) {
             this.days.clear();
             this.days.addAll(newDays);
-            this.dailyStats.clear();
-            this.dailyStats.putAll(newStats);
             notifyDataSetChanged();
         }
 
@@ -196,37 +175,13 @@ public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapte
         @Override
         public void onBindViewHolder(@NonNull DayViewHolder holder, int position) {
             LocalDate date = days.get(position);
-
-            // 如果是空白占位
             if (date == null) {
                 holder.tvDayNum.setText("");
-                holder.indicator.setVisibility(View.INVISIBLE);
                 return;
             }
-
-            int day = date.getDayOfMonth();
-            holder.tvDayNum.setText(String.valueOf(day));
-
+            holder.tvDayNum.setText(String.valueOf(date.getDayOfMonth()));
             DayOfWeek dow = date.getDayOfWeek();
-            if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) {
-                holder.tvDayNum.setTextColor(themeColor);
-            } else {
-                holder.tvDayNum.setTextColor(defaultTextColor);
-            }
-
-            if (dailyStats.containsKey(day)) {
-                double net = dailyStats.get(day);
-                holder.indicator.setVisibility(View.VISIBLE);
-                if (net > 0) {
-                    holder.indicator.setBackgroundColor(Color.parseColor("#F44336"));
-                } else if (net < 0) {
-                    holder.indicator.setBackgroundColor(Color.parseColor("#4CAF50"));
-                } else {
-                    holder.indicator.setVisibility(View.INVISIBLE);
-                }
-            } else {
-                holder.indicator.setVisibility(View.INVISIBLE);
-            }
+            holder.tvDayNum.setTextColor((dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) ? themeColor : defaultTextColor);
         }
 
         @Override
@@ -236,12 +191,9 @@ public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapte
 
         static class DayViewHolder extends RecyclerView.ViewHolder {
             TextView tvDayNum;
-            View indicator;
-
             public DayViewHolder(@NonNull View itemView) {
                 super(itemView);
                 tvDayNum = itemView.findViewById(R.id.tv_day_num);
-                indicator = itemView.findViewById(R.id.view_indicator);
             }
         }
     }
