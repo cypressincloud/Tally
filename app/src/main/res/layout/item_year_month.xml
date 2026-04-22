@@ -26,15 +26,6 @@
             android:textStyle="bold"
             android:textColor="?android:attr/textColorPrimary"/>
 
-        <View
-            android:id="@+id/view_month_indicator"
-            android:layout_width="4dp"
-            android:layout_height="4dp"
-            android:layout_toEndOf="@id/tv_month_name"
-            android:layout_alignTop="@id/tv_month_name"
-            android:layout_marginStart="2dp"
-            android:layout_marginTop="6dp"
-            android:visibility="invisible" />
     </RelativeLayout>
 
     <LinearLayout

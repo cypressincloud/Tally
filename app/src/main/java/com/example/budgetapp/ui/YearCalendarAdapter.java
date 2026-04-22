@@ -75,20 +75,14 @@ public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapte
         int month = position + 1;
         holder.tvMonthName.setText(month + "月");
 
-        // 1. 设置指示器小圆点背景
-        GradientDrawable dotShape = new GradientDrawable();
-        dotShape.setShape(GradientDrawable.OVAL);
-        dotShape.setColor(cachedThemeColor);
-        holder.monthIndicator.setBackground(dotShape);
-
-        // 🌟 2. 核心逻辑：直接检查当前月份是否在有数据的列表中
+        // 🌟 1. 核心逻辑：检查当前月份是否在有数据的列表中，并修改字体颜色
         if (monthsWithData.contains(month)) {
-            holder.monthIndicator.setVisibility(View.VISIBLE);
+            holder.tvMonthName.setTextColor(cachedThemeColor);
         } else {
-            holder.monthIndicator.setVisibility(View.INVISIBLE);
+            holder.tvMonthName.setTextColor(cachedDefaultTextColor);
         }
 
-        // 3. 事件处理：点击月份跳转
+        // 2. 事件处理：点击月份跳转
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onMonthClick(year, month);
         });
@@ -101,7 +95,7 @@ public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapte
             return true;
         });
 
-        // 4. 加载日期网格（不再需要传入统计数据，仅展示日期）
+        // 3. 加载日期网格
         List<LocalDate> days = generateDaysForMonth(year, month);
         MonthGridAdapter gridAdapter = (MonthGridAdapter) holder.rvMonthGrid.getAdapter();
         if (gridAdapter == null) {
@@ -134,13 +128,13 @@ public class YearCalendarAdapter extends RecyclerView.Adapter<YearCalendarAdapte
 
     static class MonthViewHolder extends RecyclerView.ViewHolder {
         TextView tvMonthName;
-        View monthIndicator;
+        // 🌟 移除 monthIndicator 变量
         RecyclerView rvMonthGrid;
 
         public MonthViewHolder(@NonNull View itemView, RecyclerView.RecycledViewPool pool) {
             super(itemView);
             tvMonthName = itemView.findViewById(R.id.tv_month_name);
-            monthIndicator = itemView.findViewById(R.id.view_month_indicator);
+            // 🌟 移除对 R.id.view_month_indicator 的绑定
             rvMonthGrid = itemView.findViewById(R.id.rv_month_grid);
             rvMonthGrid.setRecycledViewPool(pool);
             rvMonthGrid.setNestedScrollingEnabled(false);

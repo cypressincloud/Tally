@@ -57,7 +57,9 @@ import com.google.android.material.chip.ChipGroup;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -91,6 +93,18 @@ public class SelectToSpeakService extends AccessibilityService {
 
     // 更新金额匹配正则：捕获金额前的1-3位非数字符号
     private final Pattern amountWithSymbolPattern = Pattern.compile("([^0-9\\s]{1,3})?\\s*([0-9,]+(\\.\\d{1,2})?)");
+
+    // 🌟 新增：定义允许无障碍服务运行的目标应用包名白名单
+    private static final Set<String> TARGET_PACKAGES = new HashSet<>(Arrays.asList(
+            "com.eg.android.AlipayGphone",       // 支付宝
+            "com.tencent.mm",                    // 微信
+            "com.xunmeng.pinduoduo",             // 拼多多
+            "com.ss.android.ugc.aweme",          // 抖音
+            "com.jingdong.app.mall",             // 京东
+            "com.aliyun.tongyi",                 // 通义千问
+            "com.unionpay",                      // 云闪付
+            "com.ss.android.ugc.lifeservices"    // 抖省省
+    ));
 
     // 内部类，用于同时记录数值和识别到的符号
     private final Runnable scanRunnable = new Runnable() {
@@ -302,10 +316,23 @@ public class SelectToSpeakService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // 🌟 如果事件来自自己的应用包名，直接跳过，不执行扫描逻辑
-        if ("com.example.budgetapp".equals(event.getPackageName())) {
+        if (event == null || event.getPackageName() == null) {
             return;
         }
+
+        String packageName = event.getPackageName().toString();
+
+        // 🌟 1. 核心拦截：如果既不在白名单内，也不包含 "meituan"，直接抛弃事件，不作任何处理！
+        boolean isTargetApp = TARGET_PACKAGES.contains(packageName) || packageName.contains("meituan");
+        if (!isTargetApp) {
+            return;
+        }
+
+        // 🌟 2. 自己的应用包名也跳过（防止在自己 App 内错误识别或循环嵌套）
+        if ("com.example.budgetapp".equals(packageName)) {
+            return;
+        }
+
         if (config == null) config = new AssistantConfig(this);
         if (!config.isEnabled()) return;
 
