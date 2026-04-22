@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_bottom_sheet_rounded"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="数据备份与恢复"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="?android:attr/textColorPrimary"
+        android:gravity="center"
+        android:layout_marginBottom="24dp"/>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="400dp"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_export"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="导出数据 (Zip)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_export_excel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="导出账单 (Excel)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_import"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="导入数据 (Zip)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_import_excel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="导入账单 (Excel)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_export_category_json"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="导出分类预设 (JSON)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_import_category_json"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="导入分类预设 (JSON)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_import_external"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="导入钱迹数据 (JSON)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_import_beecount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="从蜜蜂记账导入数据 (CSV)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_import_yimu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="从一木记账导入数据 (xls)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_import_wechat"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="从微信导入账单 (xlsx)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_import_alipay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="从支付宝导入数据 (CSV)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <Button
+        android:id="@+id/btn_cancel_backup"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="24dp"
+        android:text="取 消"
+        android:textColor="?android:attr/textColorSecondary"
+        android:backgroundTint="@color/input_bg"
+        app:cornerRadius="16dp"
+        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"/>
+
+</LinearLayout>

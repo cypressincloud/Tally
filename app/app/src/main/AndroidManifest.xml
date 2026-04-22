@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@drawable/ic_app_logo"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_app_logo"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BudgetApp">
+
+        <activity
+            android:name=".MainActivity"
+            android:windowSoftInputMode="adjustPan"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.AutoTrackLogActivity"
+            android:exported="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.example.budgetapp.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <activity android:name=".ui.PhotoBackupSettingsActivity"
+            android:label="照片备份设置"
+            android:theme="@style/Theme.BudgetApp"/>
+
+        <activity android:name=".ui.ThemeSettingsActivity" />
+
+        <activity android:name=".ui.PhotoActionActivity"
+            android:theme="@style/Theme.BudgetApp.Transparent"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"/>
+
+        <activity
+            android:name=".ui.AboutActivity"
+            android:label="关于"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:label="设置"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
+        <activity
+            android:name=".ui.DonateActivity"
+            android:label="捐赠支持"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
+        <activity
+            android:name=".ui.SecuritySettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"/>
+
+        <activity
+            android:name=".ui.AuthActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"/>
+
+        <activity
+            android:name=".ui.BudgetManagementActivity"
+            android:label="预算管理设置"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
+        <activity
+            android:name=".ui.CategorySettingsActivity"
+            android:label="分类预设管理"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
+        <activity android:name=".ui.AssistantManagerActivity" />
+
+        <activity
+            android:name=".KeywordSettingActivity"
+            android:label="关键字设置"
+            android:exported="false"/>
+
+        <activity android:name=".ui.AutoAssetActivity"
+            android:label="自动资产设置"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
+        <activity
+            android:name=".ui.YearCalendarActivity"
+            android:label="年度账单"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
+        <activity android:name=".ui.UserNoticeActivity" />
+
+        <activity
+            android:name=".ui.BudgetHistoryActivity"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.CurrencySettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.AutoRenewalActivity"
+            android:label="自动续费提醒设置"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
+        <service
+            android:name=".service.QuickAddTileService"
+            android:icon="@drawable/ic_qs_record"
+            android:label="记一笔"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name="com.google.android.accessibility.selecttospeak.SelectToSpeakService"
+            android:exported="true"
+            android:label="记账屏幕同步助手"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:foregroundServiceType="dataSync">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+<!--        <service android:name=".service.NotificationMonitorService"-->
+<!--            android:label="退款通知监听"-->
+<!--            android:exported="true"-->
+<!--            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">-->
+<!--            <intent-filter>-->
+<!--                <action android:name="android.service.notification.NotificationListenerService" />-->
+<!--            </intent-filter>-->
+<!--        </service>-->
+
+    </application>
+
+</manifest>

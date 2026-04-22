@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="300dp"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="@color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="选择默认显示数据"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"
+            android:gravity="center"
+            android:layout_marginBottom="24dp"/>
+
+        <RadioGroup
+            android:id="@+id/rg_default_display"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/rb_display_balance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="结余"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
+                android:layout_marginBottom="8dp"
+                android:buttonTint="?attr/colorPrimary"/>
+
+            <RadioButton
+                android:id="@+id/rb_display_income"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="收入"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
+                android:layout_marginBottom="8dp"
+                android:buttonTint="?attr/colorPrimary"/>
+
+            <RadioButton
+                android:id="@+id/rb_display_expense"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="支出"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
+                android:layout_marginBottom="8dp"
+                android:buttonTint="?attr/colorPrimary"/>
+
+            <RadioButton
+                android:id="@+id/rb_display_overtime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="加班"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
+                android:buttonTint="?attr/colorPrimary"/>
+        </RadioGroup>
+
+        <Button
+            android:id="@+id/btn_cancel_display"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="@color/input_bg"
+            android:text="取 消"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="14sp"
+            app:cornerRadius="16dp" />
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="app_yellow">#3683f7</color>
+    <color name="ripple_yellow">#263238</color>
+
+    <color name="app_background">#121212</color>
+    <color name="white">#1E1E1E</color>
+
+    <color name="black">#E0E0E0</color>
+    <color name="black_marker">#8C8C8C</color>
+    <color name="text_primary">#E0E0E0</color>
+    <color name="text_secondary">#A0A0A0</color>
+
+    <color name="fixed_yellow">#FFD700</color>
+    <color name="tab_unselected">#90A4AE</color>
+
+    <color name="budget_safe_bg">#1A3320</color>
+    <color name="budget_exceed_bg">#3B1919</color>
+    <color name="budget_progress_safe">#A5D6A7</color>
+    <color name="budget_progress_exceed">#EF6565</color>
+
+    <color name="divider_color">#2C2C2C</color>
+
+    <color name="transfer_fab_bg">#2C2C2C</color>
+    <color name="transfer_fab_icon_tint">#E0E0E0</color>
+
+    <color name="calendar_lunar_text">#6b6d6d</color>
+
+    <color name="bottom_selected">@color/app_yellow</color>
+
+    <color name="divider">#73C5BFBF</color>
+    <color name="income_red">#EF6565</color>
+    <color name="expense_green">#A5D6A7</color>
+    <color name="pie_food">#FFF59D</color>
+    <color name="pie_fun">#A5D6A7</color>
+    <color name="pie_edu">#90CAF9</color>
+    <color name="pie_shop">#EF9A9A</color>
+    <color name="highlight_bg_color">#263238</color>
+    <color name="input_bg">#2C2C2C</color>
+
+    <color name="down_background">#000000</color>
+    <color name="bar_background">#000000</color>
+
+    <color name="bottom_unselected">#FFFFFF</color>
+
+    <color name="switch_track_off">#39393D</color>
+    <color name="real_white">#FFFFFF</color>
+
+    <color name="selector_text">#E0E0E0</color>
+    <color name="text_white">#E0E0E0</color>
+    <color name="marker_bg">#2C2C2C</color>
+    <color name="text_on_dark">#E0E0E0</color>
+
+    <color name="cat_unselected_bg">#2C2C2C</color>
+    <color name="cat_unselected_text">#E0E0E0</color>
+
+    <color name="cat_selected_text">#E0E0E0</color>
+    <color name="dialog_bg_floating">#2C2C2C</color>
+    <color name="currency_item_bg_normal">#424242</color>
+    <color name="currency_item_bg_selected">#1565C0</color>
+    <color name="currency_symbol_text_normal">#FFFFFF</color>
+    <color name="currency_symbol_text_selected">#FFFFFF</color>
+    <color name="currency_name_text">#AAAAAA</color>
+</resources>
