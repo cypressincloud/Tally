@@ -287,6 +287,149 @@ public class BackupManager {
     }
 
     // ============================================================================================
+    // 飞鸭记账账单导入 (支持 CSV)
+    // ============================================================================================
+    public static BackupData importFromFeiya(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
+        // 第一次尝试：GBK 编码
+        BackupData data = parseFeiyaCsvWithEncoding(context, uri, "GBK", allAssets);
+        // 如果解析为空，第二次尝试：UTF-8 编码
+        if (data.records == null || data.records.isEmpty()) {
+            data = parseFeiyaCsvWithEncoding(context, uri, "UTF-8", allAssets);
+        }
+        return data;
+    }
+
+    private static BackupData parseFeiyaCsvWithEncoding(Context context, Uri uri, String charsetName, List<AssetAccount> allAssets) throws Exception {
+        List<Transaction> transactions = new ArrayList<>();
+        List<AssetAccount> newAssetsToCreate = new ArrayList<>();
+        Map<String, Integer> newAssetMap = new HashMap<>();
+
+        List<String> expCats = new ArrayList<>(CategoryManager.getExpenseCategories(context));
+        List<String> incCats = new ArrayList<>(CategoryManager.getIncomeCategories(context));
+        Map<String, List<String>> subCatMap = new HashMap<>();
+
+        int maxAssetId = 0;
+        if (allAssets != null) {
+            for (AssetAccount a : allAssets) {
+                if (a.id > maxAssetId) maxAssetId = a.id;
+            }
+        }
+
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, charsetName))) {
+
+            String line;
+            boolean isDataSection = false;
+            // 飞鸭的时间格式可能是 "2026-04-20" 也可能是带时间的格式，做多重兼容
+            SimpleDateFormat parserSdf1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            SimpleDateFormat parserSdf2 = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+
+            int timeIdx = -1, typeIdx = -1, catIdx = -1, subCatIdx = -1, amtIdx = -1, accIdx = -1, remarkIdx = -1;
+
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("\ufeff")) line = line.substring(1);
+                if (TextUtils.isEmpty(line.trim())) continue;
+
+                // 识别表头
+                if (!isDataSection && line.contains("时间") && line.contains("类型") && line.contains("金额")) {
+                    isDataSection = true;
+                    List<String> headers = parseCsvLine(line);
+                    for (int i = 0; i < headers.size(); i++) {
+                        String h = headers.get(i).trim();
+                        if ("时间".equals(h)) timeIdx = i;
+                        else if ("类型".equals(h)) typeIdx = i;
+                        else if ("分类".equals(h)) catIdx = i;
+                        else if ("二级分类".equals(h)) subCatIdx = i;
+                        else if ("金额".equals(h)) amtIdx = i;
+                        else if ("账户".equals(h)) accIdx = i;
+                        else if ("备注".equals(h)) remarkIdx = i;
+                    }
+                    continue;
+                }
+
+                if (!isDataSection) continue;
+
+                List<String> tokens = parseCsvLine(line);
+                if (tokens.size() <= Math.max(timeIdx, amtIdx)) continue; // 关键列缺失则跳过
+
+                Transaction t = new Transaction();
+
+                // 1. 类型映射
+                String typeStr = (typeIdx != -1 && typeIdx < tokens.size()) ? tokens.get(typeIdx).trim() : "";
+                t.type = "收入".equals(typeStr) ? 1 : 0; // 不是收入默认算作支出 (0)
+
+                // 2. 金额映射 (取绝对值)
+                t.amount = Math.abs(parseDoubleSafe(tokens.get(amtIdx).trim()));
+
+                // 3. 时间与记录标识映射
+                String dateStr = tokens.get(timeIdx).trim();
+                Date dateObj = null;
+                try { dateObj = parserSdf1.parse(dateStr); } catch (Exception ignored) {}
+                if (dateObj == null) {
+                    try { dateObj = parserSdf2.parse(dateStr); } catch (Exception ignored) {}
+                }
+                if (dateObj == null) dateObj = new Date(); // 解析失败兜底为当前时间
+
+                t.date = dateObj.getTime();
+
+                // 提取备注并拼装记录标识
+                String remark = (remarkIdx != -1 && remarkIdx < tokens.size()) ? tokens.get(remarkIdx).trim() : "";
+                t.remark = remark;
+                String noteRemark = TextUtils.isEmpty(remark) ? "auto" : remark;
+                t.note = noteSdf.format(dateObj) + " " + noteRemark; // 格式如: "04-20 00:00 微信转账"
+
+                // 4. 分类映射 (含动态新增)
+                String category = (catIdx != -1 && catIdx < tokens.size()) ? tokens.get(catIdx).trim() : "";
+                if (TextUtils.isEmpty(category)) category = "其它";
+                String subCategory = (subCatIdx != -1 && subCatIdx < tokens.size()) ? tokens.get(subCatIdx).trim() : "";
+
+                List<String> targetList = (t.type == 1) ? incCats : expCats;
+                if (!targetList.contains(category)) targetList.add(category);
+
+                if (!TextUtils.isEmpty(subCategory)) {
+                    List<String> subs = subCatMap.get(category);
+                    if (subs == null) {
+                        subs = new ArrayList<>(CategoryManager.getSubCategories(context, category));
+                        subCatMap.put(category, subs);
+                    }
+                    if (!subs.contains(subCategory)) subs.add(subCategory);
+                }
+                t.category = category;
+                t.subCategory = subCategory;
+
+                // 5. 账户映射 (含动态新增)
+                String accountName = (accIdx != -1 && accIdx < tokens.size()) ? tokens.get(accIdx).trim() : "";
+                if (TextUtils.isEmpty(accountName)) accountName = "默认账户"; // 飞鸭中可能为空
+
+                int matchedId = matchAssetId(accountName, allAssets);
+                if (matchedId == 0 && !TextUtils.isEmpty(accountName)) {
+                    if (newAssetMap.containsKey(accountName)) {
+                        t.assetId = newAssetMap.get(accountName);
+                    } else {
+                        maxAssetId++;
+                        AssetAccount newAsset = new AssetAccount(accountName, 0.0, 0);
+                        newAsset.id = maxAssetId;
+                        newAssetsToCreate.add(newAsset);
+                        newAssetMap.put(accountName, maxAssetId);
+                        t.assetId = maxAssetId;
+                    }
+                } else {
+                    t.assetId = matchedId;
+                }
+
+                transactions.add(t);
+            }
+        }
+
+        BackupData result = new BackupData(transactions, newAssetsToCreate);
+        result.expenseCategories = expCats;
+        result.incomeCategories = incCats;
+        result.subCategoryMap = subCatMap;
+        return result;
+    }
+
+    // ============================================================================================
     // 小青账账单导入 (支持 CSV)
     // ============================================================================================
     // 1. 公开的入口方法：负责双重编码尝试

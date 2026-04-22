@@ -86,6 +86,65 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
+    // 1. 定义飞鸭记账导入的 Launcher
+    private final ActivityResultLauncher<String[]> importFeiyaLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        if (financeViewModel == null) return;
+
+                        BackupData data = BackupManager.importFromFeiya(this, uri, allAssets);
+                        int recordCount = 0;
+                        int assetCount = 0;
+
+                        // 导入资产
+                        List<AssetAccount> currentAssets = new ArrayList<>(allAssets);
+                        if (data.assets != null) {
+                            for (AssetAccount a : data.assets) {
+                                if (!isDuplicateAsset(a, currentAssets)) {
+                                    a.id = 0;
+                                    financeViewModel.addAsset(a);
+                                    currentAssets.add(a);
+                                    assetCount++;
+                                }
+                            }
+                        }
+
+                        // 同步分类配置
+                        if (data.expenseCategories != null) CategoryManager.saveExpenseCategories(this, data.expenseCategories);
+                        if (data.incomeCategories != null) CategoryManager.saveIncomeCategories(this, data.incomeCategories);
+                        if (data.subCategoryMap != null) {
+                            for (Map.Entry<String, List<String>> entry : data.subCategoryMap.entrySet()) {
+                                CategoryManager.saveSubCategories(this, entry.getKey(), entry.getValue());
+                            }
+                        }
+
+                        // 导入账单记录
+                        List<Transaction> currentTxs = new ArrayList<>(allTransactions);
+                        if (data.records != null) {
+                            for (Transaction t : data.records) {
+                                if (!isDuplicateTransaction(t, currentTxs)) {
+                                    t.id = 0;
+                                    financeViewModel.addTransaction(t);
+                                    currentTxs.add(t);
+                                    recordCount++;
+                                }
+                            }
+                        }
+
+                        String msg = "成功从飞鸭记账导入 " + recordCount + " 条账单";
+                        if (assetCount > 0) msg += "\n创建了 " + assetCount + " 个新资产账户";
+                        Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "飞鸭记账导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
     private boolean isDuplicateTransaction(Transaction newTx, List<Transaction> existingList) {
         if (existingList == null || existingList.isEmpty()) return false;
         for (Transaction ext : existingList) {
@@ -768,6 +827,11 @@ public class SettingsActivity extends AppCompatActivity {
 
         view.findViewById(R.id.tv_import_xiaoqing).setOnClickListener(v -> {
             importXiaoqingLauncher.launch(new String[]{"text/csv", "text/plain", "*/*"});
+            dialog.dismiss();
+        });
+
+        view.findViewById(R.id.tv_import_feiya).setOnClickListener(v -> {
+            importFeiyaLauncher.launch(new String[]{"text/csv", "text/plain", "*/*"});
             dialog.dismiss();
         });
 
