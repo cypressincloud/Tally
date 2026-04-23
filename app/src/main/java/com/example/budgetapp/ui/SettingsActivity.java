@@ -634,47 +634,17 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
-    // ================= 新增：小米钱包导入 Launcher =================
+    // 1. 定义小米钱包导入 Launcher
     private final ActivityResultLauncher<String[]> importXiaomiLauncher = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
             uri -> {
                 if (uri != null) {
                     try {
                         if (financeViewModel == null) return;
-
-                        // 核心修改：调用 BackupManager 里新写的 importFromXiaomi 方法
                         BackupData data = BackupManager.importFromXiaomi(this, uri, allAssets);
 
-                        int recordCount = 0;
-
-                        // 1. 同步新提取出来的分类配置 (小米账单里的新分类会自动被追加到这里)
-                        if (data.expenseCategories != null) CategoryManager.saveExpenseCategories(this, data.expenseCategories);
-                        if (data.incomeCategories != null) CategoryManager.saveIncomeCategories(this, data.incomeCategories);
-                        if (data.subCategoryMap != null) {
-                            for (Map.Entry<String, List<String>> entry : data.subCategoryMap.entrySet()) {
-                                CategoryManager.saveSubCategories(this, entry.getKey(), entry.getValue());
-                            }
-                        }
-
-                        // 2. 导入账单记录并进行查重
-                        List<Transaction> currentTxs = new ArrayList<>(allTransactions);
-                        if (data.records != null) {
-                            for (Transaction t : data.records) {
-                                if (!isDuplicateTransaction(t, currentTxs)) {
-                                    t.id = 0;
-                                    financeViewModel.addTransaction(t);
-                                    currentTxs.add(t);
-                                    recordCount++;
-                                }
-                            }
-                        }
-
-                        if (recordCount > 0) {
-                            Toast.makeText(this, "成功从小米钱包导入 " + recordCount + " 条账单 (已过滤重复)", Toast.LENGTH_LONG).show();
-                        } else {
-                            Toast.makeText(this, "所有账单均已存在，未导入新数据", Toast.LENGTH_LONG).show();
-                        }
-
+                        // 复用现有的处理逻辑
+                        processImportedData(data, "小米钱包");
                     } catch (Exception e) {
                         e.printStackTrace();
                         Toast.makeText(this, "小米钱包导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -682,7 +652,64 @@ public class SettingsActivity extends AppCompatActivity {
                 }
             }
     );
-    // ===============================================================
+
+    /**
+     * 统一处理导入后的数据保存逻辑（资产、分类、账单），避免代码重复
+     */
+    private void processImportedData(BackupData data, String sourceName) {
+        int recordCount = 0;
+        int newAssetCount = 0;
+
+        // 1. 处理资产新增
+        List<AssetAccount> currentAssets = new ArrayList<>(allAssets);
+        if (data.assets != null && !data.assets.isEmpty()) {
+            for (AssetAccount a : data.assets) {
+                if (!isDuplicateAsset(a, currentAssets)) {
+                    a.id = 0; // 设为0以便数据库自动生成主键
+                    financeViewModel.addAsset(a);
+                    currentAssets.add(a);
+                    newAssetCount++;
+                }
+            }
+        }
+
+        // 2. 保存分类更新
+        if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
+            CategoryManager.saveExpenseCategories(this, data.expenseCategories);
+        }
+        if (data.incomeCategories != null && !data.incomeCategories.isEmpty()) {
+            CategoryManager.saveIncomeCategories(this, data.incomeCategories);
+        }
+        if (data.subCategoryMap != null && !data.subCategoryMap.isEmpty()) {
+            for (Map.Entry<String, List<String>> entry : data.subCategoryMap.entrySet()) {
+                CategoryManager.saveSubCategories(this, entry.getKey(), entry.getValue());
+            }
+        }
+
+        // 3. 添加交易记录 (过滤重复)
+        List<Transaction> currentTxs = new ArrayList<>(allTransactions);
+        if (data.records != null && !data.records.isEmpty()) {
+            for (Transaction t : data.records) {
+                if (!isDuplicateTransaction(t, currentTxs)) {
+                    t.id = 0; // 设为0以便数据库自动生成主键
+                    financeViewModel.addTransaction(t);
+                    currentTxs.add(t);
+                    recordCount++;
+                }
+            }
+        }
+
+        // 4. 显示结果提示
+        if (recordCount > 0) {
+            String msg = "成功从" + sourceName + "导入 " + recordCount + " 条新账单";
+            if (newAssetCount > 0) {
+                msg += "\n自动创建了 " + newAssetCount + " 个新资产账户";
+            }
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "所有账单均已存在，或未找到有效数据", Toast.LENGTH_LONG).show();
+        }
+    }
 
     private final ActivityResultLauncher<String[]> importWeChatLauncher = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),

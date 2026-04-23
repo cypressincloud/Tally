@@ -289,147 +289,112 @@ public class BackupManager {
     }
 
     // ============================================================================================
-    // 小米钱包账单导入 (支持 xls/xlsx)
+    // 小米钱包账单导入 (支持 xlsx)
     // ============================================================================================
     public static BackupData importFromXiaomi(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
         List<Transaction> transactions = new ArrayList<>();
-        // 小米钱包不包含资产字段，所以不需要创建新资产，传空列表即可
-        List<AssetAccount> newAssetsToCreate = new ArrayList<>();
+        List<AssetAccount> newAssets = new ArrayList<>(); // 小米账单通常不带账户名，默认归入“默认账户”
 
-        // 获取现有的分类结构，以便在碰到新分类时自动追加
         List<String> expCats = new ArrayList<>(CategoryManager.getExpenseCategories(context));
         List<String> incCats = new ArrayList<>(CategoryManager.getIncomeCategories(context));
         Map<String, List<String>> subCatMap = new HashMap<>();
-        for (String cat : expCats) {
-            List<String> subs = CategoryManager.getSubCategories(context, cat);
-            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
-        }
-        for (String cat : incCats) {
-            List<String> subs = CategoryManager.getSubCategories(context, cat);
-            if (subs != null && !subs.isEmpty()) subCatMap.put(cat, subs);
-        }
 
-        // 使用项目已有的 Apache POI 库读取 Excel
         try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
              Workbook workbook = WorkbookFactory.create(inputStream)) {
 
-            Sheet sheet = workbook.getSheetAt(0); // 默认读取第一个工作表
+            Sheet sheet = workbook.getSheetAt(0);
             boolean isDataSection = false;
 
-            int timeIdx = -1, typeIdx = -1, amountIdx = -1, catIdx = -1, subCatIdx = -1, remarkIdx = -1;
+            // 小米时间格式示例: 2026-04-23 08:34:15
+            SimpleDateFormat parserSdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
 
-            SimpleDateFormat sdf1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-            SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
-            SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault());
+            int dateIdx = -1, catIdx = -1, subCatIdx = -1, typeIdx = -1, remarkIdx = -1, amtIdx = -1;
 
             for (Row row : sheet) {
                 if (row == null) continue;
 
-                // 1. 寻找表头行，确定各列的索引
+                // 1. 识别表头
                 if (!isDataSection) {
                     String firstCell = getCellText(row.getCell(0));
-                    if ("账单日期".equals(firstCell) || firstCell.contains("账单日期")) {
+                    if (firstCell.contains("账单日期") || firstCell.contains("记账分类")) {
                         isDataSection = true;
                         for (int i = 0; i < row.getLastCellNum(); i++) {
-                            String header = getCellText(row.getCell(i)).trim();
-                            if ("账单日期".equals(header)) timeIdx = i;
-                            else if ("收支类型".equals(header)) typeIdx = i;
-                            else if ("金额".equals(header)) amountIdx = i;
-                            else if ("记账分类".equals(header)) catIdx = i;
-                            else if ("分类子类".equals(header)) subCatIdx = i;
-                            else if ("备注".equals(header)) remarkIdx = i;
+                            String h = getCellText(row.getCell(i)).trim();
+                            if ("账单日期".equals(h)) dateIdx = i;
+                            else if ("记账分类".equals(h)) catIdx = i;
+                            else if ("分类子类".equals(h)) subCatIdx = i;
+                            else if ("收支类型".equals(h)) typeIdx = i;
+                            else if ("备注".equals(h)) remarkIdx = i;
+                            else if ("金额".equals(h)) amtIdx = i;
                         }
                     }
-                    continue; // 表头行处理完毕，跳过本次循环
+                    continue;
                 }
 
                 // 2. 解析数据行
-                if (timeIdx == -1 || typeIdx == -1 || amountIdx == -1) continue; // 关键列缺失
+                if (dateIdx == -1 || typeIdx == -1 || amtIdx == -1) continue;
 
-                String timeStr = getCellText(row.getCell(timeIdx)).trim();
-                if (TextUtils.isEmpty(timeStr)) continue; // 无效时间直接跳过
+                String dateStr = getCellText(row.getCell(dateIdx)).trim();
+                if (TextUtils.isEmpty(dateStr)) continue;
 
                 Transaction t = new Transaction();
 
-                // === 解析时间 (账单日期 对应 时间) ===
-                Date date = null;
+                // 时间与记录标识
+                Date dateObj;
                 try {
-                    date = sdf1.parse(timeStr);
+                    dateObj = parserSdf.parse(dateStr);
+                    t.date = (dateObj != null) ? dateObj.getTime() : System.currentTimeMillis();
                 } catch (Exception e) {
-                    try {
-                        date = sdf2.parse(timeStr);
-                    } catch (Exception e2) {
-                        try {
-                            date = sdf3.parse(timeStr);
-                        } catch (Exception e3) {}
-                    }
+                    dateObj = new Date();
+                    t.date = dateObj.getTime();
                 }
 
-                t.date = (date != null) ? date.getTime() : System.currentTimeMillis();
-                if (date == null) {
-                    date = new Date(t.date);
-                }
+                String remark = (remarkIdx != -1) ? getCellText(row.getCell(remarkIdx)).trim() : "";
+                t.remark = remark;
+                String noteRemark = TextUtils.isEmpty(remark) ? "auto" : remark;
+                t.note = noteSdf.format(dateObj) + " " + noteRemark; // 格式: 04-23 08:34 备注内容
 
-                // === 收支类型 ===
-                String typeStr = (typeIdx != -1) ? getCellText(row.getCell(typeIdx)).trim() : "";
-                if ("收入".equals(typeStr)) {
-                    t.type = 1;
-                } else {
-                    t.type = 0; // "支出" 默认当作 0
-                }
+                // 类型与金额
+                String typeStr = getCellText(row.getCell(typeIdx)).trim();
+                t.type = "收入".equals(typeStr) ? 1 : 0;
+                t.amount = Math.abs(parseDoubleSafe(getCellText(row.getCell(amtIdx))));
 
-                // === 金额 ===
-                String amountStr = getCellText(row.getCell(amountIdx)).replace("¥", "").replace("￥", "").replace(",", "").trim();
-                t.amount = Math.abs(parseDoubleSafe(amountStr));
-
-                // === 类别处理 (记账分类/分类子类) ===
-                String category = (catIdx != -1) ? getCellText(row.getCell(catIdx)).trim() : "";
+                // 分类与二级分类
+                String category = getCellText(row.getCell(catIdx)).trim();
                 if (TextUtils.isEmpty(category)) category = "其它";
                 String subCategory = (subCatIdx != -1) ? getCellText(row.getCell(subCatIdx)).trim() : "";
 
                 List<String> targetList = (t.type == 1) ? incCats : expCats;
-                if (!targetList.contains(category)) {
-                    targetList.add(category);
-                }
+                if (!targetList.contains(category)) targetList.add(category);
 
                 if (!TextUtils.isEmpty(subCategory)) {
                     List<String> subs = subCatMap.get(category);
                     if (subs == null) {
-                        subs = new ArrayList<>();
+                        subs = new ArrayList<>(CategoryManager.getSubCategories(context, category));
                         subCatMap.put(category, subs);
                     }
-                    if (!subs.contains(subCategory)) {
-                        subs.add(subCategory);
-                    }
+                    if (!subs.contains(subCategory)) subs.add(subCategory);
                 }
                 t.category = category;
                 t.subCategory = subCategory;
 
-                // === 备注与标识 (备注 对应 记录标识的备注部分) ===
-                SimpleDateFormat noteDateFmt = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-                String noteTimePart = noteDateFmt.format(date);
-
-                String remarkStr = (remarkIdx != -1) ? getCellText(row.getCell(remarkIdx)).trim() : "";
-                t.remark = remarkStr; // 真实备注
-
-                // 兜底：如果小米钱包的备注为空，则使用分类名称作为标识的补充
-                String autoPart = TextUtils.isEmpty(remarkStr) ? category : remarkStr;
-                t.note = noteTimePart + " " + autoPart;
-
-                // 没有提到的资产，默认设为 0
-                t.assetId = 0;
+                // 账户映射（小米账单通常不指定，默认设为 ID 1 或 匹配“默认账户”）
+                t.assetId = matchAssetId("默认账户", allAssets);
+                if (t.assetId == 0 && allAssets != null && !allAssets.isEmpty()) {
+                    t.assetId = allAssets.get(0).id;
+                }
 
                 transactions.add(t);
             }
         }
 
-        BackupData data = new BackupData(transactions, newAssetsToCreate);
+        BackupData data = new BackupData(transactions, newAssets);
         data.expenseCategories = expCats;
         data.incomeCategories = incCats;
         data.subCategoryMap = subCatMap;
         return data;
     }
-
     // ============================================================================================
     // 飞鸭记账账单导入 (支持 CSV)
     // ============================================================================================
