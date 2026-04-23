@@ -634,6 +634,56 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
+    // ================= 新增：小米钱包导入 Launcher =================
+    private final ActivityResultLauncher<String[]> importXiaomiLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        if (financeViewModel == null) return;
+
+                        // 核心修改：调用 BackupManager 里新写的 importFromXiaomi 方法
+                        BackupData data = BackupManager.importFromXiaomi(this, uri, allAssets);
+
+                        int recordCount = 0;
+
+                        // 1. 同步新提取出来的分类配置 (小米账单里的新分类会自动被追加到这里)
+                        if (data.expenseCategories != null) CategoryManager.saveExpenseCategories(this, data.expenseCategories);
+                        if (data.incomeCategories != null) CategoryManager.saveIncomeCategories(this, data.incomeCategories);
+                        if (data.subCategoryMap != null) {
+                            for (Map.Entry<String, List<String>> entry : data.subCategoryMap.entrySet()) {
+                                CategoryManager.saveSubCategories(this, entry.getKey(), entry.getValue());
+                            }
+                        }
+
+                        // 2. 导入账单记录并进行查重
+                        List<Transaction> currentTxs = new ArrayList<>(allTransactions);
+                        if (data.records != null) {
+                            for (Transaction t : data.records) {
+                                if (!isDuplicateTransaction(t, currentTxs)) {
+                                    t.id = 0;
+                                    financeViewModel.addTransaction(t);
+                                    currentTxs.add(t);
+                                    recordCount++;
+                                }
+                            }
+                        }
+
+                        if (recordCount > 0) {
+                            Toast.makeText(this, "成功从小米钱包导入 " + recordCount + " 条账单 (已过滤重复)", Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(this, "所有账单均已存在，未导入新数据", Toast.LENGTH_LONG).show();
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "小米钱包导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+    // ===============================================================
+
     private final ActivityResultLauncher<String[]> importWeChatLauncher = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
             uri -> {
@@ -861,6 +911,18 @@ public class SettingsActivity extends AppCompatActivity {
             });
             dialog.dismiss();
         });
+
+        View tvImportXiaomi = view.findViewById(R.id.tv_import_xiaomi);
+        if (tvImportXiaomi != null) {
+            tvImportXiaomi.setOnClickListener(v -> {
+                importXiaomiLauncher.launch(new String[]{
+                        "application/vnd.ms-excel",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "*/*"
+                });
+                dialog.dismiss();
+            });
+        }
 
         view.findViewById(R.id.tv_import_external).setOnClickListener(v -> {
             importExternalJsonLauncher.launch(new String[]{"application/json", "text/plain", "*/*"});

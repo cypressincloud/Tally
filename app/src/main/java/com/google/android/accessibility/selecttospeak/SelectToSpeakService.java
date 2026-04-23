@@ -103,8 +103,7 @@ public class SelectToSpeakService extends AccessibilityService {
             "com.jingdong.app.mall",             // 京东
             "com.aliyun.tongyi",                 // 通义千问
             "com.unionpay",                      // 云闪付
-            "com.ss.android.ugc.lifeservices",   // 抖省省
-            "com.taobao.idlefish"                // 闲鱼
+            "com.ss.android.ugc.lifeservices"    // 抖省省
     ));
 
     // 内部类，用于同时记录数值和识别到的符号
