@@ -51,6 +51,8 @@ public interface TransactionDao {
     @Query("UPDATE transactions SET subCategory = :newSubCategory WHERE category = :parentCategory AND subCategory = :oldSubCategory")
     void updateSubCategoryName(String parentCategory, String oldSubCategory, String newSubCategory);
 
+
+
     // ================= 以下为新增的高性能优化查询 =================
 
     // 1. 按需查询：只获取指定时间段内的账单（用于首页日历按月加载）
@@ -63,7 +65,8 @@ public interface TransactionDao {
             "AND (:type IS NULL OR type = :type) " +
             "AND (:minAmount IS NULL OR amount >= :minAmount) " +
             "AND (:maxAmount IS NULL OR amount <= :maxAmount) " +
-            "AND (:keyword IS NULL OR category LIKE '%' || :keyword || '%' OR note LIKE '%' || :keyword || '%') " +
+            // 🌟 修改点：在下面的查询条件中加入了 OR subCategory LIKE '%' || :keyword || '%'
+            "AND (:keyword IS NULL OR category LIKE '%' || :keyword || '%' OR subCategory LIKE '%' || :keyword || '%' OR note LIKE '%' || :keyword || '%') " +
             "ORDER BY date DESC")
     LiveData<List<Transaction>> getFilteredTransactions(long startDate, long endDate, Integer type, Float minAmount, Float maxAmount, String keyword);
 

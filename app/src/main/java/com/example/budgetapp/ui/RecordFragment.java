@@ -25,6 +25,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.NumberPicker;
 import android.widget.RadioGroup;
@@ -487,10 +488,12 @@ public class RecordFragment extends Fragment {
             long startOfDay = targetDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
             long endOfDay = targetDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 
+            // 计算目标日期的总支出
             for (Transaction t : transactions) {
                 boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
-                // 🌟 2. 增加 !isTransfer 限制，防止把互转金额从今日预算里扣掉
-                if (t.date >= startOfDay && t.date < endOfDay && t.type == 0 && !isTransfer) {
+
+                // 【修改点】：增加 !t.excludeFromBudget 判断
+                if (t.date >= startOfDay && t.date < endOfDay && t.type == 0 && !isTransfer && !t.excludeFromBudget) {
                     targetExpense += t.amount;
                 }
             }
@@ -1192,6 +1195,43 @@ public class RecordFragment extends Fragment {
         // 【新增】绑定对象输入框
         EditText etTargetObject = dialogView.findViewById(R.id.et_target_object);
 
+        // ================= 【新增】不计入预算逻辑开始 =================
+        ImageView ivExcludeBudget = dialogView.findViewById(R.id.iv_exclude_budget);
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isBudgetFeatureEnabled = prefs.getBoolean("is_budget_enabled", false);
+
+        // 记录状态
+        final boolean[] isExcludedFromBudget = { existingTransaction != null && existingTransaction.excludeFromBudget };
+
+        if (isBudgetFeatureEnabled) {
+            ivExcludeBudget.setVisibility(View.VISIBLE);
+
+            // 刷新圆点UI的闭包
+            Runnable updateDotUi = () -> {
+                if (isExcludedFromBudget[0]) {
+                    // 主题色填充（假设你的主题色是 app_yellow）
+                    ivExcludeBudget.setColorFilter(ContextCompat.getColor(getContext(), R.color.app_yellow));
+                    ivExcludeBudget.setImageResource(R.drawable.ic_dot_filled);
+                } else {
+                    // 灰色空心
+                    ivExcludeBudget.setColorFilter(android.graphics.Color.parseColor("#888888"));
+                    ivExcludeBudget.setImageResource(R.drawable.ic_dot_outline);
+                }
+            };
+            updateDotUi.run(); // 初始化状态
+
+            // 点击事件
+            ivExcludeBudget.setOnClickListener(v -> {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                isExcludedFromBudget[0] = !isExcludedFromBudget[0];
+                updateDotUi.run();
+                Toast.makeText(getContext(), isExcludedFromBudget[0] ? "该笔账单将不计入预算" : "该笔账单正常计入预算", Toast.LENGTH_SHORT).show();
+            });
+        } else {
+            ivExcludeBudget.setVisibility(View.GONE);
+        }
+        // ================= 【新增】不计入预算逻辑结束 =================
+
         Button btnSave = dialogView.findViewById(R.id.btn_save);
         Button btnDelete = dialogView.findViewById(R.id.btn_delete);
         TextView tvRevoke = dialogView.findViewById(R.id.tv_revoke);
@@ -1200,8 +1240,7 @@ public class RecordFragment extends Fragment {
         com.google.android.material.button.MaterialButton btnViewPhoto = dialogView.findViewById(R.id.btn_view_photo);
 
         etAmount.setFilters(new InputFilter[]{new DecimalDigitsInputFilter(2)});
-
-        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        
         boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
         boolean isPhotoBackupEnabled = prefs.getBoolean("enable_photo_backup", false);
 
@@ -1757,6 +1796,9 @@ public class RecordFragment extends Fragment {
                     t.photoPath = currentPhotoPath[0];
                     t.targetObject = targetObj; // 保存对象名称
 
+                    // 【新增】保存不计入预算的状态
+                    t.excludeFromBudget = isExcludedFromBudget[0];
+
                     // 使用事务保证账单和多资产同步更新
                     final int finalAssetId = selectedAssetId;
                     final String finalTargetObj = targetObj;
@@ -1826,6 +1868,9 @@ public class RecordFragment extends Fragment {
                     updateT.subCategory = selectedSubCategory[0];
                     updateT.photoPath = currentPhotoPath[0];
                     updateT.targetObject = targetObj;
+
+                    // 【新增】更新不计入预算的状态
+                    updateT.excludeFromBudget = isExcludedFromBudget[0];
 
                     viewModel.updateTransactionWithAssetSync(existingTransaction, updateT);
                 }

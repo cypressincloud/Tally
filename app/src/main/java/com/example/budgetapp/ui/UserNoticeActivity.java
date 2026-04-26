@@ -22,11 +22,15 @@ public class UserNoticeActivity extends AppCompatActivity {
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_user_notice);
 
-        // 处理系统栏遮挡，增加内边距
+        // 处理系统栏遮挡，增加内边距（保留原有的 Padding）
         View rootView = findViewById(R.id.notice_root);
+        final int originalPaddingLeft = rootView.getPaddingLeft();
+        final int originalPaddingTop = rootView.getPaddingTop();
+        final int originalPaddingRight = rootView.getPaddingRight();
+        final int originalPaddingBottom = rootView.getPaddingBottom();
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, windowInsets) -> {
             androidx.core.graphics.Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            v.setPadding(originalPaddingLeft + insets.left, originalPaddingTop + insets.top, originalPaddingRight + insets.right, originalPaddingBottom + insets.bottom);
             return WindowInsetsCompat.CONSUMED;
         });
 

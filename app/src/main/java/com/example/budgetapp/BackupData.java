@@ -1,6 +1,7 @@
 package com.example.budgetapp;
 
 import com.example.budgetapp.database.AssetAccount;
+import com.example.budgetapp.database.Goal;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.database.RenewalItem;
 
@@ -16,6 +17,8 @@ public class BackupData {
     public List<String> expenseCategories;
     public List<String> incomeCategories;
     public Map<String, List<String>> subCategoryMap;
+    public List<Goal> goals; // 👈 新增这一行
+
     public AssistantConfigData assistantConfig;
     public List<String> autoAssetRules;
     public List<RenewalItem> renewalList;
@@ -27,12 +30,18 @@ public class BackupData {
 
     public BackupData() {}
 
-    public BackupData(List<Transaction> records, List<AssetAccount> assets) {
+    public BackupData(List<Transaction> records, List<AssetAccount> assets, List<Goal> goals) {
         this.createTime = System.currentTimeMillis();
         this.records = records;
         this.assets = assets;
+        this.goals = goals; // 👈 新增赋值
     }
 
+    // 保留旧的 2 个参数的构造方法（供微信、支付宝等外部账单导入使用）
+    public BackupData(List<Transaction> records, List<AssetAccount> assets) {
+        this.records = records;
+        this.assets = assets;
+    }
     public static class AssistantConfigData {
         public boolean enableAutoTrack;
         public boolean enableRefund;

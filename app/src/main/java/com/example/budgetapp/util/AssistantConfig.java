@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 public class AssistantConfig {
-    private static final String PREF_NAME = "budget_assistant_prefs";
+    private static final String PREF_NAME = "app_prefs";
 
     private static final String KEY_RENEWAL_LIST = "key_renewal_list_json";
     // 基础功能 Key

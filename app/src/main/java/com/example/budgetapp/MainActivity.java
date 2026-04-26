@@ -58,13 +58,22 @@ public class MainActivity extends AppCompatActivity {
             new ActivityResultContracts.CreateDocument("application/zip"),
             uri -> {
                 if (uri != null) {
-                    try {
-                        BackupManager.exportToZip(this, uri, allTransactions, allAssets);
-                        Toast.makeText(this, "导出成功", Toast.LENGTH_SHORT).show();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        Toast.makeText(this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    }
+                    // 开一个子线程来查询数据库并导出，防止卡顿
+                    new Thread(() -> {
+                        try {
+                            // 查询出存钱目标
+                            com.example.budgetapp.database.AppDatabase db = com.example.budgetapp.database.AppDatabase.getDatabase(getApplicationContext());
+                            List<com.example.budgetapp.database.Goal> allGoals = db.goalDao().getAllGoalsSync();
+
+                            // 导出时加上 allGoals 参数
+                            BackupManager.exportToZip(MainActivity.this, uri, allTransactions, allAssets, allGoals);
+
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "导出成功", Toast.LENGTH_SHORT).show());
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                        }
+                    }).start();
                 }
             }
     );

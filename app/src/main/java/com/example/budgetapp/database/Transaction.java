@@ -30,6 +30,10 @@ public class Transaction {
     public String targetObject;
 
 
+    // 【新增】是否不计入预算 (默认 false，即计入预算)
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    public boolean excludeFromBudget;
+
     public Transaction() {
     }
 
@@ -55,5 +59,6 @@ public class Transaction {
         this.currencySymbol = "¥";
         this.subCategory = ""; // 默认为空
         this.photoPath = "";
+        this.excludeFromBudget = false; // 【新增】默认为false
     }
 }

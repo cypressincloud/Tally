@@ -167,13 +167,21 @@ public class SettingsActivity extends AppCompatActivity {
             new ActivityResultContracts.CreateDocument("application/zip"),
             uri -> {
                 if (uri != null) {
-                    try {
-                        BackupManager.exportToZip(this, uri, allTransactions, allAssets);
-                        Toast.makeText(this, "导出成功", Toast.LENGTH_SHORT).show();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        Toast.makeText(this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    }
+                    // 开一个子线程来查询数据库并导出
+                    new Thread(() -> {
+                        try {
+                            com.example.budgetapp.database.AppDatabase db = com.example.budgetapp.database.AppDatabase.getDatabase(getApplicationContext());
+                            List<com.example.budgetapp.database.Goal> allGoals = db.goalDao().getAllGoalsSync();
+
+                            // 导出时加上 allGoals 参数
+                            BackupManager.exportToZip(SettingsActivity.this, uri, allTransactions, allAssets, allGoals);
+
+                            runOnUiThread(() -> Toast.makeText(SettingsActivity.this, "导出成功", Toast.LENGTH_SHORT).show());
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            runOnUiThread(() -> Toast.makeText(SettingsActivity.this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                        }
+                    }).start();
                 }
             }
     );
@@ -428,6 +436,9 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_budget_management).setOnClickListener(v -> startActivity(new Intent(this, BudgetManagementActivity.class)));
 
         findViewById(R.id.btn_backup_restore).setOnClickListener(v -> showBackupOptions());
+
+        findViewById(R.id.btn_webdav_backup).setOnClickListener(v -> startActivity(new Intent(this, WebdavSettingsActivity.class)));
+
         findViewById(R.id.btn_auto_asset).setOnClickListener(v -> startActivity(new Intent(this, AutoAssetActivity.class)));
         findViewById(R.id.btn_toggle_night_mode).setOnClickListener(v -> startActivity(new Intent(this, ThemeSettingsActivity.class)));
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));

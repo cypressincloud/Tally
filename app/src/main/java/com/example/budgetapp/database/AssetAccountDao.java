@@ -22,6 +22,9 @@ public interface AssetAccountDao {
     @Query("SELECT * FROM asset_accounts ORDER BY updateTime DESC")
     LiveData<List<AssetAccount>> getAllAssets();
 
+    @Query("SELECT * FROM asset_accounts")
+    List<AssetAccount> getAllAssetsSync();
+
     // 【新增】同步方法，供Service使用，仅查询特定类型的资产（如 type=0 为资产）
     @Query("SELECT * FROM asset_accounts WHERE type = :type ORDER BY updateTime DESC")
     List<AssetAccount> getAssetsByTypeSync(int type);

@@ -9,6 +9,8 @@
 
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".MyApplication"
         android:allowBackup="true"
@@ -64,6 +66,12 @@
         <activity
             android:name=".ui.SettingsActivity"
             android:label="设置"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
+        <activity
+            android:name=".ui.WebdavSettingsActivity"
+            android:label="WebDAV备份设置"
             android:theme="@style/Theme.BudgetApp"
             android:exported="false"/>
 

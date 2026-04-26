@@ -7,6 +7,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.example.budgetapp.database.AssetAccount;
+import com.example.budgetapp.database.Goal;
 import com.example.budgetapp.database.RenewalItem;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
@@ -44,13 +45,13 @@ public class BackupManager {
     // ============================================================================================
     // ZIP 导出/导入 (JSON格式)
     // ============================================================================================
-    // ... (exportToZip 和 importFromZip 逻辑不需要修改，因为字段顺序由 Class 定义决定) ...
-    public static void exportToZip(Context context, Uri uri, List<Transaction> transactions, List<AssetAccount> assets) throws Exception {
+    public static void exportToZip(Context context, Uri uri, List<Transaction> transactions, List<AssetAccount> assets, List<Goal> goals) throws Exception {
         if (transactions == null) transactions = new ArrayList<>();
         if (assets == null) assets = new ArrayList<>();
+        if (goals == null) goals = new ArrayList<>();
         Gson gson = new Gson();
         
-        BackupData data = new BackupData(transactions, assets);
+        BackupData data = new BackupData(transactions, assets, goals);
         
         List<String> expenseCats = CategoryManager.getExpenseCategories(context);
         List<String> incomeCats = CategoryManager.getIncomeCategories(context);
@@ -1832,5 +1833,223 @@ public class BackupManager {
             return "\"" + result + "\"";
         }
         return result;
+    }
+
+    // ============================================================================================
+    // WebDAV 备份上传
+    // ============================================================================================
+    public static void uploadToWebDAV(Context context, String webdavUrl, String username, String password, List<Transaction> transactions, List<AssetAccount> assets, List<Goal> goals) throws Exception {
+        if (transactions == null) transactions = new ArrayList<>();
+        if (assets == null) assets = new ArrayList<>();
+        if (goals == null) goals = new ArrayList<>();
+        Gson gson = new Gson();
+        BackupData data = new BackupData(transactions, assets, goals);
+
+        List<String> expenseCats = CategoryManager.getExpenseCategories(context);
+        List<String> incomeCats = CategoryManager.getIncomeCategories(context);
+        data.expenseCategories = expenseCats;
+        data.incomeCategories = incomeCats;
+
+        Map<String, List<String>> subMap = new HashMap<>();
+        List<String> allCats = new ArrayList<>(expenseCats);
+        allCats.addAll(incomeCats);
+        for (String parent : allCats) {
+            List<String> subs = CategoryManager.getSubCategories(context, parent);
+            if (subs != null && !subs.isEmpty()) {
+                subMap.put(parent, subs);
+            }
+        }
+        data.subCategoryMap = subMap;
+
+        List<AutoAssetManager.AssetRule> rules = AutoAssetManager.getRules(context);
+        List<String> ruleStrings = new ArrayList<>();
+        for (AutoAssetManager.AssetRule rule : rules) {
+            ruleStrings.add(rule.toString());
+        }
+        data.autoAssetRules = ruleStrings;
+
+        AssistantConfig config = new AssistantConfig(context);
+        BackupData.AssistantConfigData configData = new BackupData.AssistantConfigData();
+        configData.enableAutoTrack = config.isEnabled();
+        configData.enableAssets = config.isAssetsEnabled();
+        configData.defaultAssetId = config.getDefaultAssetId();
+        configData.expenseKeywords = config.getExpenseKeywords();
+        configData.incomeKeywords = config.getIncomeKeywords();
+        configData.weekdayRate = config.getWeekdayOvertimeRate();
+        configData.holidayRate = config.getHolidayOvertimeRate();
+        configData.monthlyBaseSalary = config.getMonthlyBaseSalary();
+
+        data.assistantConfig = configData;
+        data.renewalList = config.getRenewalList();
+
+        SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        Map<String, BackupData.PrefItem> prefsMap = new HashMap<>();
+        for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+            if (entry.getValue() != null) {
+                String type = entry.getValue().getClass().getSimpleName();
+                prefsMap.put(entry.getKey(), new BackupData.PrefItem(type, String.valueOf(entry.getValue())));
+            }
+        }
+        data.appPreferences = prefsMap;
+
+        String jsonString = gson.toJson(data);
+
+        // 1. 构建目录 URL 和 Basic 认证
+        String dirUrlStr = webdavUrl;
+        if (!dirUrlStr.endsWith("/")) dirUrlStr += "/";
+
+        String auth = username + ":" + password;
+        String encodedAuth = android.util.Base64.encodeToString(auth.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP);
+
+        // 2. [新增] 尝试自动创建目标文件夹 (MKCOL)
+        // 解决坚果云等网盘在目标文件夹不存在时直接 PUT 会报 404 / 409 的问题
+        try {
+            java.net.URL dirUrl = new java.net.URL(dirUrlStr);
+            java.net.HttpURLConnection dirConn = (java.net.HttpURLConnection) dirUrl.openConnection();
+            dirConn.setRequestMethod("MKCOL");
+            dirConn.setRequestProperty("Authorization", "Basic " + encodedAuth);
+            dirConn.setConnectTimeout(5000);
+            dirConn.setReadTimeout(5000);
+            dirConn.getResponseCode(); // 执行请求
+            dirConn.disconnect();
+        } catch (Exception e) {
+            // 忽略异常：如果目录已存在，服务器通常会报 405 Method Not Allowed，这属于正常情况
+        }
+
+        // 3. 构建文件的完整上传 URL
+        String fileUrlStr = dirUrlStr + "budget_backup.zip";
+        java.net.URL url = new java.net.URL(fileUrlStr);
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+
+        // 4. 配置 HTTP PUT 请求
+        conn.setDoOutput(true);
+        conn.setRequestMethod("PUT");
+        conn.setRequestProperty("Authorization", "Basic " + encodedAuth);
+        conn.setRequestProperty("Content-Type", "application/zip");
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(30000);
+
+        // 5. 将数据打包成 ZIP 流并直接写入网络连接
+        try (OutputStream out = conn.getOutputStream();
+             ZipOutputStream zos = new ZipOutputStream(out)) {
+            ZipEntry entry = new ZipEntry(JSON_FILE_NAME);
+            zos.putNextEntry(entry);
+            zos.write(jsonString.getBytes(StandardCharsets.UTF_8));
+            zos.closeEntry();
+        }
+
+        // 6. 检查服务器响应码，提供更精准的错误提示
+        int responseCode = conn.getResponseCode();
+        if (responseCode == 404 || responseCode == 409) {
+            throw new Exception("服务器返回 " + responseCode + "。请检查 WebDAV 地址是否拼写错误，或手动前往网盘新建该文件夹。");
+        } else if (responseCode == 401) {
+            throw new Exception("账号或密码(授权码)错误，服务器拒绝访问 (401)。");
+        } else if (responseCode < 200 || responseCode >= 300) {
+            throw new Exception("服务器返回错误状态码: " + responseCode + " - " + conn.getResponseMessage());
+        }
+    }
+
+    // ============================================================================================
+    // WebDAV 备份下载与同步
+    // ============================================================================================
+    public static BackupData downloadFromWebDAV(Context context, String webdavUrl, String username, String password) throws Exception {
+        String targetUrl = webdavUrl;
+        if (!targetUrl.endsWith("/")) targetUrl += "/";
+        targetUrl += "budget_backup.zip"; // 下载固定的备份文件名
+
+        java.net.URL url = new java.net.URL(targetUrl);
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+
+        // 1. 配置 HTTP GET 请求和 Basic 认证
+        conn.setRequestMethod("GET");
+        String auth = username + ":" + password;
+        String encodedAuth = android.util.Base64.encodeToString(auth.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP);
+        conn.setRequestProperty("Authorization", "Basic " + encodedAuth);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(30000);
+
+        // 2. 检查服务器响应码
+        int responseCode = conn.getResponseCode();
+        if (responseCode == 404) {
+            throw new Exception("服务器上找不到备份文件，请先在其他设备上执行“上传数据”。");
+        } else if (responseCode < 200 || responseCode >= 300) {
+            throw new Exception("服务器返回错误状态码: " + responseCode + " - " + conn.getResponseMessage());
+        }
+
+        // 3. 将网络流转为 ZIP 流并解析内部的 JSON 文件
+        try (InputStream inputStream = conn.getInputStream();
+             ZipInputStream zis = new ZipInputStream(inputStream)) {
+
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.getName().equals(JSON_FILE_NAME)) {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(zis, StandardCharsets.UTF_8));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    Gson gson = new Gson();
+                    BackupData data = gson.fromJson(sb.toString(), BackupData.class);
+
+                    // --- 开始恢复应用配置 ---
+                    // 【新增】恢复一级支出分类
+                    if (data.expenseCategories != null && !data.expenseCategories.isEmpty()) {
+                        CategoryManager.saveExpenseCategories(context, data.expenseCategories);
+                    }
+
+                    // 【新增】恢复一级收入分类
+                    if (data.incomeCategories != null && !data.incomeCategories.isEmpty()) {
+                        CategoryManager.saveIncomeCategories(context, data.incomeCategories);
+                    }
+
+                    if (data.autoAssetRules != null && !data.autoAssetRules.isEmpty()) {
+                        for (String ruleStr : data.autoAssetRules) {
+                            AutoAssetManager.AssetRule rule = AutoAssetManager.AssetRule.fromString(ruleStr);
+                            if (rule != null) {
+                                AutoAssetManager.addRule(context, rule);
+                            }
+                        }
+                    }
+
+                    if (data.assistantConfig != null) {
+                        restoreAssistantConfig(context, data.assistantConfig);
+                    }
+
+                    if (data.subCategoryMap != null) {
+                        for (Map.Entry<String, List<String>> entryMap : data.subCategoryMap.entrySet()) {
+                            CategoryManager.saveSubCategories(context, entryMap.getKey(), entryMap.getValue());
+                        }
+                    }
+
+                    if (data.renewalList != null) {
+                        new AssistantConfig(context).saveRenewalList(data.renewalList);
+                    }
+
+                    if (data.appPreferences != null) {
+                        SharedPreferences.Editor editor = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE).edit();
+                        for (Map.Entry<String, BackupData.PrefItem> entryMap : data.appPreferences.entrySet()) {
+                            String key = entryMap.getKey();
+                            BackupData.PrefItem item = entryMap.getValue();
+                            if (item == null || item.value == null) continue;
+                            try {
+                                switch (item.type) {
+                                    case "Boolean": editor.putBoolean(key, Boolean.parseBoolean(item.value)); break;
+                                    case "Integer": editor.putInt(key, Integer.parseInt(item.value)); break;
+                                    case "Float": editor.putFloat(key, Float.parseFloat(item.value)); break;
+                                    case "Long": editor.putLong(key, Long.parseLong(item.value)); break;
+                                    default: editor.putString(key, item.value); break;
+                                }
+                            } catch (Exception e) {
+                                Log.e("BackupManager", "恢复配置异常", e);
+                            }
+                        }
+                        editor.apply();
+                    }
+                    return data; // 返回解析后的数据供数据库操作
+                }
+            }
+        }
+        throw new Exception("备份文件中未找到有效的数据。");
     }
 }

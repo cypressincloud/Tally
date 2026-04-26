@@ -113,6 +113,7 @@ public class StatsFragment extends Fragment {
     private List<Transaction> allTransactions = new ArrayList<>();
     private List<AssetAccount> assetList = new ArrayList<>();
     private CustomMarkerView markerView;
+    private LinearLayout cardSummary;
 
     // 新增状态变量，用于记录当前打开的弹窗
     private AlertDialog currentCategoryDetailDialog;
@@ -175,6 +176,7 @@ public class StatsFragment extends Fragment {
         tvIncomeSummaryTitle = view.findViewById(R.id.tv_income_summary_title);
         tvIncomeSummaryContent = view.findViewById(R.id.tv_income_summary_content);
 
+        cardSummary = view.findViewById(R.id.card_summary);
     }
 
     // ... (中间的 setupGestures, setupListeners, changeDate, updateDateRangeDisplay 等未修改方法省略，保持原样) ...
@@ -984,8 +986,8 @@ public class StatsFragment extends Fragment {
     }
 
     private void changeDate(int offset) {
-        // 1. 定义需要执行动画的三个数据区块
-        View[] animateViews = {layoutTrend, layoutExpense, layoutSummary};
+        // 👇 修改这里：将作用目标改为外层包含标题的 layout，并带上散装的收入标题和收入饼图
+        View[] animateViews = {layoutTrend, layoutExpense, tvIncomeTitle, incomePieChart, layoutSummary};
 
         float screenWidth = scrollView.getWidth();
         if (screenWidth == 0) screenWidth = 1080;
@@ -993,7 +995,7 @@ public class StatsFragment extends Fragment {
         // 计算滑出目标位移：点击“下一周期”则向左滑出 (-screenWidth)，反之向右
         float targetX = (offset > 0) ? -screenWidth : screenWidth;
 
-        // 2. 第一阶段：旧数据滑出并淡出 (时长 150ms)
+        // 1. 第一阶段：旧数据整体滑出并淡出 (时长 150ms)
         int visibleCount = 0;
         for (View v : animateViews) {
             if (v != null && v.getVisibility() == View.VISIBLE) {
@@ -1006,19 +1008,18 @@ public class StatsFragment extends Fragment {
             }
         }
 
-        // 3. 第二阶段：在数据滑出后的回调中更新内容
-        // 使用主布局的延时或其中一个 View 的 endAction 来确保同步
-        if (layoutTrend != null) {
-            layoutTrend.postDelayed(() -> {
-                // --- 核心：在这里更新日期逻辑，顶部的 tvDateRange 会立即变化，但它是静止的 ---
+        // 2. 第二阶段：在数据滑出后的回调中更新内容
+        if (scrollView != null) {
+            scrollView.postDelayed(() -> {
+                // 更新日期逻辑，顶部的 tvDateRange 会立即变化
                 if (currentMode == 0) selectedDate = selectedDate.plusYears(offset);
                 else if (currentMode == 1) selectedDate = selectedDate.plusMonths(offset);
                 else selectedDate = selectedDate.plusWeeks(offset);
 
                 updateDateRangeDisplay(); // 标题文字更新
-                refreshData();           // 图表数据更新
+                refreshData();            // 图表和总结数据更新
 
-                // 4. 第三阶段：将新数据布局瞬移到反方向，然后减速滑入 (时长 300ms)
+                // 3. 第三阶段：将新数据整体瞬移到反方向，然后减速滑入 (时长 300ms)
                 for (View v : animateViews) {
                     if (v != null && v.getVisibility() == View.VISIBLE) {
                         v.setTranslationX(-targetX * 0.5f); // 预位移
