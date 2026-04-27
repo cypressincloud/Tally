@@ -507,7 +507,7 @@ public class RecordFragment extends Fragment {
             for (Transaction t : transactions) {
                 boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
 
-                // 【修改点】：增加 !t.excludeFromBudget 判断
+                // 只有非转账且标记为“计入预算”（!excludeFromBudget）的支出才会被累加
                 if (t.date >= startOfDay && t.date < endOfDay && t.type == 0 && !isTransfer && !t.excludeFromBudget) {
                     targetExpense += t.amount;
                 }
@@ -1215,34 +1215,33 @@ public class RecordFragment extends Fragment {
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isBudgetFeatureEnabled = prefs.getBoolean("is_budget_enabled", false);
 
-        // 记录状态
-        final boolean[] isExcludedFromBudget = { existingTransaction != null && existingTransaction.excludeFromBudget };
+        // 在 showAddOrEditDialog 方法内部
+        final boolean[] isExcludedFromBudget = {
+                existingTransaction != null && existingTransaction.excludeFromBudget
+        };
 
+        // 初始化小圆点 UI
         if (isBudgetFeatureEnabled) {
             ivExcludeBudget.setVisibility(View.VISIBLE);
-
-            // 刷新圆点UI的闭包
             Runnable updateDotUi = () -> {
                 if (isExcludedFromBudget[0]) {
-                    // 主题色填充（假设你的主题色是 app_yellow）
+                    // 已选中：主题色填充（如 app_yellow）
                     ivExcludeBudget.setColorFilter(ContextCompat.getColor(getContext(), R.color.app_yellow));
                     ivExcludeBudget.setImageResource(R.drawable.ic_dot_filled);
                 } else {
-                    // 灰色空心
+                    // 未选中：灰色空心
                     ivExcludeBudget.setColorFilter(android.graphics.Color.parseColor("#888888"));
                     ivExcludeBudget.setImageResource(R.drawable.ic_dot_outline);
                 }
             };
-            updateDotUi.run(); // 初始化状态
+            updateDotUi.run(); // 核心：根据 existingTransaction 的状态自动渲染 UI
 
-            // 点击事件
+            // 点击切换逻辑保持不变
             ivExcludeBudget.setOnClickListener(v -> {
-                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
                 isExcludedFromBudget[0] = !isExcludedFromBudget[0];
                 updateDotUi.run();
-                Toast.makeText(getContext(), isExcludedFromBudget[0] ? "该笔账单将不计入预算" : "该笔账单正常计入预算", Toast.LENGTH_SHORT).show();
             });
-        } else {
+        }else {
             ivExcludeBudget.setVisibility(View.GONE);
         }
         // ================= 【新增】不计入预算逻辑结束 =================

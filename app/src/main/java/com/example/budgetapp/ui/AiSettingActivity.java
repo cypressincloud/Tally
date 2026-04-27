@@ -38,6 +38,11 @@ public class AiSettingActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
+        // 【新增】：状态栏与导航栏背景透明化，实现真正的沉浸式
+        getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(android.graphics.Color.TRANSPARENT);
+
         setContentView(R.layout.activity_ai_setting);
         aiClient = new AiAccountingClient();
 
@@ -52,7 +57,6 @@ public class AiSettingActivity extends AppCompatActivity {
     }
 
     private void initView() {
-        findViewById(R.id.btn_back).setOnClickListener(v -> finish());
 
         switchAi = findViewById(R.id.switch_ai_enable);
         etBaseUrl = findViewById(R.id.et_base_url);

@@ -13,23 +13,13 @@
         android:gravity="center_vertical"
         android:padding="16dp">
 
-        <ImageButton
-            android:id="@+id/btn_back"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="返回"
-            android:src="@drawable/ic_arrow_left"
-            app:tint="?android:attr/textColorPrimary" />
-
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:text="AI 记账配置"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:text="AI记账配置"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"/>
     </LinearLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -277,15 +267,17 @@
 
                 <Button
                     android:id="@+id/btn_test_connection"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="56dp"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
-                    android:backgroundTint="#F5F5F5"
                     android:text="测试连接"
                     android:textAllCaps="false"
-                    android:textColor="?android:attr/textColorPrimary"
-                    app:cornerRadius="16dp" />
+                    android:textColor="@color/app_yellow"
+                    app:cornerRadius="16dp"
+                    app:strokeColor="@color/app_yellow"
+                    app:strokeWidth="1dp" />
 
                 <Button
                     android:id="@+id/btn_save_ai_config"

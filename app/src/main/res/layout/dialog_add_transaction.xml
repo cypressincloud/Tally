@@ -32,26 +32,31 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp">
 
-                    <ImageView
-                        android:id="@+id/iv_exclude_budget"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:padding="4dp"
-                        android:src="@drawable/ic_dot_outline"
-                        android:visibility="gone"
-                        android:background="?attr/selectableItemBackgroundBorderless"/>
-
-                    <TextView
-                        android:id="@+id/tv_dialog_title"
-                        android:layout_width="wrap_content"
+                    <RelativeLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="记一笔"
-                        android:textSize="20sp"
-                        android:textStyle="bold"
-                        android:textColor="?android:attr/textColorPrimary"
-                        android:layout_centerInParent="true"/>
+                        android:layout_marginBottom="16dp">
+
+                        <ImageView
+                            android:id="@+id/iv_exclude_budget"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_alignParentStart="true"
+                            android:layout_centerVertical="true"
+                            android:padding="4dp"
+                            android:src="@drawable/ic_dot_outline"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tv_dialog_title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerInParent="true"
+                            android:text="记一笔"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            android:textColor="?android:attr/textColorPrimary"/>
+                    </RelativeLayout>
 
                     <TextView
                         android:id="@+id/tv_revoke"

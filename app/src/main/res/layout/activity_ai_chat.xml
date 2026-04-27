@@ -3,92 +3,105 @@
     android:id="@+id/ai_chat_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bar_background"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="@color/bar_background">
 
+    <!-- 顶部导航 -->
     <LinearLayout
         android:id="@+id/layout_top_nav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/white"
         android:gravity="center_vertical"
-        android:padding="16dp">
-
-        <ImageButton
-            android:id="@+id/btn_back"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="返回"
-            android:src="@drawable/ic_arrow_left" />
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp"
+        android:elevation="4dp">
 
         <TextView
+            android:id="@+id/tv_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
+            android:layout_marginStart="12dp"
             android:text="AI 记账助手"
             android:textColor="?android:attr/textColorPrimary"
-            android:textSize="20sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- 聊天列表 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_chat"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:padding="12dp" />
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="12dp"
+        android:overScrollMode="never" />
 
+    <!-- 底部输入区 -->
     <LinearLayout
         android:id="@+id/layout_bottom_input"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/white"
         android:elevation="8dp"
-        android:gravity="bottom"
         android:orientation="horizontal"
-        android:padding="12dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
         android:stateListAnimator="@null">
 
+        <!-- 语音 -->
         <ImageButton
             android:id="@+id/btn_voice_input"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="6dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="语音记账"
+            android:padding="8dp"
             android:src="@drawable/ic_quick_voice" />
 
+        <!-- 图片 -->
         <ImageButton
             android:id="@+id/btn_image_input"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="6dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="截图记账"
+            android:padding="8dp"
             android:src="@drawable/ic_quick_camera" />
 
+        <!-- 输入框 -->
         <EditText
             android:id="@+id/et_chat_input"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:background="@drawable/bg_input_field"
-            android:hint="输入一句账单、报销备注，或等会儿发张截图"
-            android:maxLines="4"
             android:minHeight="40dp"
-            android:paddingHorizontal="16dp"
+            android:maxLines="4"
+            android:background="@drawable/bg_input_field"
+            android:hint=""
+            android:paddingHorizontal="14dp"
             android:paddingVertical="8dp"
-            android:textSize="14sp" />
+            android:textSize="14sp"
+            android:gravity="center_vertical" />
 
+        <!-- 发送 -->
         <ImageButton
             android:id="@+id/btn_send"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="6dp"
             android:background="@drawable/bg_type_selector"
             android:contentDescription="发送"
+            android:padding="8dp"
             android:src="@drawable/ic_quick_ai" />
     </LinearLayout>
+
 </LinearLayout>

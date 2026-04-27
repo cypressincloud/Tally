@@ -169,8 +169,8 @@ public class BudgetFragment extends Fragment {
             if (limit > 0) {
                 double spent = 0;
                 for (Transaction t : transactions) {
-                    // 将 t.date <= endOfNow 替换为 t.date <= endOfMonth
-                    if (t.type == 0 && t.date >= startOfMonth && t.date <= endOfMonth && cat.equals(t.category)) {
+                    // 【修改点】：增加 !t.excludeFromBudget 判断
+                    if (t.type == 0 && t.date >= startOfMonth && t.date <= endOfMonth && cat.equals(t.category) && !t.excludeFromBudget) {
                         spent += t.amount;
                     }
                 }
@@ -358,7 +358,9 @@ public class BudgetFragment extends Fragment {
 
         if (transactions != null) {
             for (Transaction t : transactions) {
-                if (t.date >= startOfMonth && t.date <= endOfMonth && t.type == 0) {
+                // 【修改点】：增加不计入预算和资产互转的过滤
+                boolean isTransfer = "资产互转".equals(t.category);
+                if (t.date >= startOfMonth && t.date <= endOfMonth && t.type == 0 && !isTransfer && !t.excludeFromBudget) {
                     actualExpenseSoFar += t.amount;
                 }
             }
@@ -587,7 +589,11 @@ public class BudgetFragment extends Fragment {
                 long startOfDay = d.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 long endOfDay = d.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 for (Transaction t : allTransactions) {
-                    if (t.date >= startOfDay && t.date < endOfDay && t.type == 0) expenseToday += t.amount;
+                    // 【修改点】：增加不计入预算和资产互转的过滤
+                    boolean isTransfer = "资产互转".equals(t.category);
+                    if (t.date >= startOfDay && t.date < endOfDay && t.type == 0 && !isTransfer && !t.excludeFromBudget) {
+                        expenseToday += t.amount;
+                    }
                 }
 
                 boolean hasActiveGoal = false;

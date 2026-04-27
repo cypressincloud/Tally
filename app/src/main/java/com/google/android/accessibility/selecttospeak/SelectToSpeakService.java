@@ -31,6 +31,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -622,6 +623,36 @@ public class SelectToSpeakService extends AccessibilityService {
             Button btnTakePhoto = floatView.findViewById(R.id.btn_window_take_photo);
             Button btnViewPhoto = floatView.findViewById(R.id.btn_window_view_photo);
 
+            // ================= 【新增】不计入预算逻辑开始 =================
+            ImageView ivExcludeBudget = floatView.findViewById(R.id.iv_window_exclude_budget);
+            boolean isBudgetFeatureEnabled = prefs.getBoolean("is_budget_enabled", false);
+            final boolean[] isExcludedFromBudget = { false }; // 悬浮窗默认计入预算
+
+            if (isBudgetFeatureEnabled && ivExcludeBudget != null) {
+                ivExcludeBudget.setVisibility(View.VISIBLE);
+
+                Runnable updateDotUi = () -> {
+                    if (isExcludedFromBudget[0]) {
+                        ivExcludeBudget.setColorFilter(ContextCompat.getColor(this, R.color.app_yellow));
+                        ivExcludeBudget.setImageResource(R.drawable.ic_dot_filled);
+                    } else {
+                        ivExcludeBudget.setColorFilter(android.graphics.Color.parseColor("#888888"));
+                        ivExcludeBudget.setImageResource(R.drawable.ic_dot_outline);
+                    }
+                };
+                updateDotUi.run();
+
+                ivExcludeBudget.setOnClickListener(v -> {
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                    isExcludedFromBudget[0] = !isExcludedFromBudget[0];
+                    updateDotUi.run();
+                    Toast.makeText(this, isExcludedFromBudget[0] ? "该笔账单将不计入预算" : "该笔账单正常计入预算", Toast.LENGTH_SHORT).show();
+                });
+            } else if (ivExcludeBudget != null) {
+                ivExcludeBudget.setVisibility(View.GONE);
+            }
+            // ================= 【新增】不计入预算逻辑结束 =================
+
             etAmount.setText(String.valueOf(amount));
             etNote.setText(note);
 
@@ -864,8 +895,8 @@ public class SelectToSpeakService extends AccessibilityService {
                     String finalSymbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
                     // 【核心】：带上对方资产信息
-                    saveToDatabase(finalAmountValue, finalTypeInt, finalCatName, selectedSubCategory, finalNoteText, finalRemarkText, assetIdInt, finalSymbol, currentPhotoPath[0], transactionTime, targetObject, liabilityLoanType);
-
+                    // 【修改】：末尾加上 isExcludedFromBudget[0]
+                    saveToDatabase(finalAmountValue, finalTypeInt, finalCatName, selectedSubCategory, finalNoteText, finalRemarkText, assetIdInt, finalSymbol, currentPhotoPath[0], transactionTime, targetObject, liabilityLoanType, isExcludedFromBudget[0]);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "已记账", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -1064,20 +1095,21 @@ public class SelectToSpeakService extends AccessibilityService {
     }
 
 
-    // 兼容方法 1：无交易时间，无对方资产对象 (9 个参数，供极简调用使用)
+    // 兼容方法 1：无交易时间，无对方资产对象
     private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath) {
-        saveToDatabase(amount, type, category, subCategory, note, remark, assetId, currencySymbol, photoPath, System.currentTimeMillis(), null, -1);
+        // 后台默认传入 false
+        saveToDatabase(amount, type, category, subCategory, note, remark, assetId, currencySymbol, photoPath, System.currentTimeMillis(), null, -1, false);
     }
 
-    // 兼容方法 2：有交易时间，无对方资产对象 (10 个参数，专治报错的那一行)
+    // 兼容方法 2：有交易时间，无对方资产对象
     private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath, long transactionTime) {
-        // 直接调用 12 个参数的核心方法，后两个传 null 和 -1 代表普通收支，不涉及负债/借出
-        saveToDatabase(amount, type, category, subCategory, note, remark, assetId, currencySymbol, photoPath, transactionTime, null, -1);
+        // 后台默认传入 false
+        saveToDatabase(amount, type, category, subCategory, note, remark, assetId, currencySymbol, photoPath, transactionTime, null, -1, false);
     }
 
     // 2. 修改现有的 saveToDatabase 方法（增加 long transactionTime 参数）
     // 核心入库方法
-    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath, long transactionTime, String targetObject, int liabilityLoanType) {
+    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath, long transactionTime, String targetObject, int liabilityLoanType, boolean excludeFromBudget) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
 

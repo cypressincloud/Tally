@@ -22,6 +22,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,6 +30,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -36,6 +38,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -71,6 +74,11 @@ public class AiChatActivity extends AppCompatActivity {
     private LinearLayout layoutTopNav;
     private LinearLayout layoutBottomInput;
 
+    // --- 内部录音专用的变量 ---
+    private android.media.MediaRecorder mediaRecorder;
+    private java.io.File currentAudioFile;
+    private long recordStartTime;
+
     private final List<ChatMessage> chatMessages = new ArrayList<>();
     private ChatAdapter chatAdapter;
     private FinanceViewModel financeViewModel;
@@ -100,7 +108,6 @@ public class AiChatActivity extends AppCompatActivity {
         btnVoice = findViewById(R.id.btn_voice_input);
         btnImage = findViewById(R.id.btn_image_input);
         btnSend = findViewById(R.id.btn_send);
-        findViewById(R.id.btn_back).setOnClickListener(v -> finish());
 
         setupWindowInsets();
         setupInputElevationEffect();
@@ -130,8 +137,147 @@ public class AiChatActivity extends AppCompatActivity {
             imagePickerLauncher.launch(intent);
         });
 
-        btnVoice.setOnClickListener(v -> startSpeechRecognition());
+        btnVoice.setOnTouchListener(new View.OnTouchListener() {
+            private float startY;
+
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent event) {
+                switch (event.getAction()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        v.getParent().requestDisallowInterceptTouchEvent(true);
+                        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                        btnVoice.setColorFilter(androidx.core.content.ContextCompat.getColor(AiChatActivity.this, R.color.app_yellow));
+                        startY = event.getY();
+                        startInternalRecording(); // 开始应用内录音
+                        return true;
+
+                    case android.view.MotionEvent.ACTION_MOVE:
+                        // 如果手指向上滑动超过 200 像素，按钮变红提示即将取消
+                        if (startY - event.getY() > 200) {
+                            btnVoice.setColorFilter(android.graphics.Color.RED);
+                        } else {
+                            btnVoice.setColorFilter(androidx.core.content.ContextCompat.getColor(AiChatActivity.this, R.color.app_yellow));
+                        }
+                        return true;
+
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        btnVoice.clearColorFilter();
+                        // 判断是否是上滑取消，或者异常中断
+                        boolean isCancel = event.getAction() == android.view.MotionEvent.ACTION_CANCEL || (startY - event.getY() > 200);
+                        if (isCancel && event.getAction() == android.view.MotionEvent.ACTION_UP) {
+                            Toast.makeText(AiChatActivity.this, "已取消发送", Toast.LENGTH_SHORT).show();
+                        }
+                        stopInternalRecording(isCancel); // 停止录音
+                        return true;
+                }
+                return false;
+            }
+        });
         handleIncomingIntent(getIntent());
+    }
+
+    private void startInternalRecording() {
+        if (!ensureTextReady()) return;
+        if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            androidx.core.app.ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.RECORD_AUDIO}, 101);
+            return;
+        }
+
+        try {
+            // 在应用的缓存目录创建一个临时音频文件 (无需存储权限)
+            currentAudioFile = new java.io.File(getCacheDir(), "voice_record.m4a");
+            mediaRecorder = new android.media.MediaRecorder();
+            mediaRecorder.setAudioSource(android.media.MediaRecorder.AudioSource.MIC);
+            mediaRecorder.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4);
+            mediaRecorder.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC);
+            mediaRecorder.setOutputFile(currentAudioFile.getAbsolutePath());
+            mediaRecorder.prepare();
+            mediaRecorder.start();
+            recordStartTime = System.currentTimeMillis();
+        } catch (Exception e) {
+            Toast.makeText(this, "麦克风被占用或无法录音", Toast.LENGTH_SHORT).show();
+            stopInternalRecording(true);
+        }
+    }
+
+    private void stopInternalRecording(boolean isCancel) {
+        if (mediaRecorder != null) {
+            try {
+                mediaRecorder.stop();
+            } catch (RuntimeException e) {
+                // 如果用户长按时间极短（如零点几秒），stop() 会抛出异常，这里捕获并当做取消处理
+                isCancel = true;
+            }
+            mediaRecorder.release();
+            mediaRecorder = null;
+
+            if (!isCancel && currentAudioFile != null && currentAudioFile.exists()) {
+                long duration = System.currentTimeMillis() - recordStartTime;
+                if (duration < 1000) {
+                    Toast.makeText(this, "说话时间太短", Toast.LENGTH_SHORT).show();
+                    currentAudioFile.delete();
+                } else {
+                    // 开始调用 AI 大模型进行转写
+                    transcribeInternalAudio(currentAudioFile);
+                }
+            } else if (currentAudioFile != null && currentAudioFile.exists()) {
+                currentAudioFile.delete(); // 用户取消或太短，直接删除临时文件
+            }
+        }
+    }
+
+    private void transcribeInternalAudio(java.io.File file) {
+        if (!aiConfig.isAudioReady()) {
+            Toast.makeText(this, "未配置音频大模型，无法转写语音", Toast.LENGTH_SHORT).show();
+            file.delete();
+            return;
+        }
+
+        int statusIndex = addMessage(ChatMessage.aiText("正在转写语音..."));
+        new Thread(() -> {
+            try {
+                // 读取录好的 m4a 文件转化为字节
+                java.io.FileInputStream fis = new java.io.FileInputStream(file);
+                java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                byte[] b = new byte[1024];
+                int len;
+                while ((len = fis.read(b)) != -1) {
+                    bos.write(b, 0, len);
+                }
+                byte[] audioBytes = bos.toByteArray();
+                fis.close();
+                file.delete(); // 内存读取完毕，清理磁盘临时文件
+
+                // 提交给你原本的 AI 接口
+                String transcript = aiClient.transcribeAudio(audioBytes, "voice-input", "audio/m4a");
+                runOnUiThread(() -> {
+                    updateMessage(statusIndex, "正在为您生成账单...");
+                    addMessage(ChatMessage.mine(transcript, null));
+                    processTextAccounting(transcript, statusIndex);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> updateMessage(statusIndex, "语音转写失败：" + e.getMessage()));
+            }
+        }).start();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // 【删除旧的 mySpeechRecognizer 代码，换成释放 mediaRecorder】
+        if (mediaRecorder != null) {
+            try {
+                // 如果页面意外销毁时还在录音，先停止它
+                mediaRecorder.stop();
+            } catch (RuntimeException e) {
+                // 忽略未处于录制状态的报错
+            }
+            mediaRecorder.release();
+            mediaRecorder = null;
+        }
     }
 
     @Override
@@ -198,21 +344,6 @@ public class AiChatActivity extends AppCompatActivity {
             if (uri != null) {
                 handleImageUri(uri);
             }
-        }
-    }
-
-    private void startSpeechRecognition() {
-        if (!ensureTextReady()) {
-            return;
-        }
-        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.CHINESE.toLanguageTag());
-        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "说一句账单内容");
-        try {
-            speechRecognizerLauncher.launch(intent);
-        } catch (Exception e) {
-            startAudioFallback("当前设备语音识别不可用。");
         }
     }
 
@@ -638,20 +769,29 @@ public class AiChatActivity extends AppCompatActivity {
         private final int index;
 
         private final TextView tvIndex;
-        private final TextView tvTitle;
         private final TextView tvStatus;
+        private final ImageButton btnRemove;
+
+        private final LinearLayout layoutSummary;
+        private final TextView tvTitle;
         private final TextView tvDetail;
+
         private final LinearLayout layoutEditor;
-        private final Spinner spType;
+        private final RadioGroup rgType;
+        private final RecyclerView rvCategory;
         private final EditText etAmount;
-        private final Spinner spCategory;
-        private final Spinner spSubCategory;
         private final Spinner spAsset;
         private final EditText etNote;
         private final CheckBox cbExcludeBudget;
+
         private final TextView btnEdit;
         private final TextView btnSave;
+
         private final List<AssetAccount> selectableAssets = new ArrayList<>();
+        private CategoryAdapter categoryAdapter;
+
+        private String currentSelectedCategory = "其他";
+        private String currentSelectedSubCategory = "";
 
         DraftCardController(View root, DraftCardModel model, List<AssetAccount> assets, int index) {
             this.root = root;
@@ -660,58 +800,78 @@ public class AiChatActivity extends AppCompatActivity {
             this.index = index;
 
             tvIndex = root.findViewById(R.id.tv_draft_index);
-            tvTitle = root.findViewById(R.id.tv_draft_title);
             tvStatus = root.findViewById(R.id.tv_draft_status);
+            btnRemove = root.findViewById(R.id.btn_remove);
+
+            layoutSummary = root.findViewById(R.id.layout_summary);
+            tvTitle = root.findViewById(R.id.tv_draft_title);
             tvDetail = root.findViewById(R.id.tv_draft_detail);
+
             layoutEditor = root.findViewById(R.id.layout_editor);
-            spType = root.findViewById(R.id.sp_type);
+            rgType = root.findViewById(R.id.rg_type);
+            rvCategory = root.findViewById(R.id.rv_category);
             etAmount = root.findViewById(R.id.et_amount);
-            spCategory = root.findViewById(R.id.sp_category);
-            spSubCategory = root.findViewById(R.id.sp_sub_category);
             spAsset = root.findViewById(R.id.sp_asset);
             etNote = root.findViewById(R.id.et_note);
             cbExcludeBudget = root.findViewById(R.id.cb_exclude_budget);
+
             btnEdit = root.findViewById(R.id.btn_edit);
             btnSave = root.findViewById(R.id.btn_save);
         }
 
         void bind() {
-            tvIndex.setText("账单建议 " + index);
+            tvIndex.setText("账单");
             setupForm();
             fillForm(model.draft);
             bindSummary();
             updateEditorState();
 
             btnEdit.setOnClickListener(v -> {
-                if (model.saved) {
-                    return;
-                }
+                if (model.saved) return;
                 model.editing = !model.editing;
                 updateEditorState();
             });
 
             btnSave.setOnClickListener(v -> saveDraft());
+
+            btnRemove.setOnClickListener(v -> {
+                root.setVisibility(View.GONE);
+            });
         }
 
         private void setupForm() {
-            ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(
-                    AiChatActivity.this,
-                    android.R.layout.simple_spinner_dropdown_item,
-                    Arrays.asList("支出", "收入")
-            );
-            spType.setAdapter(typeAdapter);
-            spType.setOnItemSelectedListener(new SimpleItemSelectedListener() {
-                @Override
-                public void onItemSelected(int position) {
-                    updateCategoryAdapter(position == 1 ? 1 : 0, null, null);
-                }
-            });
-            spCategory.setOnItemSelectedListener(new SimpleItemSelectedListener() {
-                @Override
-                public void onItemSelected(int position) {
-                    updateSubCategoryAdapter(null);
-                }
-            });
+            // 1. 设置类型单选栏
+            if (rgType != null) {
+                rgType.setOnCheckedChangeListener((group, checkedId) -> {
+                    int type = 0; // 默认支出
+                    if (checkedId == R.id.rb_income) type = 1;
+                    else if (checkedId == R.id.rb_liability) type = 2;
+                    else if (checkedId == R.id.rb_lend) type = 3;
+                    updateCategoryAdapter(type, currentSelectedCategory, "");
+                });
+            }
+
+            // 2. 直接复用你原版“记一笔”的 CategoryAdapter
+            if (rvCategory != null) {
+                // 如果开启了“详细分类”，建议使用 StaggeredGridLayoutManager 或 FlexboxLayoutManager
+                rvCategory.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(AiChatActivity.this, 5));
+
+                categoryAdapter = new CategoryAdapter(AiChatActivity.this, new ArrayList<>(), currentSelectedCategory, category -> {
+                    // 点击一级分类时触发
+                    currentSelectedCategory = category;
+                    currentSelectedSubCategory = ""; // 清空二级分类
+                });
+
+                // 绑定长按事件
+                categoryAdapter.setOnCategoryLongClickListener(category -> {
+                    currentSelectedCategory = category;
+                    categoryAdapter.setSelectedCategory(category);
+                    showSubCategoryDialog(category);
+                    return true;
+                });
+
+                rvCategory.setAdapter(categoryAdapter);
+            }
 
             selectableAssets.clear();
             AssetAccount noAsset = new AssetAccount("不关联资产", 0, 0);
@@ -727,10 +887,15 @@ public class AiChatActivity extends AppCompatActivity {
         }
 
         private void fillForm(TransactionDraft draft) {
-            spType.setSelection(draft.type == 1 ? 1 : 0, false);
+            if (draft.type == 1) rgType.check(R.id.rb_income);
+            else rgType.check(R.id.rb_expense);
+
             etAmount.setText(String.format(Locale.getDefault(), "%.2f", draft.amount));
             etNote.setText(draft.note == null ? "" : draft.note);
             cbExcludeBudget.setChecked(draft.excludeFromBudget);
+
+            currentSelectedCategory = draft.category;
+            currentSelectedSubCategory = draft.subCategory;
             updateCategoryAdapter(draft.type, draft.category, draft.subCategory);
 
             int preferredAssetId = resolvePreferredAssetId(assets, draft.assetId);
@@ -746,27 +911,92 @@ public class AiChatActivity extends AppCompatActivity {
 
         private void updateCategoryAdapter(int type, String selectedCategory, String selectedSubCategory) {
             List<String> categories = getPrimaryCategories(type);
-            spCategory.setAdapter(new ArrayAdapter<>(AiChatActivity.this, android.R.layout.simple_spinner_dropdown_item, categories));
-            int categoryIndex = Math.max(0, categories.indexOf(selectedCategory));
-            spCategory.setSelection(categoryIndex, false);
-            updateSubCategoryAdapter(selectedSubCategory);
+            if (selectedCategory == null || !categories.contains(selectedCategory)) {
+                currentSelectedCategory = "其他";
+            } else {
+                currentSelectedCategory = selectedCategory;
+            }
+            currentSelectedSubCategory = selectedSubCategory == null ? "" : selectedSubCategory;
+
+            if (categoryAdapter != null) {
+                categoryAdapter.updateData(categories);
+                categoryAdapter.setSelectedCategory(currentSelectedCategory);
+            }
         }
 
-        private void updateSubCategoryAdapter(String selectedSubCategory) {
-            String category = spCategory.getSelectedItem() == null ? "其他" : spCategory.getSelectedItem().toString();
-            List<String> subCategories = new ArrayList<>();
-            subCategories.add("无二级分类");
-            List<String> savedSubCategories = CategoryManager.getSubCategories(AiChatActivity.this, category);
-            if (savedSubCategories != null) {
-                for (String subCategory : savedSubCategories) {
-                    if (subCategory != null && !subCategory.trim().isEmpty()) {
-                        subCategories.add(subCategory.trim());
-                    }
-                }
+        private void showSubCategoryDialog(String primaryCategory) {
+            List<String> savedSubCategories = CategoryManager.getSubCategories(AiChatActivity.this, primaryCategory);
+            if (savedSubCategories == null || savedSubCategories.isEmpty()) {
+                Toast.makeText(AiChatActivity.this, "【" + primaryCategory + "】无二级分类", Toast.LENGTH_SHORT).show();
+                return;
             }
-            spSubCategory.setAdapter(new ArrayAdapter<>(AiChatActivity.this, android.R.layout.simple_spinner_dropdown_item, subCategories));
-            int index = Math.max(0, subCategories.indexOf(selectedSubCategory));
-            spSubCategory.setSelection(index, false);
+
+            // 1. 居中悬浮窗
+            android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(AiChatActivity.this);
+            View view = LayoutInflater.from(AiChatActivity.this).inflate(R.layout.dialog_select_sub_category, null);
+            builder.setView(view);
+            android.app.AlertDialog dialog = builder.create();
+
+            // 2. 悬浮窗透明背景（让 XML 里的圆角完美显示）
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
+
+            TextView tvTitle = view.findViewById(R.id.tv_title);
+            tvTitle.setText("选择细分");
+
+            com.google.android.material.chip.ChipGroup chipGroup = view.findViewById(R.id.cg_sub_categories);
+            chipGroup.removeAllViews();
+
+            // 3. 【核心照搬】：提取 CategoryAdapter.java 里的配色，生成状态颜色列表
+            int[][] states = new int[][] {
+                    new int[] { android.R.attr.state_checked }, // 选中状态
+                    new int[] { -android.R.attr.state_checked } // 未选中状态
+            };
+            int[] bgColors = new int[] {
+                    getColor(R.color.app_yellow),           // 选中时的黄色背景
+                    getColor(R.color.cat_unselected_bg)     // 未选中时的灰色背景
+            };
+            int[] textColors = new int[] {
+                    getColor(R.color.cat_selected_text),    // 选中时的文字颜色
+                    getColor(R.color.cat_unselected_text)   // 未选中时的文字颜色
+            };
+            android.content.res.ColorStateList bgColorStateList = new android.content.res.ColorStateList(states, bgColors);
+            android.content.res.ColorStateList textColorStateList = new android.content.res.ColorStateList(states, textColors);
+
+            // 4. 动态添加并极简美化 Chip
+            for (String sub : savedSubCategories) {
+                com.google.android.material.chip.Chip chip = new com.google.android.material.chip.Chip(AiChatActivity.this);
+                chip.setText(sub);
+                chip.setCheckable(true);
+                chip.setClickable(true);
+
+                // === 完美照搬 UI 样式 ===
+                chip.setChipBackgroundColor(bgColorStateList); // 应用背景色状态
+                chip.setTextColor(textColorStateList);         // 应用文字色状态
+                chip.setCheckedIconVisible(false);             // 隐藏默认的打勾图标，保持文字居中
+                chip.setChipStrokeWidth(0f);                   // 去除自带的边框
+                chip.setTextSize(14f);                         // 统一字号
+
+                // 回显之前选中的二级分类
+                if (sub.equals(currentSelectedSubCategory)) {
+                    chip.setChecked(true);
+                }
+
+                chip.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    if (isChecked) {
+                        currentSelectedSubCategory = sub;
+                        // 延迟 150 毫秒关闭，让用户能看清丝滑的颜色切换动画
+                        buttonView.postDelayed(dialog::dismiss, 150);
+                    }
+                });
+                chipGroup.addView(chip);
+            }
+
+            // 绑定取消按钮
+            view.findViewById(R.id.btn_cancel).setOnClickListener(v -> dialog.dismiss());
+
+            dialog.show();
         }
 
         private void bindSummary() {
@@ -787,28 +1017,35 @@ public class AiChatActivity extends AppCompatActivity {
             detailBuilder.append("\n预算: ").append(draft.excludeFromBudget ? "不计入" : "计入");
             tvDetail.setText(detailBuilder.toString());
 
-            tvStatus.setText(model.saved ? "已保存" : "待确认");
+            tvStatus.setText(model.saved ? "已入账" : "待确认");
             tvStatus.setTextColor(getColor(model.saved ? R.color.expense_green : R.color.app_yellow));
-            btnSave.setEnabled(!model.saved);
-            btnSave.setAlpha(model.saved ? 0.5f : 1f);
-            btnEdit.setEnabled(!model.saved);
-            btnEdit.setAlpha(model.saved ? 0.5f : 1f);
         }
 
         private void updateEditorState() {
-            layoutEditor.setVisibility(model.editing && !model.saved ? View.VISIBLE : View.GONE);
-            btnEdit.setText(model.saved ? "已保存" : (model.editing ? "收起" : "编辑"));
+            // 根据状态控制显示：如果是编辑中且没保存，就展示你的漂亮布局
+            boolean showEditor = model.editing && !model.saved;
+            layoutEditor.setVisibility(showEditor ? View.VISIBLE : View.GONE);
+            layoutSummary.setVisibility(showEditor ? View.GONE : View.VISIBLE);
+
+            btnEdit.setText(model.saved ? "已保存" : (model.editing ? "收起" : "修改"));
+            btnEdit.setEnabled(!model.saved);
+            btnEdit.setAlpha(model.saved ? 0.5f : 1f);
+
+            btnSave.setVisibility(model.saved ? View.GONE : View.VISIBLE);
+            btnRemove.setVisibility(model.saved ? View.GONE : View.VISIBLE);
         }
 
         private void saveDraft() {
             TransactionDraft updatedDraft = collectDraft();
-            if (updatedDraft == null) {
-                return;
-            }
+            if (updatedDraft == null) return;
+
             model.draft = updatedDraft;
             model.saved = true;
             model.editing = false;
-            financeViewModel.addTransaction(updatedDraft.toTransaction());
+
+            // 【修改这里】：调用带有资产同步逻辑的方法
+            financeViewModel.addTransactionWithAssetSync(updatedDraft.toTransaction());
+
             bindSummary();
             updateEditorState();
             Toast.makeText(AiChatActivity.this, "已保存这笔账单。", Toast.LENGTH_SHORT).show();
@@ -829,15 +1066,24 @@ public class AiChatActivity extends AppCompatActivity {
             }
 
             TransactionDraft draft = model.draft;
-            draft.type = spType.getSelectedItemPosition() == 1 ? 1 : 0;
+
+            if (rgType != null) {
+                int checkedId = rgType.getCheckedRadioButtonId();
+                if (checkedId == R.id.rb_income) draft.type = 1;
+                    // 【修复】：原本写的是 2 和 3，实际上 2 是资产互转，负债和借出分别是 3 和 4
+                else if (checkedId == R.id.rb_liability) draft.type = 3;
+                else if (checkedId == R.id.rb_lend) draft.type = 4;
+                else draft.type = 0; // 默认支出
+            }
+
             draft.amount = amount;
-            draft.category = spCategory.getSelectedItem() == null ? "其他" : spCategory.getSelectedItem().toString();
-            String selectedSub = spSubCategory.getSelectedItem() == null ? "" : spSubCategory.getSelectedItem().toString();
-            draft.subCategory = "无二级分类".equals(selectedSub) ? "" : selectedSub;
+            draft.category = currentSelectedCategory;
+            draft.subCategory = currentSelectedSubCategory;
             draft.note = etNote.getText().toString().trim();
             draft.assetId = selectableAssets.get(spAsset.getSelectedItemPosition()).id;
             draft.excludeFromBudget = cbExcludeBudget.isChecked();
             draft.currencySymbol = getCurrencySymbol();
+
             if (draft.date <= 0L) {
                 draft.date = System.currentTimeMillis();
             }

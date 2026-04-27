@@ -68,6 +68,45 @@ public class FinanceViewModel extends AndroidViewModel {
         });
     }
 
+    /**
+     * 【新增】同步增加账单及对应的双边资产余额（用于 AI 记账和正常入账）
+     */
+    public void addTransactionWithAssetSync(Transaction transaction) {
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            database.runInTransaction(() -> {
+                // 1. 处理己方支付账户（如微信、支付宝）的资产变更
+                if (transaction.assetId != 0) {
+                    AssetAccount asset = assetDao.getAssetByIdSync(transaction.assetId);
+                    if (asset != null) {
+                        applyAssetBalance(asset, transaction); // 调用已有的加减逻辑
+                        assetDao.update(asset);
+                    }
+                }
+
+                // 2. 处理对方资产（负债/借出对象）的变更
+                if (transaction.type == 3 || transaction.type == 4) {
+                    if (transaction.targetObject != null && !transaction.targetObject.isEmpty()) {
+                        int targetType = (transaction.type == 3) ? 1 : 2;
+                        AssetAccount targetAccount = assetDao.getAssetByNameAndType(transaction.targetObject, targetType);
+                        if (targetAccount == null) {
+                            // 如果是新对象，直接创建这个资产
+                            targetAccount = new AssetAccount(transaction.targetObject, transaction.amount, targetType);
+                            assetDao.insert(targetAccount);
+                        } else {
+                            // 如果已有对象，累加欠款/借出额
+                            targetAccount.amount += transaction.amount;
+                            assetDao.update(targetAccount);
+                        }
+                    }
+                }
+
+                // 3. 最终把账单记录插进数据库
+                transactionDao.insert(transaction);
+            });
+            notifyWidgetUpdate(); // 事务完成后通知桌面小部件刷新
+        });
+    }
+
     // ================= 账单记录 (Transaction) 相关 =================
 
     public LiveData<List<Transaction>> getAllTransactions() {

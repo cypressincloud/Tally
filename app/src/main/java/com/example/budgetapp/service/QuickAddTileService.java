@@ -27,6 +27,7 @@ import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -155,6 +156,37 @@ public class QuickAddTileService extends TileService {
             Spinner spAsset = floatView.findViewById(R.id.sp_asset);
             Button btnCurrency = floatView.findViewById(R.id.btn_window_currency);
 
+            // ================= 【新增】不计入预算逻辑开始 =================
+            ImageView ivExcludeBudget = floatView.findViewById(R.id.iv_window_exclude_budget);
+            SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+            boolean isBudgetFeatureEnabled = prefs.getBoolean("is_budget_enabled", false);
+            final boolean[] isExcludedFromBudget = { false }; // 悬浮窗默认计入预算
+
+            if (isBudgetFeatureEnabled && ivExcludeBudget != null) {
+                ivExcludeBudget.setVisibility(View.VISIBLE);
+
+                Runnable updateDotUi = () -> {
+                    if (isExcludedFromBudget[0]) {
+                        ivExcludeBudget.setColorFilter(ContextCompat.getColor(this, R.color.app_yellow));
+                        ivExcludeBudget.setImageResource(R.drawable.ic_dot_filled);
+                    } else {
+                        ivExcludeBudget.setColorFilter(android.graphics.Color.parseColor("#888888"));
+                        ivExcludeBudget.setImageResource(R.drawable.ic_dot_outline);
+                    }
+                };
+                updateDotUi.run();
+
+                ivExcludeBudget.setOnClickListener(v -> {
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                    isExcludedFromBudget[0] = !isExcludedFromBudget[0];
+                    updateDotUi.run();
+                    Toast.makeText(this, isExcludedFromBudget[0] ? "该笔账单将不计入预算" : "该笔账单正常计入预算", Toast.LENGTH_SHORT).show();
+                });
+            } else if (ivExcludeBudget != null) {
+                ivExcludeBudget.setVisibility(View.GONE);
+            }
+            // ================= 【新增】不计入预算逻辑结束 =================
+
             Button btnSave = floatView.findViewById(R.id.btn_window_save);
             Button btnCancel = floatView.findViewById(R.id.btn_window_cancel);
 
@@ -167,7 +199,6 @@ public class QuickAddTileService extends TileService {
             etAmount.requestFocus();
             rgType.check(R.id.rb_window_expense);
 
-            SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
             boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
             boolean isPhotoBackupEnabled = prefs.getBoolean("enable_photo_backup", false);
             final String[] currentPhotoPath = {null};
@@ -416,8 +447,8 @@ public class QuickAddTileService extends TileService {
 
                     String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
-                    // 【修改】将 targetObject 和 liabilityLoanType 传给底层方法
-                    saveToDatabase(finalAmount, finalType, finalCat, selectedSubCategory, finalNote, finalRemark, assetId, symbol, currentPhotoPath[0], targetObject, liabilityLoanType);
+                    // 【修改】加上最后的 isExcludedFromBudget[0]
+                    saveToDatabase(finalAmount, finalType, finalCat, selectedSubCategory, finalNote, finalRemark, assetId, symbol, currentPhotoPath[0], targetObject, liabilityLoanType, isExcludedFromBudget[0]);
                     closeWindow(windowManager, floatView);
                     Toast.makeText(this, "记账成功", Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
@@ -605,7 +636,7 @@ public class QuickAddTileService extends TileService {
         }
     }
 
-    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath, String targetObject, int liabilityLoanType) {
+    private void saveToDatabase(double amount, int type, String category, String subCategory, String note, String remark, int assetId, String currencySymbol, String photoPath, String targetObject, int liabilityLoanType, boolean excludeFromBudget) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             AppDatabase db = AppDatabase.getDatabase(getApplicationContext());
 
@@ -621,6 +652,9 @@ public class QuickAddTileService extends TileService {
             t.currencySymbol = currencySymbol;
             t.photoPath = photoPath;
             t.targetObject = targetObject;
+
+            t.excludeFromBudget = excludeFromBudget;
+
             db.transactionDao().insert(t);
 
             // 1. 同步影响【对方资产】（负债/借出对象）
