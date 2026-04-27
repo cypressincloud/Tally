@@ -25,7 +25,25 @@ public class TransactionDraftMapper {
                 object.optString("remark", ""),
                 object.optString("description", "")
         );
-        draft.date = System.currentTimeMillis();
+
+        // === 修改时间解析逻辑开始 ===
+        long parsedDate = System.currentTimeMillis(); // 默认当前时间
+        String timeStr = object.optString("time", "");
+        if (!timeStr.isEmpty()) {
+            try {
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                java.util.Date d = sdf.parse(timeStr);
+                if (d != null) {
+                    parsedDate = d.getTime(); // 成功解析出 AI 识别的时间
+                }
+            } catch (Exception e) {
+                // 如果解析失败，走 catch 块，依然使用默认的当前时间
+                e.printStackTrace();
+            }
+        }
+        draft.date = parsedDate;
+        // === 修改时间解析逻辑结束 ===
+
         draft.excludeFromBudget = false;
 
         SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);

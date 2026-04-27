@@ -306,20 +306,49 @@ public class AiAccountingClient {
 
     private String buildSystemPrompt(Context context) {
         StringBuilder builder = new StringBuilder();
+
+        // 获取当前时间，提供给 AI 作为时间计算基准
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+        String currentTime = sdf.format(new java.util.Date());
+
+        // 系统角色和基本规则
         builder.append("你是一个中文记账助手，只能返回 JSON，不要输出 markdown、解释或代码块。");
-        builder.append("请始终返回 JSON 数组。每一项必须包含：type、amount、category、subCategory、note、asset。");
+        builder.append("当前系统时间是：").append(currentTime).append("。");
+
+        // JSON 输出要求
+        builder.append("请始终返回 JSON 数组，每一项必须包含：type、amount、category、subCategory、note、asset、time。");
         builder.append("type 只能是 0 或 1。0 表示支出，1 表示收入。amount 必须是纯数字，不要带货币符号。");
-        builder.append("分类必须优先使用给定的项目分类；如果命中了二级分类，category 必须写对应一级分类，subCategory 必须写对应二级分类。");
-        builder.append("如果没有适合的分类，统一使用“其他”，subCategory 留空。");
-        builder.append("asset 必须尽量从给定资产列表中选择最合适的账户名称；如果无法判断，可以留空。");
+        builder.append("time 表示账单发生时间，格式严格为 yyyy-MM-dd HH:mm。");
+
+        // 优先识别金额逻辑
+        builder.append("在识别截图账单金额时，请遵循以下规则：");
+        builder.append("1. 优先识别含有“实付”、“实付款”、“支付”字样的金额字段作为实际支出。");
+        builder.append("2. 如果没有实付字段，再取总价或其他明显消费金额。");
+        builder.append("3. 不要将优惠金额、折扣、红包、共减金额作为支出金额。");
+
+        // 分类规则
+        builder.append("分类必须优先使用给定项目分类；二级分类命中时 category 写一级分类，subCategory 写二级分类。");
+        builder.append("没有适合分类的统一使用“其他”，subCategory 留空。");
+
+        // 资产规则
+        builder.append("asset 优先从给定资产列表选择；无法判断可留空。");
+
+        // 支出分类与二级分类
         builder.append("\n\n支出分类与二级分类：");
         appendCategories(builder, buildPromptCategories(context, false), context);
+
+        // 收入分类与二级分类
         builder.append("\n\n收入分类与二级分类：");
         appendCategories(builder, buildPromptCategories(context, true), context);
+
+        // 可用资产账户
         builder.append("\n\n可用资产账户：");
         appendAssets(builder, context);
-        builder.append("\n\n只返回 JSON 数组，例如：");
-        builder.append("[{\"type\":0,\"amount\":25,\"category\":\"餐饮\",\"subCategory\":\"午餐\",\"note\":\"午饭\",\"asset\":\"微信余额\"}]");
+
+        // 示例 JSON 返回格式
+        builder.append("\n\n示例 JSON 返回格式：");
+        builder.append("[{\"type\":0,\"amount\":22.66,\"category\":\"食品饮料\",\"subCategory\":\"牛奶\",\"note\":\"天猫超市购买纯牛奶\",\"asset\":\"微信余额\",\"time\":\"").append(currentTime).append("\"}]");
+
         return builder.toString();
     }
 
