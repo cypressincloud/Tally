@@ -78,4 +78,6 @@ dependencies {
 
     implementation("com.google.android.flexbox:flexbox:3.0.0")
 
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.0")
+
 }

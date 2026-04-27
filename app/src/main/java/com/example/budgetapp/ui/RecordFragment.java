@@ -33,6 +33,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.budgetapp.ai.AiConfig;
 import com.example.budgetapp.database.AppDatabase;
 import com.example.budgetapp.database.RenewalItem;
 import com.google.android.material.chip.Chip;
@@ -320,6 +321,20 @@ public class RecordFragment extends Fragment {
                 }
             });
         }
+
+        // 👇 新增：长按开启AI对话 👇
+        btnQuickRecord.setOnLongClickListener(v -> {
+            AiConfig config = AiConfig.load(requireContext());
+            if (config.isEnabledAndReady()) {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                startActivity(new Intent(requireContext(), AiChatActivity.class));
+                return true;
+            } else {
+                Toast.makeText(requireContext(), "请先在设置中启用 AI 记账，并至少填写 Base URL、API Key、文本模型。", Toast.LENGTH_LONG).show();
+                return false;
+            }
+        });
+        // 👆 新增结束 👆
 
         calendarRecycler = view.findViewById(R.id.calendar_recycler);
         GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 7) {

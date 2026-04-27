@@ -439,6 +439,8 @@ public class SettingsActivity extends AppCompatActivity {
 
         findViewById(R.id.btn_webdav_backup).setOnClickListener(v -> startActivity(new Intent(this, WebdavSettingsActivity.class)));
 
+        findViewById(R.id.btn_ai_setting).setOnClickListener(v -> startActivity(new Intent(this, AiSettingActivity.class)));
+
         findViewById(R.id.btn_auto_asset).setOnClickListener(v -> startActivity(new Intent(this, AutoAssetActivity.class)));
         findViewById(R.id.btn_toggle_night_mode).setOnClickListener(v -> startActivity(new Intent(this, ThemeSettingsActivity.class)));
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
