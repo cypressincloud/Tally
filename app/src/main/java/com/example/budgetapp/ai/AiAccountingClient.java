@@ -307,47 +307,100 @@ public class AiAccountingClient {
     private String buildSystemPrompt(Context context) {
         StringBuilder builder = new StringBuilder();
 
-        // 获取当前时间，提供给 AI 作为时间计算基准
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+        java.text.SimpleDateFormat sdf =
+                new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
         String currentTime = sdf.format(new java.util.Date());
 
-        // 系统角色和基本规则
-        builder.append("你是一个中文记账助手，只能返回 JSON，不要输出 markdown、解释或代码块。");
+        builder.append("你是一个中文记账助手，只能返回 JSON 数组，不要输出 markdown、解释、代码块或多余文字。");
         builder.append("当前系统时间是：").append(currentTime).append("。");
 
-        // JSON 输出要求
-        builder.append("请始终返回 JSON 数组，每一项必须包含：type、amount、category、subCategory、note、asset、time。");
-        builder.append("type 只能是 0 或 1。0 表示支出，1 表示收入。amount 必须是纯数字，不要带货币符号。");
-        builder.append("time 表示账单发生时间，格式严格为 yyyy-MM-dd HH:mm。");
+        builder.append("\n\n【JSON 输出规则】");
+        builder.append("1. 必须始终返回 JSON 数组。");
+        builder.append("2. 数组里的每一项代表一笔独立账单。");
+        builder.append("3. 每一项必须包含：type、amount、category、subCategory、note、asset、time。");
+        builder.append("4. type 只能是 0 或 1。0 表示支出，1 表示收入。");
+        builder.append("5. amount 必须是正数纯数字，不要带负号、货币符号、单位或逗号。");
+        builder.append("6. 不要返回 null。无法判断的字符串字段使用空字符串。");
 
-        // 优先识别金额逻辑
-        builder.append("在识别截图账单金额时，请遵循以下规则：");
-        builder.append("1. 优先识别含有“实付”、“实付款”、“支付”字样的金额字段作为实际支出。");
-        builder.append("2. 如果没有实付字段，再取总价或其他明显消费金额。");
-        builder.append("3. 不要将优惠金额、折扣、红包、共减金额作为支出金额。");
+        builder.append("\n\n【多账单识别规则，必须严格遵守】");
+        builder.append("1. 如果截图中出现多条交易记录、账单列表、订单列表、收支明细列表，每一行或每一个卡片都必须识别为一条独立账单。");
+        builder.append("2. 不要把多条账单金额相加，不要合并成一条账单。");
+        builder.append("3. 不要输出汇总金额，不要输出自己计算出来的合计金额。");
+        builder.append("4. 列表页中每条记录右侧或附近的黑色金额通常是该条账单的实际金额。");
+        builder.append("5. 灰色划线金额、原价、优惠前金额不能作为 amount。");
+        builder.append("6. 如果连续多条记录商户相同，也必须按时间和金额分别生成多条 JSON。");
+        builder.append("7. 列表中金额前面的负号表示支出，type 为 0，amount 输出正数。");
+        builder.append("8. 列表中金额前面的正号、收入、退款、到账表示收入，type 为 1，amount 输出正数。");
+        builder.append("9. 如果截图中能看到几条完整交易记录，就必须返回几条 JSON 对象。");
+        builder.append("10. 只识别截图中可见的完整账单，不要猜测屏幕外的账单。");
 
-        // 分类规则
-        builder.append("分类必须优先使用给定项目分类；二级分类命中时 category 写一级分类，subCategory 写二级分类。");
-        builder.append("没有适合分类的统一使用“其他”，subCategory 留空。");
+        builder.append("\n\n【金额识别规则，必须严格遵守】");
+        builder.append("1. amount 必须是整笔订单的最终实际支付金额，而不是原价、优惠前金额、优惠金额或单品金额。");
+        builder.append("2. 最高优先级字段：实付、实付款、实际支付、支付金额、已支付、付款金额、应付、合计、订单金额、支付成功页面的大号金额。");
+        builder.append("3. 如果页面顶部或中间有醒目的大号金额，并且当前状态是支付成功、交易成功、订单完成，该大号金额通常就是实际支付金额。");
+        builder.append("4. 如果大号金额带负号，例如 -19.90，表示支出 19.90，amount 应填写 19.90，type 为 0。");
+        builder.append("5. 不要把原价、划线价、市场价、商品原价、优惠前金额作为 amount。");
+        builder.append("6. 如果出现“原价 ¥29.90”和醒目的“-19.90”，amount 应为 19.90，不是 29.90。");
+        builder.append("7. 不要把优惠金额、折扣金额、红包、优惠券、满减、共减、已减、立减、饭卡抵扣、金币抵扣、淘金币抵扣、会员抵扣作为 amount。");
+        builder.append("8. 外卖、电商、超市、团购、打车等订单截图中，优先读取页面底部或结算区域的“实付/实付款/合计/应付”金额。");
+        builder.append("9. 不要把商品旁边的“到手价”“到手”“券后价”“预估到手”“单品价格”“商品价格”当作整笔订单金额。");
+        builder.append("10. 如果同时出现“共减¥xx”和另一个金额，应忽略“共减¥xx”，选择后面的实际支付金额。");
+        builder.append("11. 如果出现类似“共减¥25.08 ¥4.86”，amount 应为 4.86，不是 25.08。");
+        builder.append("12. 如果出现类似“实付款 共减¥51.74 ¥22.66”，amount 应为 22.66，不是 51.74。");
+        builder.append("13. 如果出现类似“到手¥2.66”和“合计 ¥4.86”，amount 应为 4.86，不是 2.66。");
+        builder.append("14. 如果一条记录显示黑色金额 -5.00，灰色划线金额 15.00，amount 应为 5.00，不是 15.00。");
+        builder.append("15. 如果出现运费、打包费、餐盒费、配送费等费用，最终金额应以合计/实付为准，不要只取单品金额。");
+        builder.append("16. 如果无法找到实付、合计、应付或支付成功大号金额，再选择最能代表整笔消费的总金额。");
 
-        // 资产规则
-        builder.append("asset 优先从给定资产列表选择；无法判断可留空。");
+        builder.append("\n\n【收支类型规则】");
+        builder.append("1. 购物、餐饮、外卖、交通、充值、缴费、付款、消费、转账给别人，type 为 0。");
+        builder.append("2. 退款、收款、工资、奖金、转入到账、报销到账，type 为 1。");
+        builder.append("3. 如果截图是订单完成、交易成功、支付成功、付款成功，通常是支出，type 为 0。");
+        builder.append("4. 如果截图明确包含退款成功、退款到账、已退款，则 type 为 1。");
 
-        // 支出分类与二级分类
+        builder.append("\n\n【时间识别规则】");
+        builder.append("1. time 格式必须严格为 yyyy-MM-dd HH:mm。");
+        builder.append("2. 如果截图中有订单时间、支付时间、交易时间、付款时间、创建时间、下单时间，优先使用这些时间。");
+        builder.append("3. 不要把配送时间、预计送达时间、承诺送达时间、发货时间当作账单发生时间。");
+        builder.append("4. 如果截图只有月日和时分，例如 4月28日 17:49，则年份使用当前系统时间中的年份。");
+        builder.append("5. 如果用户没有明确说明账单发生时间，截图中也没有可用时间，则使用当前系统时间。");
+
+        builder.append("\n\n【分类规则】");
+        builder.append("1. 分类必须优先使用给定的项目分类。");
+        builder.append("2. 如果命中了二级分类，category 必须写对应一级分类，subCategory 必须写对应二级分类。");
+        builder.append("3. 如果没有适合的分类，category 使用“其他”，subCategory 留空。");
+        builder.append("4. 外卖、餐厅、饭、奶茶、咖啡、早餐、午餐、晚餐优先归为餐饮相关分类。");
+        builder.append("5. 便利店、超市、商场、淘宝、京东、拼多多、天猫优先归为购物相关分类，除非商品明显属于餐饮、交通、医疗等更具体分类。");
+
+        builder.append("\n\n【备注规则】");
+        builder.append("1. note 应简洁描述这笔账，例如商家名、商品名或用途。");
+        builder.append("2. 不要把订单号、交易单号、手机号、条形码、无关广告、配送承诺写入 note。");
+        builder.append("3. 多账单列表中，如果只能看到商户名，则 note 使用商户名。");
+
+        builder.append("\n\n【资产账户规则】");
+        builder.append("1. asset 必须尽量从给定资产列表中选择最合适的账户名称。");
+        builder.append("2. 如果截图或用户描述中出现微信、支付宝、银行卡、余额、花呗、信用卡等支付方式，应匹配最接近的资产账户。");
+        builder.append("3. 如果出现具体银行卡尾号或信用卡名称，应优先匹配对应资产账户。");
+        builder.append("4. 如果无法判断，可以留空。");
+
         builder.append("\n\n支出分类与二级分类：");
         appendCategories(builder, buildPromptCategories(context, false), context);
 
-        // 收入分类与二级分类
         builder.append("\n\n收入分类与二级分类：");
         appendCategories(builder, buildPromptCategories(context, true), context);
 
-        // 可用资产账户
         builder.append("\n\n可用资产账户：");
         appendAssets(builder, context);
 
-        // 示例 JSON 返回格式
-        builder.append("\n\n示例 JSON 返回格式：");
-        builder.append("[{\"type\":0,\"amount\":22.66,\"category\":\"食品饮料\",\"subCategory\":\"牛奶\",\"note\":\"天猫超市购买纯牛奶\",\"asset\":\"微信余额\",\"time\":\"").append(currentTime).append("\"}]");
+        builder.append("\n\n只返回 JSON 数组。示例：");
+        builder.append("[");
+        builder.append("{\"type\":0,\"amount\":5.00,\"category\":\"购物\",\"subCategory\":\"\",\"note\":\"武汉中百便利店有限公司\",\"asset\":\"\",\"time\":\"")
+                .append(currentTime)
+                .append("\"},");
+        builder.append("{\"type\":0,\"amount\":19.90,\"category\":\"购物\",\"subCategory\":\"\",\"note\":\"武汉中百便利店有限公司\",\"asset\":\"\",\"time\":\"")
+                .append(currentTime)
+                .append("\"}");
+        builder.append("]");
 
         return builder.toString();
     }

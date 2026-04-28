@@ -6,4 +6,5 @@
     <string name="widget_name_combined">财务全景仪表盘</string>
     <string name="widget_name_overtime">加班薪资统计</string>
     <string name="widget_name_budget">今日预算卡片</string>
+    <string name="edit_rule">编辑规则</string>
 </resources>

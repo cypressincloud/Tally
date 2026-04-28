@@ -66,4 +66,6 @@
     <color name="currency_symbol_text_normal">#000000</color>
     <color name="currency_symbol_text_selected">#2196F3</color>
     <color name="currency_name_text">#888888</color>
+    
+    <color name="icon_secondary">#888888</color>
 </resources>
