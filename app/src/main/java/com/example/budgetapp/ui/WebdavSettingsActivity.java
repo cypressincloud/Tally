@@ -22,14 +22,18 @@ import java.util.List;
 
 public class WebdavSettingsActivity extends AppCompatActivity {
 
-    private TextInputEditText etUrl;
-    private TextInputEditText etUsername;
-    private TextInputEditText etPassword;
+    private android.widget.EditText etUrl;
+    private android.widget.EditText etUsername;
+    private android.widget.EditText etPassword;
+    private androidx.appcompat.widget.SwitchCompat switchAutoSync;
+    private android.widget.TextView tvLastBackupTime;
 
     private static final String PREF_NAME = "webdav_prefs";
     private static final String KEY_URL = "webdav_url";
     private static final String KEY_USERNAME = "webdav_username";
     private static final String KEY_PASSWORD = "webdav_password";
+    private static final String KEY_AUTO_SYNC = "webdav_auto_sync";
+    private static final String KEY_LAST_BACKUP_TIME = "webdav_last_backup_time";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,6 +57,8 @@ public class WebdavSettingsActivity extends AppCompatActivity {
         etUrl = findViewById(R.id.et_webdav_url);
         etUsername = findViewById(R.id.et_webdav_username);
         etPassword = findViewById(R.id.et_webdav_password);
+        switchAutoSync = findViewById(R.id.switch_auto_sync);
+        tvLastBackupTime = findViewById(R.id.tv_last_backup_time);
 
         Button btnSave = findViewById(R.id.btn_save_webdav);
         Button btnUpload = findViewById(R.id.btn_upload_data);
@@ -60,6 +66,9 @@ public class WebdavSettingsActivity extends AppCompatActivity {
 
         // 加载已保存的配置
         loadWebdavConfig();
+        
+        // 更新上次备份时间显示
+        updateLastBackupTime();
 
         // 1. 保存配置
         btnSave.setOnClickListener(v -> saveWebdavConfig());
@@ -95,6 +104,8 @@ public class WebdavSettingsActivity extends AppCompatActivity {
 
                     // 成功后切回主线程更新 UI
                     runOnUiThread(() -> {
+                        // 保存备份时间
+                        saveLastBackupTime();
                         Toast.makeText(this, "✅ 备份数据已成功上传至 WebDAV！", Toast.LENGTH_LONG).show();
                         btnUpload.setEnabled(true);
                         btnUpload.setText("上传数据");
@@ -202,6 +213,7 @@ public class WebdavSettingsActivity extends AppCompatActivity {
         etUrl.setText(prefs.getString(KEY_URL, ""));
         etUsername.setText(prefs.getString(KEY_USERNAME, ""));
         etPassword.setText(prefs.getString(KEY_PASSWORD, ""));
+        switchAutoSync.setChecked(prefs.getBoolean(KEY_AUTO_SYNC, false));
     }
 
     private void saveWebdavConfig() {
@@ -219,9 +231,49 @@ public class WebdavSettingsActivity extends AppCompatActivity {
                 .putString(KEY_URL, url)
                 .putString(KEY_USERNAME, username)
                 .putString(KEY_PASSWORD, password)
+                .putBoolean(KEY_AUTO_SYNC, switchAutoSync.isChecked())
                 .apply();
 
         Toast.makeText(this, "WebDAV 配置已保存", Toast.LENGTH_SHORT).show();
         // 移除了 finish()，允许用户保存后停留在当前页面继续点击"上传"或"同步"
+    }
+
+    private void saveLastBackupTime() {
+        SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        prefs.edit()
+                .putLong(KEY_LAST_BACKUP_TIME, System.currentTimeMillis())
+                .apply();
+        updateLastBackupTime();
+    }
+
+    private void updateLastBackupTime() {
+        SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        long lastBackupTime = prefs.getLong(KEY_LAST_BACKUP_TIME, 0);
+        
+        if (lastBackupTime == 0) {
+            tvLastBackupTime.setText("暂无备份记录");
+            return;
+        }
+        
+        long currentTime = System.currentTimeMillis();
+        long diffMillis = currentTime - lastBackupTime;
+        
+        // 转换为分钟
+        long diffMinutes = diffMillis / (1000 * 60);
+        
+        String timeText;
+        if (diffMinutes < 1) {
+            timeText = "上次备份：刚刚";
+        } else if (diffMinutes < 60) {
+            timeText = "上次备份：" + diffMinutes + " 分钟前";
+        } else if (diffMinutes < 1440) { // 小于24小时
+            long diffHours = diffMinutes / 60;
+            timeText = "上次备份：" + diffHours + " 小时前";
+        } else {
+            long diffDays = diffMinutes / 1440;
+            timeText = "上次备份：" + diffDays + " 天前";
+        }
+        
+        tvLastBackupTime.setText(timeText);
     }
 }

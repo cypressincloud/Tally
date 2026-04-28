@@ -23,11 +23,19 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/tv_transaction_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="14sp" />
+
+        <TextView
             android:id="@+id/tv_draft_status"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="8dp"
             android:textColor="@color/app_yellow"
             android:textSize="14sp"
             android:textStyle="bold" />

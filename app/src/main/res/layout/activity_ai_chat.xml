@@ -1,107 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/ai_chat_root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/bar_background">
+    android:layout_height="match_parent">
 
-    <!-- 顶部导航 -->
     <LinearLayout
-        android:id="@+id/layout_top_nav"
+        android:id="@+id/ai_chat_root"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/white"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp"
-        android:elevation="4dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@color/bar_background">
 
-        <TextView
-            android:id="@+id/tv_title"
+        <!-- 顶部导航 -->
+        <LinearLayout
+            android:id="@+id/layout_top_nav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/white"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp">
+
+            <TextView
+                android:id="@+id/tv_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="AI 记账助手"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 聊天列表 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_chat"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="12dp"
+            android:overScrollMode="never" />
+
+        <!-- 底部输入区 -->
+        <LinearLayout
+            android:id="@+id/layout_bottom_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/white"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp">
+
+            <!-- 语音 -->
+            <ImageButton
+                android:id="@+id/btn_voice_input"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="语音记账"
+                android:padding="8dp"
+                android:src="@drawable/ic_quick_voice" />
+
+            <!-- 图片 -->
+            <ImageButton
+                android:id="@+id/btn_image_input"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="截图记账"
+                android:padding="8dp"
+                android:src="@drawable/ic_image" />
+
+            <!-- 输入框 -->
+            <EditText
+                android:id="@+id/et_chat_input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:minHeight="40dp"
+                android:maxLines="4"
+                android:background="@drawable/bg_input_field"
+                android:hint=""
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="8dp"
+                android:textSize="14sp"
+                android:gravity="center_vertical" />
+
+            <!-- 发送 -->
+            <ImageButton
+                android:id="@+id/btn_send"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_type_selector"
+                android:contentDescription="发送"
+                android:padding="8dp"
+                android:src="@drawable/ic_quick_ai" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- 语音录制遮罩层 -->
+    <FrameLayout
+        android:id="@+id/voice_recording_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#DD000000"
+        android:visibility="gone"
+        android:clickable="true">
+
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:text="AI 记账助手"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-    </LinearLayout>
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="@drawable/bg_bottom_sheet_rounded"
+            android:backgroundTint="#EE222222"
+            android:padding="40dp">
 
-    <!-- 聊天列表 -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_chat"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="12dp"
-        android:overScrollMode="never" />
+            <ImageView
+                android:id="@+id/iv_recording_icon"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@drawable/ic_quick_voice"
+                android:tint="@color/app_yellow" />
 
-    <!-- 底部输入区 -->
-    <LinearLayout
-        android:id="@+id/layout_bottom_input"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/white"
-        android:elevation="8dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
-        android:stateListAnimator="@null">
+            <TextView
+                android:id="@+id/tv_recording_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="松开发送，上滑取消"
+                android:textColor="@color/white"
+                android:textSize="15sp" />
 
-        <!-- 语音 -->
-        <ImageButton
-            android:id="@+id/btn_voice_input"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="语音记账"
-            android:padding="8dp"
-            android:src="@drawable/ic_quick_voice" />
+            <TextView
+                android:id="@+id/tv_cancel_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="松开手指，取消发送"
+                android:textColor="@color/app_yellow"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </LinearLayout>
+    </FrameLayout>
 
-        <!-- 图片 -->
-        <ImageButton
-            android:id="@+id/btn_image_input"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="截图记账"
-            android:padding="8dp"
-            android:src="@drawable/ic_quick_camera" />
-
-        <!-- 输入框 -->
-        <EditText
-            android:id="@+id/et_chat_input"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:minHeight="40dp"
-            android:maxLines="4"
-            android:background="@drawable/bg_input_field"
-            android:hint=""
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="8dp"
-            android:textSize="14sp"
-            android:gravity="center_vertical" />
-
-        <!-- 发送 -->
-        <ImageButton
-            android:id="@+id/btn_send"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="6dp"
-            android:background="@drawable/bg_type_selector"
-            android:contentDescription="发送"
-            android:padding="8dp"
-            android:src="@drawable/ic_quick_ai" />
-    </LinearLayout>
-
-</LinearLayout>
+</FrameLayout>

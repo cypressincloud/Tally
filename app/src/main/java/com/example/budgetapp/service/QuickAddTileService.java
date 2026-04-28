@@ -696,6 +696,9 @@ public class QuickAddTileService extends TileService {
 
             // 👇👇👇 一键刷新所有桌面小组件 👇👇👇
             com.example.budgetapp.widget.WidgetUtils.updateAllWidgets(getApplicationContext());
+            
+            // 触发 WebDAV 自动同步
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplicationContext());
 
         }); // 这里是 execute 的结尾大括号
     }

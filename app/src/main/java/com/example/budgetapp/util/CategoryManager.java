@@ -28,10 +28,12 @@ public class CategoryManager {
 
     public static void saveExpenseCategories(Context context, List<String> list) {
         saveList(context, KEY_EXPENSE, list);
+        com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(context);
     }
 
     public static void saveIncomeCategories(Context context, List<String> list) {
         saveList(context, KEY_INCOME, list);
+        com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(context);
     }
 
     // 【新增】二级分类开关状态
@@ -43,6 +45,7 @@ public class CategoryManager {
     public static void setSubCategoryEnabled(Context context, boolean enabled) {
         SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         prefs.edit().putBoolean(KEY_ENABLE_SUB_CATEGORY, enabled).apply();
+        com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(context);
     }
 
     // 【新增】获取某分类的二级分类列表
@@ -53,6 +56,7 @@ public class CategoryManager {
     // 【新增】保存某分类的二级分类列表
     public static void saveSubCategories(Context context, String parentCategory, List<String> list) {
         saveList(context, "sub_cat_" + parentCategory, list);
+        com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(context);
     }
 
     private static List<String> getList(Context context, String key, String defaultValue) {
@@ -84,6 +88,7 @@ public class CategoryManager {
     public static void setDetailedCategoryEnabled(Context context, boolean enabled) {
         SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         prefs.edit().putBoolean(KEY_ENABLE_DETAILED_CATEGORY, enabled).apply();
+        com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(context);
     }
 
 }

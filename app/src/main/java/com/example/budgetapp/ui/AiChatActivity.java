@@ -19,6 +19,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -56,8 +57,10 @@ import com.example.budgetapp.viewmodel.FinanceViewModel;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -73,6 +76,11 @@ public class AiChatActivity extends AppCompatActivity {
     private ImageButton btnSend;
     private LinearLayout layoutTopNav;
     private LinearLayout layoutBottomInput;
+    
+    // 语音录制遮罩层
+    private FrameLayout voiceRecordingOverlay;
+    private TextView tvRecordingHint;
+    private TextView tvCancelHint;
 
     // --- 内部录音专用的变量 ---
     private android.media.MediaRecorder mediaRecorder;
@@ -108,6 +116,10 @@ public class AiChatActivity extends AppCompatActivity {
         btnVoice = findViewById(R.id.btn_voice_input);
         btnImage = findViewById(R.id.btn_image_input);
         btnSend = findViewById(R.id.btn_send);
+        
+        voiceRecordingOverlay = findViewById(R.id.voice_recording_overlay);
+        tvRecordingHint = findViewById(R.id.tv_recording_hint);
+        tvCancelHint = findViewById(R.id.tv_cancel_hint);
 
         setupWindowInsets();
         setupInputElevationEffect();
@@ -146,23 +158,29 @@ public class AiChatActivity extends AppCompatActivity {
                     case android.view.MotionEvent.ACTION_DOWN:
                         v.getParent().requestDisallowInterceptTouchEvent(true);
                         v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
-                        btnVoice.setColorFilter(androidx.core.content.ContextCompat.getColor(AiChatActivity.this, R.color.app_yellow));
                         startY = event.getY();
+                        // 显示遮罩层
+                        voiceRecordingOverlay.setVisibility(View.VISIBLE);
+                        tvRecordingHint.setVisibility(View.VISIBLE);
+                        tvCancelHint.setVisibility(View.GONE);
                         startInternalRecording(); // 开始应用内录音
                         return true;
 
                     case android.view.MotionEvent.ACTION_MOVE:
-                        // 如果手指向上滑动超过 200 像素，按钮变红提示即将取消
+                        // 如果手指向上滑动超过 200 像素，显示取消提示
                         if (startY - event.getY() > 200) {
-                            btnVoice.setColorFilter(android.graphics.Color.RED);
+                            tvRecordingHint.setVisibility(View.GONE);
+                            tvCancelHint.setVisibility(View.VISIBLE);
                         } else {
-                            btnVoice.setColorFilter(androidx.core.content.ContextCompat.getColor(AiChatActivity.this, R.color.app_yellow));
+                            tvRecordingHint.setVisibility(View.VISIBLE);
+                            tvCancelHint.setVisibility(View.GONE);
                         }
                         return true;
 
                     case android.view.MotionEvent.ACTION_UP:
                     case android.view.MotionEvent.ACTION_CANCEL:
-                        btnVoice.clearColorFilter();
+                        // 隐藏遮罩层
+                        voiceRecordingOverlay.setVisibility(View.GONE);
                         // 判断是否是上滑取消，或者异常中断
                         boolean isCancel = event.getAction() == android.view.MotionEvent.ACTION_CANCEL || (startY - event.getY() > 200);
                         if (isCancel && event.getAction() == android.view.MotionEvent.ACTION_UP) {
@@ -179,6 +197,14 @@ public class AiChatActivity extends AppCompatActivity {
 
     private void startInternalRecording() {
         if (!ensureTextReady()) return;
+        
+        // 【修改】：如果没有配置音频大模型，直接使用系统语音识别
+        if (!aiConfig.isAudioReady()) {
+            voiceRecordingOverlay.setVisibility(View.GONE);
+            startSystemSpeechRecognition();
+            return;
+        }
+        
         if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
                 != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             androidx.core.app.ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.RECORD_AUDIO}, 101);
@@ -228,14 +254,17 @@ public class AiChatActivity extends AppCompatActivity {
         }
     }
 
-    private void transcribeInternalAudio(java.io.File file) {
-        if (!aiConfig.isAudioReady()) {
-            Toast.makeText(this, "未配置音频大模型，无法转写语音", Toast.LENGTH_SHORT).show();
-            file.delete();
-            return;
-        }
+    private void startSystemSpeechRecognition() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "zh-CN");
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "请说出记账内容");
+        speechRecognizerLauncher.launch(intent);
+    }
 
+    private void transcribeInternalAudio(java.io.File file) {
         int statusIndex = addMessage(ChatMessage.aiText("正在转写语音..."));
+
         new Thread(() -> {
             try {
                 // 读取录好的 m4a 文件转化为字节
@@ -770,6 +799,7 @@ public class AiChatActivity extends AppCompatActivity {
 
         private final TextView tvIndex;
         private final TextView tvStatus;
+        private final TextView tvTransactionTime;
         private final ImageButton btnRemove;
 
         private final LinearLayout layoutSummary;
@@ -801,6 +831,7 @@ public class AiChatActivity extends AppCompatActivity {
 
             tvIndex = root.findViewById(R.id.tv_draft_index);
             tvStatus = root.findViewById(R.id.tv_draft_status);
+            tvTransactionTime = root.findViewById(R.id.tv_transaction_time);
             btnRemove = root.findViewById(R.id.btn_remove);
 
             layoutSummary = root.findViewById(R.id.layout_summary);
@@ -820,11 +851,12 @@ public class AiChatActivity extends AppCompatActivity {
         }
 
         void bind() {
-            tvIndex.setText("账单");
+            tvIndex.setText("账单 " + index);
             setupForm();
             fillForm(model.draft);
             bindSummary();
             updateEditorState();
+            updateTransactionTime(model.draft.date);
 
             btnEdit.setOnClickListener(v -> {
                 if (model.saved) return;
@@ -1019,6 +1051,15 @@ public class AiChatActivity extends AppCompatActivity {
 
             tvStatus.setText(model.saved ? "已入账" : "待确认");
             tvStatus.setTextColor(getColor(model.saved ? R.color.expense_green : R.color.app_yellow));
+        }
+
+        private void updateTransactionTime(long timestamp) {
+            if (timestamp <= 0) {
+                timestamp = System.currentTimeMillis();
+            }
+            SimpleDateFormat sdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+            String formattedTime = sdf.format(new Date(timestamp));
+            tvTransactionTime.setText(formattedTime);
         }
 
         private void updateEditorState() {

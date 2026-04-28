@@ -2052,4 +2052,56 @@ public class BackupManager {
         }
         throw new Exception("备份文件中未找到有效的数据。");
     }
+
+    // ============================================================================================
+    // WebDAV 自动同步辅助方法
+    // ============================================================================================
+    
+    /**
+     * 触发 WebDAV 自动上传（如果已启用自动同步）
+     * 此方法会在后台线程执行，不会阻塞主线程
+     * 
+     * @param context 上下文
+     */
+    public static void triggerAutoUploadIfEnabled(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences("webdav_prefs", Context.MODE_PRIVATE);
+        boolean autoSyncEnabled = prefs.getBoolean("webdav_auto_sync", false);
+        
+        if (!autoSyncEnabled) {
+            return; // 自动同步未启用，直接返回
+        }
+        
+        String url = prefs.getString("webdav_url", "");
+        String username = prefs.getString("webdav_username", "");
+        String password = prefs.getString("webdav_password", "");
+        
+        if (url.isEmpty() || username.isEmpty() || password.isEmpty()) {
+            return; // 配置不完整，直接返回
+        }
+        
+        // 在后台线程执行上传
+        new Thread(() -> {
+            try {
+                com.example.budgetapp.database.AppDatabase db = com.example.budgetapp.database.AppDatabase.getDatabase(context);
+                
+                // 获取需要备份的数据
+                List<com.example.budgetapp.database.Transaction> transactions = db.transactionDao().getAllTransactionsSync();
+                List<com.example.budgetapp.database.AssetAccount> assets = db.assetAccountDao().getAllAssetsSync();
+                List<com.example.budgetapp.database.Goal> goals = db.goalDao().getAllGoalsSync();
+                
+                // 执行上传
+                uploadToWebDAV(context, url, username, password, transactions, assets, goals);
+                
+                // 保存备份时间
+                prefs.edit()
+                        .putLong("webdav_last_backup_time", System.currentTimeMillis())
+                        .apply();
+                
+                Log.d("BackupManager", "WebDAV 自动上传成功");
+            } catch (Exception e) {
+                Log.e("BackupManager", "WebDAV 自动上传失败: " + e.getMessage(), e);
+                // 静默失败，不打扰用户
+            }
+        }).start();
+    }
 }

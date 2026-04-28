@@ -274,10 +274,12 @@
                     android:layout_weight="1"
                     android:text="测试连接"
                     android:textAllCaps="false"
-                    android:textColor="@color/app_yellow"
+                    android:textColor="@color/button_text_yellow_selector"
+                    android:textSize="16sp"
                     app:cornerRadius="16dp"
-                    app:strokeColor="@color/app_yellow"
-                    app:strokeWidth="1dp" />
+                    app:strokeColor="@color/button_stroke_yellow_selector"
+                    app:strokeWidth="2dp"
+                    app:rippleColor="@color/app_yellow" />
 
                 <Button
                     android:id="@+id/btn_save_ai_config"
@@ -289,6 +291,7 @@
                     android:text="保存配置"
                     android:textAllCaps="false"
                     android:textColor="@color/real_white"
+                    android:textSize="16sp"
                     app:cornerRadius="16dp" />
             </LinearLayout>
         </LinearLayout>

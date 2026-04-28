@@ -68,16 +68,25 @@ public class FinanceViewModel extends AndroidViewModel {
     }
 
     public void addTransaction(Transaction transaction) {
-        AppDatabase.databaseWriteExecutor.execute(() -> transactionDao.insert(transaction));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            transactionDao.insert(transaction);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+        });
     }
 
     public void deleteTransaction(Transaction transaction) {
-        AppDatabase.databaseWriteExecutor.execute(() -> transactionDao.delete(transaction));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            transactionDao.delete(transaction);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+        });
     }
 
     // 保留原方法，供只修改照片、备注等不涉及金额变动的场景使用
     public void updateTransaction(Transaction transaction) {
-        AppDatabase.databaseWriteExecutor.execute(() -> transactionDao.update(transaction));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            transactionDao.update(transaction);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+        });
     }
 
     /**
@@ -141,6 +150,7 @@ public class FinanceViewModel extends AndroidViewModel {
                 // 3. 最终更新数据库中的账单记录
                 transactionDao.update(newTx);
             });
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
         });
     }
 
@@ -175,15 +185,24 @@ public class FinanceViewModel extends AndroidViewModel {
     }
 
     public void addAsset(AssetAccount asset) {
-        AppDatabase.databaseWriteExecutor.execute(() -> assetDao.insert(asset));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            assetDao.insert(asset);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+        });
     }
 
     public void updateAsset(AssetAccount asset) {
-        AppDatabase.databaseWriteExecutor.execute(() -> assetDao.update(asset));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            assetDao.update(asset);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+        });
     }
 
     public void deleteAsset(AssetAccount asset) {
-        AppDatabase.databaseWriteExecutor.execute(() -> assetDao.delete(asset));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            assetDao.delete(asset);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+        });
     }
 
     // ================= 预算目标 (Goal) 相关 =================
@@ -193,11 +212,17 @@ public class FinanceViewModel extends AndroidViewModel {
     }
 
     public void insertGoal(Goal goal) {
-        AppDatabase.databaseWriteExecutor.execute(() -> goalDao.insert(goal));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            goalDao.insert(goal);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+        });
     }
 
     public void deleteGoal(Goal goal) {
-        AppDatabase.databaseWriteExecutor.execute(() -> goalDao.delete(goal));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            goalDao.delete(goal);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+        });
     }
 
     /**
@@ -209,6 +234,7 @@ public class FinanceViewModel extends AndroidViewModel {
             goalDao.clearPriorities(); // 先将所有目标的 isPriority 设为 0
             goal.isPriority = true;
             goalDao.update(goal); // 更新当前目标的优先状态
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
         });
     }
 
@@ -261,11 +287,15 @@ public class FinanceViewModel extends AndroidViewModel {
                     }
                 }
             });
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
         });
     }
 
     public void updateGoal(Goal goal) {
-        AppDatabase.databaseWriteExecutor.execute(() -> goalDao.update(goal));
+        AppDatabase.databaseWriteExecutor.execute(() -> {
+            goalDao.update(goal);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+        });
     }
     /**
      * 处理自动续费扣款逻辑
@@ -295,6 +325,7 @@ public class FinanceViewModel extends AndroidViewModel {
                 transaction.date = System.currentTimeMillis();
                 transaction.assetId = assetId;
                 transactionDao.insert(transaction);
+                com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
             }
         });
     }
@@ -342,6 +373,7 @@ public class FinanceViewModel extends AndroidViewModel {
             transaction.assetId = fromAccount.id; // 关联转出账户
 
             transactionDao.insert(transaction);
+            com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
         });
     }
 
