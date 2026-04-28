@@ -66,7 +66,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="文本、截图、语音共用同一套 Base URL 和 API Key"
+                            android:text="文本、截图、语音共用同一套 Base URL 和 API Key。长按记账模块快捷按钮进入AI对话"
                             android:textColor="#888888"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -288,7 +288,7 @@
                     android:backgroundTint="@color/app_yellow"
                     android:text="保存配置"
                     android:textAllCaps="false"
-                    android:textColor="@color/white"
+                    android:textColor="@color/real_white"
                     app:cornerRadius="16dp" />
             </LinearLayout>
         </LinearLayout>

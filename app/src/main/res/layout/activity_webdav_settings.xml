@@ -88,6 +88,7 @@
                         android:layout_height="54dp"
                         android:layout_marginTop="24dp"
                         android:text="保存配置"
+                        android:textColor="@color/real_white"
                         android:textSize="16sp"
                         app:cornerRadius="12dp" />
 
