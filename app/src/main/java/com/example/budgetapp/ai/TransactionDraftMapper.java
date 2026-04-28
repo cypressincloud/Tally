@@ -79,6 +79,10 @@ public class TransactionDraftMapper {
         if (draft.note.isEmpty()) {
             draft.note = firstNonEmpty(rawSubCategory, rawCategory, rawAsset);
         }
+        
+        // 应用AI分类关键字规则
+        com.example.budgetapp.util.AiCategoryRuleManager.applyRules(context, draft);
+        
         return draft;
     }
 

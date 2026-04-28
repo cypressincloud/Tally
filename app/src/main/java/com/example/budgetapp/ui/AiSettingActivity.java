@@ -79,6 +79,12 @@ public class AiSettingActivity extends AppCompatActivity {
         etAudioModel.setText(config.audioModel);
         showCachedCapabilities(config);
 
+        // 添加AI分类关键字规则入口点击事件
+        findViewById(R.id.card_ai_category_rules).setOnClickListener(v -> {
+            android.content.Intent intent = new android.content.Intent(this, AiCategoryRuleActivity.class);
+            startActivity(intent);
+        });
+
         btnTest.setOnClickListener(v -> testConnection());
         btnSave.setOnClickListener(v -> {
             AiConfig newConfig = buildConfigFromInput();
