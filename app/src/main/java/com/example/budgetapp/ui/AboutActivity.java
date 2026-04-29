@@ -69,6 +69,8 @@ public class AboutActivity extends AppCompatActivity {
         // 按钮跳转逻辑
         findViewById(R.id.btn_user_notice).setOnClickListener(v -> 
             startActivity(new Intent(this, UserNoticeActivity.class)));
+        findViewById(R.id.btn_privacy_policy).setOnClickListener(v -> 
+            startActivity(new Intent(this, PrivacyPolicyActivity.class)));
         findViewById(R.id.btn_donate).setOnClickListener(v -> 
             startActivity(new Intent(this, DonateActivity.class)));
     }

@@ -149,6 +149,8 @@
 
         <activity android:name=".ui.UserNoticeActivity" />
 
+        <activity android:name=".ui.PrivacyPolicyActivity" />
+
         <activity
             android:name=".ui.BudgetHistoryActivity"
             android:theme="@style/Theme.BudgetApp"

@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/privacy_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:importantForAccessibility="noHideDescendants"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/bar_background">
+    
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="隐私政策"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"/>
+    </LinearLayout>
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="none"
+            android:overScrollMode="never">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tally 个人信息保护政策"
+                    android:textStyle="bold"
+                    android:textSize="18sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="生效日期：2026年4月29日\n最近更新日期：2026年4月29日"
+                    android:textSize="13sp"
+                    android:layout_marginTop="8dp"
+                    android:textColor="#888888"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="前言"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Tally（以下简称&quot;本应用&quot;或&quot;我们&quot;）深知个人信息对您的重要性，我们将按照法律法规要求，采取相应的安全保护措施，尽力保护您的个人信息安全可控。\n\n本政策适用于 Tally 应用的所有版本和功能。请您在使用本应用前，仔细阅读并充分理解本政策。如果您不同意本政策的内容，将可能导致本应用无法正常运行，或者无法达到我们拟达到的服务效果，您应立即停止访问/使用本应用。\n\n您使用或继续使用本应用，即意味着您同意我们按照本政策收集、使用、储存和分享您的相关信息。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="一、我们如何收集和使用您的个人信息"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.1 本地数据存储\n\n本应用是一款完全本地化的记账应用，您的所有记账数据（包括但不限于交易记录、资产账户、预算目标、分类设置等）均存储在您的设备本地存储空间中，我们不会主动收集、上传或存储这些数据到任何远程服务器。\n\n1.2 设备权限使用\n\n为了实现应用的核心功能，我们需要获取以下设备权限：\n\n• 存储权限：用于读写本地数据库文件、导出备份文件、保存照片备份\n• 相机权限：用于拍摄账单照片（仅在您使用照片记账功能时）\n• 无障碍服务权限：用于实现自动记账功能（仅在您开启自动记账时）\n• 悬浮窗权限：用于自动记账时的弹窗交互\n• 通知权限：用于自动续费提醒和自动记账状态通知\n\n以上权限均需要您主动授予，您可以随时在系统设置中撤销这些权限。撤销权限可能导致相关功能无法正常使用，但不影响应用的基本记账功能。\n\n1.3 网络功能使用\n\n本应用提供以下可选的网络功能，这些功能需要您主动配置和启用：\n\n• WebDAV 云备份：当您配置并启用 WebDAV 云备份功能时，应用会将您的记账数据加密后上传到您指定的 WebDAV 服务器。我们不会获取、存储或使用您的 WebDAV 服务器地址、用户名、密码或备份数据。\n\n• AI 记账功能：当您配置并启用 AI 记账功能时，应用会将您输入的账单描述、拍摄的账单照片或录制的语音发送到您指定的 AI 服务商（如 Longcat、DeepSeek、通义千问等）进行识别。我们不会获取、存储或使用您的 API 配置信息或发送的数据。\n\n重要提示：WebDAV 和 AI 功能的数据传输由您选择的第三方服务商处理，请您仔细阅读相关服务商的隐私政策。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="二、我们如何存储和保护您的个人信息"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="2.1 数据存储位置\n\n您的所有记账数据均存储在您的设备本地存储空间中，具体路径为应用的私有数据目录。这些数据受到 Android 系统的沙盒机制保护，其他应用无法访问。\n\n2.2 数据存储期限\n\n您的数据将一直存储在您的设备中，直到您主动删除应用或清除应用数据。我们不会设置数据过期时间或自动删除您的数据。\n\n2.3 数据安全措施\n\n我们采取以下措施保护您的数据安全：\n\n• 本地加密存储：敏感配置信息（如 WebDAV 密码、API Key）使用 Android 系统提供的加密机制存储\n• 访问控制：应用数据受 Android 沙盒机制保护，其他应用无法访问\n• 安全传输：WebDAV 和 AI 功能使用 HTTPS 加密传输\n• 开源透明：应用代码完全开源，接受社区审查\n\n2.4 数据备份安全\n\n当您使用 WebDAV 云备份功能时，备份文件会以 ZIP 格式加密压缩。建议您选择可信赖的 WebDAV 服务商，并妥善保管您的服务器地址、用户名和密码。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="三、我们如何共享、转让、公开披露您的个人信息"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="3.1 共享\n\n我们不会与任何第三方共享您的个人信息，除非：\n\n• 您主动配置并启用了 WebDAV 或 AI 功能，此时您的数据会发送到您指定的第三方服务商\n• 法律法规规定或政府主管部门要求\n\n3.2 转让\n\n我们不会将您的个人信息转让给任何公司、组织和个人。\n\n3.3 公开披露\n\n我们不会公开披露您的个人信息。\n\n3.4 第三方服务商\n\n当您使用 WebDAV 或 AI 功能时，您的数据会发送到您选择的第三方服务商。这些服务商的数据处理行为受其自身隐私政策约束，我们建议您仔细阅读相关服务商的隐私政策：\n\n• 坚果云：https://www.jianguoyun.com/s/privacy\n• DeepSeek：https://www.deepseek.com/privacy\n• 阿里云（通义千问）：https://terms.aliyun.com/legal-agreement/terms/suit_bu1_ali_cloud/suit_bu1_ali_cloud202107071622_61954.html\n• OpenAI：https://openai.com/privacy"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="四、您的权利"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="按照中国相关的法律法规和监管规定，我们保障您对自己的个人信息行使以下权利：\n\n4.1 访问权\n\n您有权随时访问您的个人信息。您可以在应用内查看、编辑您的所有记账数据。\n\n4.2 更正权\n\n当您发现我们处理的关于您的个人信息有错误时，您有权要求我们做出更正。您可以在应用内直接修改您的记账数据。\n\n4.3 删除权\n\n您有权要求我们删除您的个人信息。您可以：\n\n• 在应用内删除单条或多条记账记录\n• 在系统设置中清除应用数据，删除所有本地数据\n• 卸载应用，删除所有本地数据\n\n4.4 撤回同意权\n\n您有权撤回您曾经授予我们的权限。您可以：\n\n• 在系统设置中撤销存储、相机、无障碍等权限\n• 在应用设置中关闭 WebDAV 自动同步\n• 在应用设置中关闭 AI 记账功能\n\n4.5 注销账户权\n\n本应用不需要注册账户，您可以随时卸载应用以停止使用服务。\n\n4.6 获取个人信息副本权\n\n您有权获取您的个人信息副本。您可以：\n\n• 使用应用内的&quot;导出备份&quot;功能，导出 ZIP 或 CSV 格式的数据文件\n• 使用 WebDAV 云备份功能，将数据备份到您的网盘"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="五、我们如何处理未成年人的个人信息"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="本应用主要面向成年人。如果您是未成年人，请在监护人的陪同下阅读本政策，并在监护人同意的前提下使用我们的服务或向我们提供信息。\n\n对于经监护人同意而收集未成年人个人信息的情况，我们只会在受到法律允许、监护人明确同意或者保护未成年人所必要的情况下使用或公开披露此信息。\n\n如果我们发现自己在未事先获得可证实的监护人同意的情况下收集了未成年人的个人信息，则会设法尽快删除相关数据。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="六、本政策如何更新"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="我们可能适时修订本政策的条款，该等修订构成本政策的一部分。如该等修订造成您在本政策下权利的实质减少，我们将在修订生效前通过在主页上显著位置提示或向您发送通知等方式通知您。\n\n在该种情况下，若您继续使用我们的服务，即表示同意受经修订的本政策的约束。\n\n本政策所指的重大变更包括但不限于：\n\n• 我们的服务模式发生重大变化\n• 个人信息共享、转让或公开披露的主要对象发生变化\n• 您参与个人信息处理方面的权利及其行使方式发生重大变化\n• 我们的联络方式及投诉渠道发生变化\n• 个人信息安全影响评估报告表明存在高风险时"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="七、如何联系我们"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="如果您对本隐私政策有任何疑问、意见或建议，可以通过以下方式与我们联系：\n\n• 酷安：@柏芸\n• B站：@路过的柏芸\n• GitHub：https://github.com/cypressincloud/Tally\n\n我们将在收到您的反馈后尽快（一般在15个工作日内）予以回复。\n\n如果您对我们的回复不满意，特别是我们的个人信息处理行为损害了您的合法权益，您还可以向网信、电信、公安及工商等监管部门进行投诉或举报。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="八、其他"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="8.1 适用法律\n\n本政策的成立、生效、履行、解释及纠纷解决，适用中华人民共和国大陆地区法律（不包括冲突法）。\n\n8.2 争议解决\n\n若您和我们之间发生任何纠纷或争议，首先应友好协商解决；协商不成的，您同意将纠纷或争议提交本政策签订地有管辖权的人民法院管辖。\n\n8.3 语言\n\n本政策以中文书写。如本政策有其他语言版本，以中文版本为准。\n\n8.4 可分割性\n\n本政策任一条款被视为废止、无效或不可执行，该条应视为可分的且并不影响本政策其余条款的有效性及可执行性。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="6dp"
+                    android:layout_marginTop="10dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="感谢您信任并使用 Tally！"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="我们将持续努力保护您的个人信息安全。"
+                    android:textSize="14sp"
+                    android:gravity="center"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="20dp"
+                    android:textColor="#888888"/>
+
+            </LinearLayout>
+        </ScrollView>
+    </androidx.cardview.widget.CardView>
+</LinearLayout>

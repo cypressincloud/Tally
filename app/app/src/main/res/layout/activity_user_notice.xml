@@ -58,7 +58,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Tally 是一个纯本地的记账项目，拥有自动记账、照片备份、自动续费提醒、多币种、关联资产等核心功能。"
+                    android:text="Tally 是一个功能强大的记账应用，拥有自动记账、AI 智能记账、照片备份、WebDAV 云备份、自动续费提醒、多币种、关联资产等核心功能。所有数据存储在本地，可完全离线使用。WebDAV 云备份和 AI 记账功能需要联网，但完全由用户控制。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="6dp"
                     android:layout_marginTop="10dp"

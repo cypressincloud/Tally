@@ -56,7 +56,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Tally 是一个纯本地的记账项目，拥有自动记账、照片备份、自动续费提醒、多币种、关联资产等核心功能。"
+                    android:text="Tally 是一个功能强大的记账应用，拥有自动记账、AI 智能记账、照片备份、WebDAV 云备份、自动续费提醒、多币种、关联资产等核心功能。所有数据存储在本地，可完全离线使用。WebDAV 云备份和 AI 记账功能需要联网，但完全由用户控制。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="6dp"
                     android:layout_marginTop="10dp"
@@ -79,7 +79,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="• 记账助手设置：“开启屏幕自动记账”关闭，“开启资产功能”开启\n• 自动资产设置：“开启自动资产”关闭\n• 分类预设管理：“开启二级分类”关闭\n• 记账界面默认显示：“结余”\n• 货币单位设置：“开启货币单位”关闭，默认“￥”\n• 照片备份设置：“开启照片备份”关闭。备份为纯本地存储（原理是复制一份至指定路径），推荐新建以“.”开头（如 .Tally）的空白文件夹作为存储路径\n• 主题设置：“跟随系统”\n• 极简模式：关闭\n\n💡 隐藏彩蛋：长按当前界面左上角的“用户须知”标题，可以取消激活高级设置。"
+                    android:text="• 记账助手设置：&quot;开启屏幕自动记账&quot;关闭，&quot;开启资产功能&quot;开启\n• 自动资产设置：&quot;开启自动资产&quot;关闭\n• 分类预设管理：&quot;开启二级分类&quot;关闭\n• 记账界面默认显示：&quot;结余&quot;\n• 货币单位设置：&quot;开启货币单位&quot;关闭，默认&quot;￥&quot;\n• 照片备份设置：&quot;开启照片备份&quot;关闭。备份为纯本地存储（原理是复制一份至指定路径），推荐新建以&quot;.&quot;开头（如 .Tally）的空白文件夹作为存储路径\n• WebDAV 云备份：&quot;自动同步&quot;关闭。需配置 WebDAV 服务器地址、用户名和密码，支持坚果云等网盘服务。开启自动同步后，每次记账、修改资产、修改分类等操作都会自动备份到云端\n• AI 记账配置：&quot;启用 AI 记账&quot;关闭。需配置兼容 OpenAI 的 API 服务（如 DeepSeek、通义千问等），支持文本、图片、语音识别。可设置 AI 分类关键字规则，自动应用分类\n• 主题设置：&quot;跟随系统&quot;\n• 极简模式：关闭\n\n💡 隐藏彩蛋：长按当前界面左上角的&quot;用户须知&quot;标题，可以取消激活高级设置。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="8dp"
                     android:layout_marginTop="12dp"
@@ -125,7 +125,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="使用“无障碍管理器”锁死 Tally 的无障碍权限。\n“无障碍管理器”和“shizuku”在123链接里面的“辅助软件”，具体使用方法看B站视频。"
+                    android:text="使用&quot;无障碍管理器&quot;锁死 Tally 的无障碍权限。\n&quot;无障碍管理器&quot;和&quot;shizuku&quot;在123链接里面的&quot;辅助软件&quot;，具体使用方法看B站视频。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="6dp"
                     android:layout_marginTop="10dp"
@@ -148,7 +148,53 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Tally的自动记账功能依赖于无障碍权限，下面的原理适用于“记账助手设置”、“自动记账设置”：\n\n• 触发机制：只要在指定的应用内的屏幕出现了设定的关键字，就会触发自动记账（弹出悬浮窗、自动输入对应的金额）。例如，在“微信”这个应用设定关键字“微信”，那么每次打开“微信”都会触发自动记账。\n• 注意事项：无障碍不识别图片。\n• 资产关联：“自动资产设置”是对自动记账功能的补充，如果没有设定相关的自动资产，那么记账会关联默认资产（长按资产设置默认资产）。"
+                    android:text="Tally的自动记账功能依赖于无障碍权限，下面的原理适用于&quot;记账助手设置&quot;、&quot;自动记账设置&quot;：\n\n• 触发机制：只要在指定的应用内的屏幕出现了设定的关键字，就会触发自动记账（弹出悬浮窗、自动输入对应的金额）。例如，在&quot;微信&quot;这个应用设定关键字&quot;微信&quot;，那么每次打开&quot;微信&quot;都会触发自动记账。\n• 注意事项：无障碍不识别图片。\n• 资产关联：&quot;自动资产设置&quot;是对自动记账功能的补充，如果没有设定相关的自动资产，那么记账会关联默认资产（长按资产设置默认资产）。"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="8dp"
+                    android:layout_marginTop="12dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="WebDAV 云备份使用方法"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="WebDAV 是一种网络文件传输协议，可以将数据备份到支持 WebDAV 的网盘服务。\n\n配置步骤：\n1. 进入&quot;设置&quot; → &quot;WebDAV 云备份&quot;\n2. 填写 WebDAV 服务器地址（如坚果云提供的地址）\n3. 填写用户名和密码（坚果云需使用应用密码）\n4. 点击&quot;保存配置&quot;\n5. 点击&quot;测试连接&quot;验证配置是否正确\n6. 开启&quot;自动同步&quot;开关（可选）\n\n使用说明：\n• 手动备份：点击&quot;上传数据&quot;按钮\n• 手动恢复：点击&quot;同步数据&quot;按钮（会覆盖本地数据）\n• 自动备份：开启后，每次记账、修改资产、修改分类等操作都会自动上传\n• 备份内容：包含所有交易记录、资产账户、目标、分类设置等\n\n推荐网盘：\n• 坚果云（国内稳定，免费版每月1GB上传流量）\n• Teracloud（日本服务，免费10GB空间）\n• Box.com（国际服务，免费10GB空间）"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="8dp"
+                    android:layout_marginTop="12dp"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginVertical="24dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="AI 记账使用方法"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:textColor="?android:attr/colorPrimary"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="AI 记账功能可以通过文本、图片、语音识别账单信息，自动填写记账表单。\n\n配置步骤：\n1. 进入&quot;设置&quot; → &quot;AI 记账配置&quot;\n2. 填写 API Base URL（如 https://api.deepseek.com）\n3. 填写 API Key（从服务商获取）\n4. 填写模型名称：\n   - 文本模型（必填）：如 deepseek-chat\n   - 视觉模型（可选）：如 deepseek-vision（支持图片识别）\n   - 音频模型（可选）：如 whisper-1（支持语音识别）\n5. 点击&quot;测试连接&quot;验证配置\n6. 点击&quot;保存配置&quot;并开启&quot;启用 AI 记账&quot;\n\n使用说明：\n• 文本识别：在记账页面输入账单描述，AI 自动识别金额、分类等\n• 图片识别：拍摄或选择账单照片，AI 自动提取信息\n• 语音识别：语音输入账单信息，AI 转换为文字并识别\n• 分类规则：在&quot;AI 分类关键字规则&quot;中设置关键字映射，提高分类准确性\n\n推荐服务商：\n• Longcat（国内，每天有免费额度，适合轻度使用）\n• DeepSeek（国内，性价比高，1元/百万tokens）\n• 通义千问（阿里云，免费额度较多）\n• OpenAI（国际标准，需科学上网）\n\n注意事项：\n• API 调用需要消耗服务商的额度或费用\n• 建议使用国内服务商，速度更快\n• 首次使用建议先测试连接，确保配置正确"
                     android:textSize="15sp"
                     android:lineSpacingExtra="8dp"
                     android:layout_marginTop="12dp"
@@ -171,7 +217,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="由于使用到的权限较为敏感，Tally 承诺完全不具备联网功能，未来也不会添加。如有云同步等需求，建议参考开源代码自行扩展。关注酷安 “Tally” 项目，不定时发布版本更新。"
+                    android:text="由于使用到的权限较为敏感，Tally 承诺：\n\n• 应用可完全离线使用，所有核心功能不依赖网络\n• 联网功能仅用于 WebDAV 云备份和 AI 记账，需用户主动配置和启用\n• 所有数据存储在本地，用户拥有完全控制权\n• 不收集、不上传任何个人隐私数据\n• 开源代码可供审查，确保透明可信\n\n关注酷安 &quot;Tally&quot; 项目，不定时发布版本更新。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="6dp"
                     android:layout_marginTop="10dp"
@@ -194,7 +240,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="如果有bug反馈或者有新的想法，可以在评论区里发表想法。也可以私信我，酷安“柏芸”、B站“路过的柏芸”。"
+                    android:text="如果有bug反馈或者有新的想法，可以在评论区里发表想法。也可以私信我，酷安&quot;柏芸&quot;、B站&quot;路过的柏芸&quot;。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="6dp"
                     android:layout_marginTop="10dp"
