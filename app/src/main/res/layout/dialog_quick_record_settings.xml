@@ -49,6 +49,17 @@
                 android:textSize="16sp"
                 android:textColor="?android:attr/textColorPrimary"
                 android:padding="12dp"
+                android:layout_marginBottom="8dp"
+                android:buttonTint="?attr/colorPrimary"/>
+
+            <RadioButton
+                android:id="@+id/rb_quick_ai_assistant"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="直接进入AI记账助手"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="12dp"
                 android:buttonTint="?attr/colorPrimary"/>
         </RadioGroup>
 

@@ -32,6 +32,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.budgetapp.ai.AiConfig;
 import com.example.budgetapp.database.AppDatabase;
 import com.example.budgetapp.database.RenewalItem;
 import com.google.android.material.chip.Chip;
@@ -197,6 +198,14 @@ public class RecordFragment extends Fragment {
                 int quickMode = prefs.getInt("quick_record_mode", 0);
                 if (quickMode == 1) {
                     showAddOrEditDialog(null, LocalDate.now());
+                } else if (quickMode == 2) {
+                    // 直接进入AI记账助手
+                    AiConfig config = AiConfig.load(requireContext());
+                    if (config.isEnabledAndReady()) {
+                        startActivity(new Intent(requireContext(), AiChatActivity.class));
+                    } else {
+                        Toast.makeText(requireContext(), "请先在设置中启用 AI 记账，并至少填写 Base URL、API Key、文本模型。", Toast.LENGTH_LONG).show();
+                    }
                 } else {
                     showDateDetailDialog(LocalDate.now());
                 }

@@ -1193,6 +1193,8 @@ public class SettingsActivity extends AppCompatActivity {
         // 初始化选中状态
         if (currentMode == 1) {
             rgQuickRecord.check(R.id.rb_quick_add);
+        } else if (currentMode == 2) {
+            rgQuickRecord.check(R.id.rb_quick_ai_assistant);
         } else {
             rgQuickRecord.check(R.id.rb_quick_default);
         }
@@ -1205,12 +1207,15 @@ public class SettingsActivity extends AppCompatActivity {
             if (checkedId == R.id.rb_quick_add) {
                 selectedMode = 1;
                 text = "直接进入记一笔";
+            } else if (checkedId == R.id.rb_quick_ai_assistant) {
+                selectedMode = 2;
+                text = "直接进入AI记账助手";
             }
 
             prefs.edit().putInt("quick_record_mode", selectedMode).apply();
             Toast.makeText(this, "已设置为: " + text, Toast.LENGTH_SHORT).show();
 
-            // 延迟一点关闭，让用户能看到选中的反馈效果
+            // 延迟一点关闭,让用户能看到选中的反馈效果
             view.postDelayed(dialog::dismiss, 200);
         });
 
