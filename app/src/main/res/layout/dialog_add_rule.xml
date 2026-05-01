@@ -42,13 +42,22 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:background="@drawable/bg_input_field"
-                android:hint="例如：咖啡、工资"
+                android:hint="输入关键字，多个关键字用空格分隔"
                 android:paddingHorizontal="20dp"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textColorHint="?android:attr/textColorHint"
                 android:textSize="16sp"
                 android:maxLines="1"
                 android:inputType="text"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tv_example"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="例如：外卖 美团 饿了么"
+                android:textColor="#888888"
+                android:textSize="12sp"
                 android:layout_marginBottom="20dp" />
 
             <TextView
@@ -118,6 +127,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="已选择：未选择"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tv_preview"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="将创建 N 条规则"
                 android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp"
                 android:layout_marginBottom="24dp"

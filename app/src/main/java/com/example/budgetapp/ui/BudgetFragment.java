@@ -55,6 +55,14 @@ public class BudgetFragment extends Fragment {
     private boolean isDetailedEnabled = false;
 
     private double currentMonthSurplus = 0;
+    
+    // FAB 滚动隐藏相关
+    private LinearLayout fabContainer;
+    private FabScrollListener fabScrollListener;
+    private FabGestureListener fabGestureListener;
+    private boolean isFabVisible = true;
+    private boolean isFabAnimating = false;
+    private RecyclerView currentRecyclerView;
 
     @Nullable
     @Override
@@ -69,6 +77,11 @@ public class BudgetFragment extends Fragment {
         view.findViewById(R.id.layout_monthly_budget).setOnClickListener(v -> showSetMonthBudgetDialog());
         view.findViewById(R.id.btn_add_goal).setOnClickListener(v -> showAddGoalDialog());
         view.findViewById(R.id.btn_budget_history).setOnClickListener(v -> startActivity(new Intent(getContext(), BudgetHistoryActivity.class)));
+
+        // 初始化 FAB 容器
+        fabContainer = view.findViewById(R.id.fab_container_budget);
+        fabScrollListener = new FabScrollListener();
+        fabGestureListener = new FabGestureListener();
 
         goalAdapter = new GoalAdapter();
         detailedAdapter = new DetailedBudgetAdapter();
@@ -111,6 +124,8 @@ public class BudgetFragment extends Fragment {
                     prefs.edit().putInt("last_budget_tab", position).apply();
                     // 核心逻辑：切换页面时更新按钮可见性
                     updateActionButtonsVisibility(position, btnAddGoal, btnHistory);
+                    // 切换页面时重新附加滚动监听器
+                    attachScrollListeners(position);
                 }
             });
         } else {
@@ -120,6 +135,8 @@ public class BudgetFragment extends Fragment {
             // 未开启详细模式时，默认显示按钮
             btnAddGoal.setVisibility(View.VISIBLE);
             btnHistory.setVisibility(View.VISIBLE);
+            // 附加滚动监听器到存储目标页面
+            viewPager.post(() -> attachScrollListeners(0));
         }
 
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), transactions -> {
@@ -148,6 +165,105 @@ public class BudgetFragment extends Fragment {
             btnAdd.setVisibility(View.VISIBLE);
             btnHistory.setVisibility(View.VISIBLE);
         }
+    }
+    
+    /**
+     * 附加滚动监听器到当前页面的 RecyclerView
+     * @param position 当前页面位置（0=详细预算，1=存储目标）
+     */
+    private void attachScrollListeners(int position) {
+        // 只在"存储目标"页面（position 1 或未开启详细模式时的 position 0）附加监听器
+        boolean shouldAttach = (isDetailedEnabled && position == 1) || (!isDetailedEnabled && position == 0);
+        
+        if (!shouldAttach) {
+            // 移除旧的监听器
+            detachScrollListeners();
+            return;
+        }
+        
+        // 延迟获取 RecyclerView，确保 ViewPager2 已经创建了子视图
+        viewPager.postDelayed(() -> {
+            RecyclerView rv = findRecyclerViewInViewPager(position);
+            if (rv != null && rv != currentRecyclerView) {
+                // 移除旧的监听器
+                detachScrollListeners();
+                
+                // 附加新的监听器
+                currentRecyclerView = rv;
+                currentRecyclerView.addOnScrollListener(fabScrollListener);
+                currentRecyclerView.addOnItemTouchListener(fabGestureListener);
+            }
+        }, 100);
+    }
+    
+    /**
+     * 移除滚动监听器
+     */
+    private void detachScrollListeners() {
+        if (currentRecyclerView != null) {
+            currentRecyclerView.removeOnScrollListener(fabScrollListener);
+            currentRecyclerView.removeOnItemTouchListener(fabGestureListener);
+            currentRecyclerView = null;
+        }
+    }
+    
+    /**
+     * 在 ViewPager2 中查找指定位置的 RecyclerView
+     */
+    private RecyclerView findRecyclerViewInViewPager(int position) {
+        if (viewPager.getChildCount() == 0) return null;
+        
+        // ViewPager2 内部有一个 RecyclerView
+        View vpChild = viewPager.getChildAt(0);
+        if (vpChild instanceof RecyclerView) {
+            RecyclerView vpRecyclerView = (RecyclerView) vpChild;
+            // 查找当前显示的页面
+            RecyclerView.ViewHolder holder = vpRecyclerView.findViewHolderForAdapterPosition(position);
+            if (holder != null && holder.itemView instanceof RecyclerView) {
+                return (RecyclerView) holder.itemView;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * 隐藏 FAB 按钮（带动画）
+     */
+    private void hideFab() {
+        if (!isFabVisible || isFabAnimating || fabContainer == null) return;
+        
+        isFabAnimating = true;
+        fabContainer.animate()
+                .translationY(fabContainer.getHeight() + 20)
+                .alpha(0f)
+                .setDuration(200)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                .withEndAction(() -> {
+                    fabContainer.setVisibility(View.GONE);
+                    isFabVisible = false;
+                    isFabAnimating = false;
+                })
+                .start();
+    }
+    
+    /**
+     * 显示 FAB 按钮（带动画）
+     */
+    private void showFab() {
+        if (isFabVisible || isFabAnimating || fabContainer == null) return;
+        
+        isFabAnimating = true;
+        fabContainer.setVisibility(View.VISIBLE);
+        fabContainer.animate()
+                .translationY(0f)
+                .alpha(1f)
+                .setDuration(200)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                .withEndAction(() -> {
+                    isFabVisible = true;
+                    isFabAnimating = false;
+                })
+                .start();
     }
 
     /**
@@ -685,6 +801,31 @@ public class BudgetFragment extends Fragment {
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
         updateFragmentTransparency(isCustomBg);
+        
+        // 重置 FAB 按钮状态
+        if (fabContainer != null) {
+            fabContainer.setVisibility(View.VISIBLE);
+            fabContainer.setAlpha(1f);
+            fabContainer.setTranslationY(0f);
+            isFabVisible = true;
+            isFabAnimating = false;
+        }
+        
+        // 重新附加滚动监听器
+        if (viewPager != null) {
+            int currentPosition = viewPager.getCurrentItem();
+            viewPager.post(() -> attachScrollListeners(currentPosition));
+        }
+    }
+    
+    @Override
+    public void onDestroyView() {
+        // 移除监听器，防止内存泄漏
+        detachScrollListeners();
+        fabScrollListener = null;
+        fabGestureListener = null;
+        fabContainer = null;
+        super.onDestroyView();
     }
 
     private void updateFragmentTransparency(boolean isCustomBg) {
@@ -769,7 +910,66 @@ public class BudgetFragment extends Fragment {
             if (tabLayout != null) tabLayout.setBackgroundResource(R.color.bar_background);
         }
     }
-
-
+    
+    // ========== FAB 滚动隐藏功能 ==========
+    
+    /**
+     * FAB 滚动监听器内部类
+     * 监听 RecyclerView 的滚动事件，根据滚动方向自动显示/隐藏浮动按钮
+     */
+    private class FabScrollListener extends RecyclerView.OnScrollListener {
+        @Override
+        public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+            super.onScrolled(recyclerView, dx, dy);
+            
+            // 向上滚动（dy > 0）隐藏按钮
+            if (dy > 0) {
+                hideFab();
+            }
+            // 向下滚动（dy < 0）显示按钮
+            else if (dy < 0) {
+                showFab();
+            }
+        }
+    }
+    
+    /**
+     * FAB 手势监听器内部类
+     * 监听触摸手势，即使列表内容少不需要滚动，也能响应上下滑动手势
+     */
+    private class FabGestureListener implements RecyclerView.OnItemTouchListener {
+        private android.view.GestureDetector gestureDetector;
+        
+        FabGestureListener() {
+            gestureDetector = new android.view.GestureDetector(getContext(), new android.view.GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public boolean onScroll(android.view.MotionEvent e1, android.view.MotionEvent e2, float distanceX, float distanceY) {
+                    // distanceY > 0 表示向上滑动，< 0 表示向下滑动
+                    if (distanceY > 0) {
+                        // 向上滑动，隐藏按钮
+                        hideFab();
+                    } else if (distanceY < 0) {
+                        // 向下滑动，显示按钮
+                        showFab();
+                    }
+                    return false;
+                }
+            });
+        }
+        
+        @Override
+        public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull android.view.MotionEvent e) {
+            gestureDetector.onTouchEvent(e);
+            return false;
+        }
+        
+        @Override
+        public void onTouchEvent(@NonNull RecyclerView rv, @NonNull android.view.MotionEvent e) {
+        }
+        
+        @Override
+        public void onRequestDisallowInterceptTouchEvent(boolean disallowIntercept) {
+        }
+    }
 
 }

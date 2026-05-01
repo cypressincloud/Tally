@@ -47,6 +47,13 @@ public class AssetsFragment extends Fragment {
     // 0: 资产, 1: 负债, 2: 借出
     private int currentType = 0;
 
+    // FAB 滚动隐藏相关
+    private LinearLayout fabContainer;
+    private FabScrollListener fabScrollListener;
+    private FabGestureListener fabGestureListener;
+    private boolean isFabVisible = true;
+    private boolean isFabAnimating = false;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -132,6 +139,15 @@ public class AssetsFragment extends Fragment {
         layoutAssets.setOnClickListener(v -> switchType(0));
         layoutLiability.setOnClickListener(v -> switchType(1));
         layoutLent.setOnClickListener(v -> switchType(2));
+
+        // 初始化 FAB 容器和滚动监听器
+        fabContainer = view.findViewById(R.id.fab_container);
+        fabScrollListener = new FabScrollListener();
+        rvAssets.addOnScrollListener(fabScrollListener);
+        
+        // 添加手势监听器（即使列表内容少也能响应滑动）
+        fabGestureListener = new FabGestureListener();
+        rvAssets.addOnItemTouchListener(fabGestureListener);
     }
 
     // 🌟 补齐完整的资产转移弹窗渲染与数据处理逻辑 (分别提示转出/转入)
@@ -1045,6 +1061,31 @@ public class AssetsFragment extends Fragment {
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
         updateFragmentTransparency(isCustomBg);
+        
+        // 重置 FAB 按钮状态
+        if (fabContainer != null) {
+            fabContainer.setVisibility(View.VISIBLE);
+            fabContainer.setAlpha(1f);
+            fabContainer.setTranslationY(0f);
+            isFabVisible = true;
+            isFabAnimating = false;
+        }
+    }
+
+    @Override
+    public void onDestroyView() {
+        // 移除监听器，防止内存泄漏
+        if (rvAssets != null && fabScrollListener != null) {
+            rvAssets.removeOnScrollListener(fabScrollListener);
+        }
+        if (rvAssets != null && fabGestureListener != null) {
+            rvAssets.removeOnItemTouchListener(fabGestureListener);
+        }
+        // 清空引用
+        fabScrollListener = null;
+        fabGestureListener = null;
+        fabContainer = null;
+        super.onDestroyView();
     }
 
     private void updateFragmentTransparency(boolean isCustomBg) {
@@ -1212,4 +1253,106 @@ public class AssetsFragment extends Fragment {
         dialog.show();
     }
     // ==========================================================
+
+    // ========== FAB 滚动隐藏功能 ==========
+    
+    /**
+     * 隐藏 FAB 按钮（带动画）
+     */
+    private void hideFab() {
+        if (!isFabVisible || isFabAnimating || fabContainer == null) return;
+        
+        isFabAnimating = true;
+        fabContainer.animate()
+                .translationY(fabContainer.getHeight() + 20) // 向下滑出屏幕
+                .alpha(0f)
+                .setDuration(200)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                .withEndAction(() -> {
+                    fabContainer.setVisibility(View.GONE);
+                    isFabVisible = false;
+                    isFabAnimating = false;
+                })
+                .start();
+    }
+    
+    /**
+     * 显示 FAB 按钮（带动画）
+     */
+    private void showFab() {
+        if (isFabVisible || isFabAnimating || fabContainer == null) return;
+        
+        isFabAnimating = true;
+        fabContainer.setVisibility(View.VISIBLE);
+        fabContainer.animate()
+                .translationY(0f)
+                .alpha(1f)
+                .setDuration(200)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                .withEndAction(() -> {
+                    isFabVisible = true;
+                    isFabAnimating = false;
+                })
+                .start();
+    }
+    
+    /**
+     * FAB 滚动监听器内部类
+     * 监听 RecyclerView 的滚动事件，根据滚动方向自动显示/隐藏浮动按钮
+     */
+    private class FabScrollListener extends RecyclerView.OnScrollListener {
+        @Override
+        public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+            super.onScrolled(recyclerView, dx, dy);
+            
+            // 向上滚动（dy > 0）隐藏按钮
+            if (dy > 0) {
+                hideFab();
+            }
+            // 向下滚动（dy < 0）显示按钮
+            else if (dy < 0) {
+                showFab();
+            }
+        }
+    }
+    
+    /**
+     * FAB 手势监听器内部类
+     * 监听触摸手势，即使列表内容少不需要滚动，也能响应上下滑动手势
+     */
+    private class FabGestureListener implements RecyclerView.OnItemTouchListener {
+        private android.view.GestureDetector gestureDetector;
+        
+        FabGestureListener() {
+            gestureDetector = new android.view.GestureDetector(getContext(), new android.view.GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public boolean onScroll(android.view.MotionEvent e1, android.view.MotionEvent e2, float distanceX, float distanceY) {
+                    // distanceY > 0 表示向上滑动，< 0 表示向下滑动
+                    if (distanceY > 0) {
+                        // 向上滑动，隐藏按钮
+                        hideFab();
+                    } else if (distanceY < 0) {
+                        // 向下滑动，显示按钮
+                        showFab();
+                    }
+                    return false;
+                }
+            });
+        }
+        
+        @Override
+        public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull android.view.MotionEvent e) {
+            gestureDetector.onTouchEvent(e);
+            return false;
+        }
+        
+        @Override
+        public void onTouchEvent(@NonNull RecyclerView rv, @NonNull android.view.MotionEvent e) {
+        }
+        
+        @Override
+        public void onRequestDisallowInterceptTouchEvent(boolean disallowIntercept) {
+        }
+    }
+
 }

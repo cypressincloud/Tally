@@ -47,6 +47,13 @@ public class AssetsFragment extends Fragment {
     // 0: 资产, 1: 负债, 2: 借出
     private int currentType = 0;
 
+    // FAB 滚动隐藏相关
+    private LinearLayout fabContainer;
+    private boolean isFabVisible = true;
+    private FabScrollListener fabScrollListener;
+    private static final int SCROLL_THRESHOLD = 5;
+    private static final int ANIMATION_DURATION = 200;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -132,6 +139,11 @@ public class AssetsFragment extends Fragment {
         layoutAssets.setOnClickListener(v -> switchType(0));
         layoutLiability.setOnClickListener(v -> switchType(1));
         layoutLent.setOnClickListener(v -> switchType(2));
+
+        // 初始化 FAB 容器和滚动监听器
+        fabContainer = view.findViewById(R.id.fab_container);
+        fabScrollListener = new FabScrollListener();
+        rvAssets.addOnScrollListener(fabScrollListener);
     }
 
     // 🌟 补齐完整的资产转移弹窗渲染与数据处理逻辑 (分别提示转出/转入)
@@ -1024,6 +1036,24 @@ public class AssetsFragment extends Fragment {
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
         updateFragmentTransparency(isCustomBg);
+        
+        // 重置 FAB 按钮状态
+        isFabVisible = true;
+        if (fabContainer != null) {
+            fabContainer.setTranslationY(0);
+        }
+    }
+
+    @Override
+    public void onDestroyView() {
+        // 移除监听器，防止内存泄漏
+        if (rvAssets != null && fabScrollListener != null) {
+            rvAssets.removeOnScrollListener(fabScrollListener);
+        }
+        // 清空引用
+        fabScrollListener = null;
+        fabContainer = null;
+        super.onDestroyView();
     }
 
     private void updateFragmentTransparency(boolean isCustomBg) {
@@ -1191,4 +1221,64 @@ public class AssetsFragment extends Fragment {
         dialog.show();
     }
     // ==========================================================
+
+    // ========== FAB 滚动隐藏功能 ==========
+    /**
+     * FAB 滚动监听器内部类
+     * 监听 RecyclerView 的滚动事件，根据滚动方向自动显示/隐藏浮动按钮
+     */
+    private class FabScrollListener extends RecyclerView.OnScrollListener {
+        @Override
+        public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+            super.onScrolled(recyclerView, dx, dy);
+            
+            // 忽略微小滚动，防止抖动触发动画
+            if (Math.abs(dy) < SCROLL_THRESHOLD) {
+                return;
+            }
+            
+            // 向上滚动（dy > 0）隐藏按钮
+            if (dy > 0 && isFabVisible) {
+                hideFab();
+            }
+            // 向下滚动（dy < 0）显示按钮
+            else if (dy < 0 && !isFabVisible) {
+                showFab();
+            }
+        }
+    }
+
+    /**
+     * 隐藏浮动按钮容器
+     * 使用平移动画将按钮向下移出屏幕
+     */
+    private void hideFab() {
+        if (fabContainer == null || !isFabVisible) {
+            return;
+        }
+        
+        isFabVisible = false;
+        fabContainer.animate()
+            .translationY(fabContainer.getHeight() + getResources().getDimensionPixelSize(R.dimen.fab_margin))
+            .setInterpolator(new android.view.animation.AccelerateInterpolator())
+            .setDuration(ANIMATION_DURATION)
+            .start();
+    }
+
+    /**
+     * 显示浮动按钮容器
+     * 使用平移动画将按钮从屏幕外移回原位
+     */
+    private void showFab() {
+        if (fabContainer == null || isFabVisible) {
+            return;
+        }
+        
+        isFabVisible = true;
+        fabContainer.animate()
+            .translationY(0)
+            .setInterpolator(new android.view.animation.DecelerateInterpolator())
+            .setDuration(ANIMATION_DURATION)
+            .start();
+    }
 }

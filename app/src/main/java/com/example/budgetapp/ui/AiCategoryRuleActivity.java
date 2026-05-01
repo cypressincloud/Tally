@@ -5,11 +5,14 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,8 +29,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.budgetapp.R;
 import com.example.budgetapp.util.AiCategoryRuleManager;
+import com.example.budgetapp.util.BatchInputParser;
 import com.example.budgetapp.util.CategoryManager;
 import com.example.budgetapp.util.CategoryRule;
+import com.example.budgetapp.util.RuleValidator;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
@@ -130,16 +135,47 @@ public class AiCategoryRuleActivity extends AppCompatActivity {
         android.widget.RadioButton rbIncome = view.findViewById(R.id.rb_income);
         RecyclerView rvCategory = view.findViewById(R.id.rv_category);
         TextView tvSelectedCategory = view.findViewById(R.id.tv_selected_category);
+        TextView tvPreview = view.findViewById(R.id.tv_preview);
         Button btnCancel = view.findViewById(R.id.btn_cancel);
         Button btnConfirm = view.findViewById(R.id.btn_confirm);
 
         tvTitle.setText(title);
         tvSelectedCategory.setVisibility(View.VISIBLE);
+        tvPreview.setVisibility(View.GONE);
 
         // 如果是编辑模式，预填充数据
         if (existingRule != null) {
             etKeyword.setText(existingRule.getKeyword());
         }
+        
+        // 添加文本变化监听器 - 实时预览批量输入
+        etKeyword.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                // 不需要实现
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // 不需要实现
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String input = s.toString();
+                if (BatchInputParser.isBatchInput(input)) {
+                    List<String> keywords = BatchInputParser.parseKeywords(input);
+                    if (!keywords.isEmpty()) {
+                        tvPreview.setText("将创建 " + keywords.size() + " 条规则");
+                        tvPreview.setVisibility(View.VISIBLE);
+                    } else {
+                        tvPreview.setVisibility(View.GONE);
+                    }
+                } else {
+                    tvPreview.setVisibility(View.GONE);
+                }
+            }
+        });
 
         // 获取分类列表
         List<String> expenseCategories = CategoryManager.getExpenseCategories(this);
@@ -237,33 +273,62 @@ public class AiCategoryRuleActivity extends AppCompatActivity {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         
         btnConfirm.setOnClickListener(v -> {
-            String keyword = etKeyword.getText().toString().trim();
+            String input = etKeyword.getText().toString().trim();
             
-            if (keyword.isEmpty()) {
-                Toast.makeText(this, "请输入关键字", Toast.LENGTH_SHORT).show();
+            // 使用BatchInputParser解析关键字
+            List<String> keywords = BatchInputParser.parseKeywords(input);
+            
+            // 验证输入
+            RuleValidator.ValidationResult validation = 
+                RuleValidator.validate(this, keywords, position);
+            
+            if (!validation.isValid) {
+                Toast.makeText(this, validation.errorMessage, Toast.LENGTH_SHORT).show();
                 return;
             }
-
+            
+            // 处理重复关键字
+            if (!validation.duplicateKeywords.isEmpty()) {
+                showDuplicateWarningDialog(validation, selectedCategory[0], 
+                    selectedSubCategory[0], isExpense[0], position, dialog);
+                return;
+            }
+            
+            // 选择分类验证
             if (selectedCategory[0] == null || selectedCategory[0].isEmpty()) {
                 Toast.makeText(this, "请选择分类", Toast.LENGTH_SHORT).show();
                 return;
             }
-
-            int type = isExpense[0] ? 0 : 1;
-            CategoryRule rule = new CategoryRule(keyword, selectedCategory[0], selectedSubCategory[0], type);
             
-            if (position >= 0) {
-                // 编辑模式
-                AiCategoryRuleManager.updateRule(this, position, rule);
-                Toast.makeText(this, "规则已更新", Toast.LENGTH_SHORT).show();
-            } else {
-                // 添加模式
-                AiCategoryRuleManager.addRule(this, rule);
-                Toast.makeText(this, "规则已添加", Toast.LENGTH_SHORT).show();
+            // 创建规则
+            int type = isExpense[0] ? 0 : 1;
+            List<CategoryRule> rules = new ArrayList<>();
+            for (String keyword : validation.validKeywords) {
+                rules.add(new CategoryRule(keyword, selectedCategory[0], 
+                    selectedSubCategory[0], type));
             }
             
-            loadRules();
-            dialog.dismiss();
+            // 保存规则
+            if (position >= 0) {
+                // 编辑模式
+                AiCategoryRuleManager.replaceRule(this, position, rules);
+                Toast.makeText(this, "已更新为 " + rules.size() + " 条规则", 
+                    Toast.LENGTH_SHORT).show();
+                loadRules();
+                dialog.dismiss();
+            } else {
+                // 添加模式
+                if (rules.size() > 5) {
+                    // 显示进度对话框
+                    showProgressDialog(rules, dialog);
+                } else {
+                    AiCategoryRuleManager.addRules(this, rules);
+                    Toast.makeText(this, "已添加 " + rules.size() + " 条规则", 
+                        Toast.LENGTH_SHORT).show();
+                    loadRules();
+                    dialog.dismiss();
+                }
+            }
         });
 
         dialog.show();
@@ -381,6 +446,113 @@ public class AiCategoryRuleActivity extends AppCompatActivity {
         }
 
         dialog.show();
+    }
+
+    /**
+     * 显示重复关键字警告对话框
+     */
+    private void showDuplicateWarningDialog(RuleValidator.ValidationResult validation,
+                                           String category, String subCategory, 
+                                           boolean isExpense, int position, 
+                                           AlertDialog parentDialog) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_duplicate_warning, null);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+        
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        
+        TextView tvMessage = view.findViewById(R.id.tv_message);
+        TextView tvDuplicates = view.findViewById(R.id.tv_duplicates);
+        Button btnSkip = view.findViewById(R.id.btn_skip);
+        Button btnCancel = view.findViewById(R.id.btn_cancel);
+        
+        tvMessage.setText("以下关键字已存在：");
+        tvDuplicates.setText(String.join(", ", validation.duplicateKeywords));
+        
+        btnSkip.setOnClickListener(v -> {
+            // 仅保存不重复的关键字
+            if (validation.validKeywords.isEmpty()) {
+                Toast.makeText(this, "没有可添加的关键字", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+                return;
+            }
+            
+            int type = isExpense ? 0 : 1;
+            List<CategoryRule> rules = new ArrayList<>();
+            for (String keyword : validation.validKeywords) {
+                rules.add(new CategoryRule(keyword, category, subCategory, type));
+            }
+            
+            if (position >= 0) {
+                AiCategoryRuleManager.replaceRule(this, position, rules);
+                Toast.makeText(this, "已更新为 " + rules.size() + " 条规则", 
+                    Toast.LENGTH_SHORT).show();
+            } else {
+                AiCategoryRuleManager.addRules(this, rules);
+                Toast.makeText(this, "已添加 " + rules.size() + " 条规则", 
+                    Toast.LENGTH_SHORT).show();
+            }
+            
+            loadRules();
+            dialog.dismiss();
+            parentDialog.dismiss();
+        });
+        
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        
+        dialog.show();
+    }
+
+    /**
+     * 显示批量创建进度对话框
+     */
+    private void showProgressDialog(List<CategoryRule> rules, AlertDialog parentDialog) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_progress, null);
+        builder.setView(view);
+        builder.setCancelable(false);
+        AlertDialog dialog = builder.create();
+        
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        
+        TextView tvProgress = view.findViewById(R.id.tv_progress);
+        ProgressBar progressBar = view.findViewById(R.id.progress_bar);
+        progressBar.setMax(rules.size());
+        
+        dialog.show();
+        
+        // 在后台线程执行批量添加
+        new Thread(() -> {
+            for (int i = 0; i < rules.size(); i++) {
+                final int current = i + 1;
+                runOnUiThread(() -> {
+                    tvProgress.setText("正在创建规则 " + current + "/" + rules.size());
+                    progressBar.setProgress(current);
+                });
+                
+                // 模拟处理时间（实际可能不需要）
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            
+            // 批量保存
+            runOnUiThread(() -> {
+                AiCategoryRuleManager.addRules(this, rules);
+                Toast.makeText(this, "已添加 " + rules.size() + " 条规则", 
+                    Toast.LENGTH_SHORT).show();
+                loadRules();
+                dialog.dismiss();
+                parentDialog.dismiss();
+            });
+        }).start();
     }
 
     // RecyclerView适配器

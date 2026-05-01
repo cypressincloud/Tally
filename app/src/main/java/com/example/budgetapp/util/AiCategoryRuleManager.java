@@ -108,6 +108,56 @@ public class AiCategoryRuleManager {
     }
 
     /**
+     * 批量添加规则
+     * @param context 上下文
+     * @param rules 规则列表
+     */
+    public static void addRules(Context context, List<CategoryRule> rules) {
+        if (rules == null || rules.isEmpty()) {
+            Log.w(TAG, "Attempted to add empty rules list");
+            return;
+        }
+        
+        try {
+            List<CategoryRule> existingRules = getRules(context);
+            existingRules.addAll(rules);
+            saveRules(context, existingRules);
+            Log.d(TAG, "Successfully added " + rules.size() + " rules");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to add rules", e);
+            throw new RuntimeException("批量添加规则失败", e);
+        }
+    }
+
+    /**
+     * 批量替换规则（用于编辑模式）
+     * @param context 上下文
+     * @param index 要替换的规则索引
+     * @param newRules 新的规则列表
+     */
+    public static void replaceRule(Context context, int index, List<CategoryRule> newRules) {
+        if (newRules == null || newRules.isEmpty()) {
+            Log.w(TAG, "Attempted to replace with empty rules list");
+            return;
+        }
+        
+        try {
+            List<CategoryRule> rules = getRules(context);
+            if (index >= 0 && index < rules.size()) {
+                rules.remove(index);  // 删除原规则
+                rules.addAll(index, newRules);  // 在相同位置插入新规则
+                saveRules(context, rules);
+                Log.d(TAG, "Successfully replaced rule at index " + index + " with " + newRules.size() + " rules");
+            } else {
+                Log.w(TAG, "Invalid index for rule replacement: " + index);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to replace rule", e);
+            throw new RuntimeException("批量替换规则失败", e);
+        }
+    }
+
+    /**
      * 应用规则到账单草稿
      * @param context 上下文
      * @param draft 账单草稿
