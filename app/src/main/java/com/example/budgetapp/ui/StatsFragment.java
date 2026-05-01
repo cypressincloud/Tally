@@ -764,24 +764,15 @@ public class StatsFragment extends Fragment {
                     Transaction t = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     t.assetId = selectedAssetId;
                     t.subCategory = selectedSubCategory[0]; // 【新增】保存二级分类
-                    viewModel.addTransaction(t);
-
-                    if (selectedAssetId != 0) {
-                        for (AssetAccount asset : assetList) {
-                            if (asset.id == selectedAssetId) {
-                                if (type == 1) asset.amount += amount;
-                                else asset.amount -= amount;
-                                viewModel.updateAsset(asset);
-                                break;
-                            }
-                        }
-                    }
+                    // 【修复】使用带资产同步的方法，支持负债/借出还款逻辑
+                    viewModel.addTransactionWithAssetSync(t);
                 } else {
                     Transaction updateT = new Transaction(ts, type, category, amount, noteContent, userRemark);
                     updateT.id = existingTransaction.id;
                     updateT.assetId = selectedAssetId;
                     updateT.subCategory = selectedSubCategory[0]; // 【新增】更新二级分类
-                    viewModel.updateTransaction(updateT);
+                    // 【修复】使用带资产同步的方法
+                    viewModel.updateTransactionWithAssetSync(existingTransaction, updateT);
                 }
                 dialog.dismiss();
             }

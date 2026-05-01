@@ -1129,6 +1129,7 @@ public class SelectToSpeakService extends AccessibilityService {
 
             // 1. 同步目标资产(如存在)
             if (targetObject != null && !targetObject.isEmpty() && liabilityLoanType != -1) {
+                // 负债借入或借出：增加对应账户金额
                 List<AssetAccount> targets = db.assetAccountDao().getAssetsByTypeSync(liabilityLoanType);
                 AssetAccount existingTarget = null;
                 if (targets != null) {
@@ -1146,6 +1147,26 @@ public class SelectToSpeakService extends AccessibilityService {
                     AssetAccount newTarget = new AssetAccount(targetObject, 0, liabilityLoanType);
                     newTarget.amount = amount;
                     db.assetAccountDao().insert(newTarget);
+                }
+            } else if (type == 0 && remark != null && !remark.isEmpty()) {
+                // 支出还款：检查备注是否匹配负债账户名称
+                AssetAccount liabilityAccount = db.assetAccountDao().getAssetByNameAndType(remark, 1);
+                if (liabilityAccount != null) {
+                    liabilityAccount.amount -= amount;
+                    if (liabilityAccount.amount <= 0) {
+                        liabilityAccount.amount = 0;
+                    }
+                    db.assetAccountDao().update(liabilityAccount);
+                }
+            } else if (type == 1 && remark != null && !remark.isEmpty()) {
+                // 收入收款：检查备注是否匹配借出账户名称
+                AssetAccount lentAccount = db.assetAccountDao().getAssetByNameAndType(remark, 2);
+                if (lentAccount != null) {
+                    lentAccount.amount -= amount;
+                    if (lentAccount.amount <= 0) {
+                        lentAccount.amount = 0;
+                    }
+                    db.assetAccountDao().update(lentAccount);
                 }
             }
 

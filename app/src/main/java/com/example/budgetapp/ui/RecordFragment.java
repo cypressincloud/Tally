@@ -1866,6 +1866,7 @@ public class RecordFragment extends Fragment {
 
                             // c. 同步到资产模块对应的【负债】或【借出】板块
                             if (finalType == 3 || finalType == 4) {
+                                // 负债借入或借出：增加对应账户金额
                                 int targetAssetType = (finalType == 3) ? 1 : 2; // 1:负债板块, 2:借出板块
                                 AssetAccount targetAccount = db.assetAccountDao().getAssetByNameAndType(finalTargetObj, targetAssetType);
 
@@ -1879,6 +1880,28 @@ public class RecordFragment extends Fragment {
                                     targetAccount.amount += amount;
                                     targetAccount.updateTime = System.currentTimeMillis();
                                     db.assetAccountDao().update(targetAccount);
+                                }
+                            } else if (finalType == 0 && !userRemark.isEmpty()) {
+                                // 支出还款：检查备注是否匹配负债账户名称
+                                AssetAccount liabilityAccount = db.assetAccountDao().getAssetByNameAndType(userRemark, 1);
+                                if (liabilityAccount != null) {
+                                    liabilityAccount.amount -= amount;
+                                    if (liabilityAccount.amount <= 0) {
+                                        liabilityAccount.amount = 0;
+                                    }
+                                    liabilityAccount.updateTime = System.currentTimeMillis();
+                                    db.assetAccountDao().update(liabilityAccount);
+                                }
+                            } else if (finalType == 1 && !userRemark.isEmpty()) {
+                                // 收入收款：检查备注是否匹配借出账户名称
+                                AssetAccount lentAccount = db.assetAccountDao().getAssetByNameAndType(userRemark, 2);
+                                if (lentAccount != null) {
+                                    lentAccount.amount -= amount;
+                                    if (lentAccount.amount <= 0) {
+                                        lentAccount.amount = 0;
+                                    }
+                                    lentAccount.updateTime = System.currentTimeMillis();
+                                    db.assetAccountDao().update(lentAccount);
                                 }
                             }
                         });

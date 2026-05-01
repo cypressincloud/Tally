@@ -85,6 +85,7 @@ public class FinanceViewModel extends AndroidViewModel {
 
                 // 2. 处理对方资产（负债/借出对象）的变更
                 if (transaction.type == 3 || transaction.type == 4) {
+                    // 类型3（负债借入）或类型4（借出）：增加对应的负债/借出账户金额
                     if (transaction.targetObject != null && !transaction.targetObject.isEmpty()) {
                         int targetType = (transaction.type == 3) ? 1 : 2;
                         AssetAccount targetAccount = assetDao.getAssetByNameAndType(transaction.targetObject, targetType);
@@ -97,6 +98,28 @@ public class FinanceViewModel extends AndroidViewModel {
                             targetAccount.amount += transaction.amount;
                             assetDao.update(targetAccount);
                         }
+                    }
+                } else if (transaction.type == 0 && transaction.note != null && !transaction.note.isEmpty()) {
+                    // 类型0（支出）：检查备注是否匹配负债账户名称，如果匹配则减少负债
+                    AssetAccount liabilityAccount = assetDao.getAssetByNameAndType(transaction.note, 1);
+                    if (liabilityAccount != null) {
+                        liabilityAccount.amount -= transaction.amount;
+                        // 如果负债已还清，可以选择删除账户或保留为0
+                        if (liabilityAccount.amount <= 0) {
+                            liabilityAccount.amount = 0;
+                        }
+                        assetDao.update(liabilityAccount);
+                    }
+                } else if (transaction.type == 1 && transaction.note != null && !transaction.note.isEmpty()) {
+                    // 类型1（收入）：检查备注是否匹配借出账户名称，如果匹配则减少借出
+                    AssetAccount lentAccount = assetDao.getAssetByNameAndType(transaction.note, 2);
+                    if (lentAccount != null) {
+                        lentAccount.amount -= transaction.amount;
+                        // 如果借出已收回，可以选择删除账户或保留为0
+                        if (lentAccount.amount <= 0) {
+                            lentAccount.amount = 0;
+                        }
+                        assetDao.update(lentAccount);
                     }
                 }
 
@@ -170,19 +193,39 @@ public class FinanceViewModel extends AndroidViewModel {
                 }
 
                 // 2. 处理对方资产（负债/借出对象）的变更
-                // a) 撤回旧对象的金额
+                // a) 撤回旧交易对负债/借出账户的影响
                 if (oldTx.type == 3 || oldTx.type == 4) {
+                    // 旧交易是负债借入或借出：减少对应账户金额
                     if (oldTx.targetObject != null && !oldTx.targetObject.isEmpty()) {
                         int oldTargetType = (oldTx.type == 3) ? 1 : 2;
                         AssetAccount oldTargetAccount = assetDao.getAssetByNameAndType(oldTx.targetObject, oldTargetType);
                         if (oldTargetAccount != null) {
                             oldTargetAccount.amount -= oldTx.amount;
+                            if (oldTargetAccount.amount <= 0) {
+                                oldTargetAccount.amount = 0;
+                            }
                             assetDao.update(oldTargetAccount);
                         }
                     }
+                } else if (oldTx.type == 0 && oldTx.note != null && !oldTx.note.isEmpty()) {
+                    // 旧交易是支出还款：撤回时增加负债
+                    AssetAccount liabilityAccount = assetDao.getAssetByNameAndType(oldTx.note, 1);
+                    if (liabilityAccount != null) {
+                        liabilityAccount.amount += oldTx.amount;
+                        assetDao.update(liabilityAccount);
+                    }
+                } else if (oldTx.type == 1 && oldTx.note != null && !oldTx.note.isEmpty()) {
+                    // 旧交易是收入收款：撤回时增加借出
+                    AssetAccount lentAccount = assetDao.getAssetByNameAndType(oldTx.note, 2);
+                    if (lentAccount != null) {
+                        lentAccount.amount += oldTx.amount;
+                        assetDao.update(lentAccount);
+                    }
                 }
-                // b) 追加新对象的金额
+                
+                // b) 应用新交易对负债/借出账户的影响
                 if (newTx.type == 3 || newTx.type == 4) {
+                    // 新交易是负债借入或借出：增加对应账户金额
                     if (newTx.targetObject != null && !newTx.targetObject.isEmpty()) {
                         int newTargetType = (newTx.type == 3) ? 1 : 2;
                         AssetAccount newTargetAccount = assetDao.getAssetByNameAndType(newTx.targetObject, newTargetType);
@@ -193,6 +236,26 @@ public class FinanceViewModel extends AndroidViewModel {
                             newTargetAccount.amount += newTx.amount;
                             assetDao.update(newTargetAccount);
                         }
+                    }
+                } else if (newTx.type == 0 && newTx.note != null && !newTx.note.isEmpty()) {
+                    // 新交易是支出还款：减少负债
+                    AssetAccount liabilityAccount = assetDao.getAssetByNameAndType(newTx.note, 1);
+                    if (liabilityAccount != null) {
+                        liabilityAccount.amount -= newTx.amount;
+                        if (liabilityAccount.amount <= 0) {
+                            liabilityAccount.amount = 0;
+                        }
+                        assetDao.update(liabilityAccount);
+                    }
+                } else if (newTx.type == 1 && newTx.note != null && !newTx.note.isEmpty()) {
+                    // 新交易是收入收款：减少借出
+                    AssetAccount lentAccount = assetDao.getAssetByNameAndType(newTx.note, 2);
+                    if (lentAccount != null) {
+                        lentAccount.amount -= newTx.amount;
+                        if (lentAccount.amount <= 0) {
+                            lentAccount.amount = 0;
+                        }
+                        assetDao.update(lentAccount);
                     }
                 }
 
@@ -334,6 +397,7 @@ public class FinanceViewModel extends AndroidViewModel {
 
                 // 3. 撤回对方资产 (负债/借出对象) 并自动删除归零账户
                 if (transaction.type == 3 || transaction.type == 4) {
+                    // 撤回负债借入或借出：减少对应账户金额
                     if (transaction.targetObject != null && !transaction.targetObject.isEmpty()) {
                         int targetAssetType = (transaction.type == 3) ? 1 : 2; // 3->负债区(1), 4->借出区(2)
                         AssetAccount targetAccount = assetDao.getAssetByNameAndType(transaction.targetObject, targetAssetType);
@@ -348,6 +412,20 @@ public class FinanceViewModel extends AndroidViewModel {
                                 assetDao.update(targetAccount);
                             }
                         }
+                    }
+                } else if (transaction.type == 0 && transaction.note != null && !transaction.note.isEmpty()) {
+                    // 撤回支出还款：增加负债
+                    AssetAccount liabilityAccount = assetDao.getAssetByNameAndType(transaction.note, 1);
+                    if (liabilityAccount != null) {
+                        liabilityAccount.amount += transaction.amount;
+                        assetDao.update(liabilityAccount);
+                    }
+                } else if (transaction.type == 1 && transaction.note != null && !transaction.note.isEmpty()) {
+                    // 撤回收入收款：增加借出
+                    AssetAccount lentAccount = assetDao.getAssetByNameAndType(transaction.note, 2);
+                    if (lentAccount != null) {
+                        lentAccount.amount += transaction.amount;
+                        assetDao.update(lentAccount);
                     }
                 }
             });
