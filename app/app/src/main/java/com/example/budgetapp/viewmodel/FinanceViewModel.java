@@ -156,10 +156,14 @@ public class FinanceViewModel extends AndroidViewModel {
 
     // 【增强】撤回账单对己方资产的影响 (兼容 0支出, 1收入, 3负债, 4借出)
     private void revertAssetBalance(AssetAccount asset, Transaction tx) {
-        if (asset.type == 0 || asset.type == 2) {
-            // 普通资产/借出账户：撤回支出(0)和借出(4)余额增加，撤回收入(1)和负债借入(3)余额减少
+        if (asset.type == 0) {
+            // 普通资产账户：撤回支出(0)和借出(4)余额增加，撤回收入(1)和负债借入(3)余额减少
             if (tx.type == 0 || tx.type == 4) asset.amount += tx.amount;
             else if (tx.type == 1 || tx.type == 3) asset.amount -= tx.amount;
+        } else if (asset.type == 2) {
+            // 借出账户：撤回支出/借出减少借出金额，撤回收入/负债借入增加借出金额（撤销还钱）
+            if (tx.type == 0 || tx.type == 4) asset.amount -= tx.amount;
+            else if (tx.type == 1 || tx.type == 3) asset.amount += tx.amount;
         } else if (asset.type == 1) {
             // 负债账户(信用卡)：撤回支出(0)和借出(4)负债减少，撤回收入(1)和负债借入(3)负债增加
             if (tx.type == 0 || tx.type == 4) asset.amount -= tx.amount;
@@ -169,10 +173,16 @@ public class FinanceViewModel extends AndroidViewModel {
 
     // 【增强】应用账单对己方资产的影响 (兼容 0支出, 1收入, 3负债, 4借出)
     private void applyAssetBalance(AssetAccount asset, Transaction tx) {
-        if (asset.type == 0 || asset.type == 2) {
+        if (asset.type == 0) {
+            // 普通资产账户：支出/借出减少，收入/负债借入增加
             if (tx.type == 0 || tx.type == 4) asset.amount -= tx.amount;
             else if (tx.type == 1 || tx.type == 3) asset.amount += tx.amount;
+        } else if (asset.type == 2) {
+            // 借出账户：支出/借出增加借出金额，收入/负债借入减少借出金额（对方还钱）
+            if (tx.type == 0 || tx.type == 4) asset.amount += tx.amount;
+            else if (tx.type == 1 || tx.type == 3) asset.amount -= tx.amount;
         } else if (asset.type == 1) {
+            // 负债账户(信用卡)：支出/借出增加负债，收入/负债借入减少负债
             if (tx.type == 0 || tx.type == 4) asset.amount += tx.amount;
             else if (tx.type == 1 || tx.type == 3) asset.amount -= tx.amount;
         }

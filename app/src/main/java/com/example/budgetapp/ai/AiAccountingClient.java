@@ -51,8 +51,10 @@ public class AiAccountingClient {
 
     public List<TransactionDraft> parseText(Context context, String text) throws Exception {
         ensureTextReady();
-        String reply = chat(
+        String reply = chatWithEndpoint(
                 config.textModel,
+                config.getEffectiveTextBaseUrl(),
+                config.getEffectiveTextApiKey(),
                 buildSystemPrompt(context),
                 new JSONObject().put("role", "user").put("content", text)
         );
@@ -67,8 +69,10 @@ public class AiAccountingClient {
         JSONObject imageUrl = new JSONObject();
         imageUrl.put("url", "data:" + mimeType + ";base64," + base64);
         content.put(new JSONObject().put("type", "image_url").put("image_url", imageUrl));
-        String reply = chat(
+        String reply = chatWithEndpoint(
                 config.visionModel,
+                config.getEffectiveVisionBaseUrl(),
+                config.getEffectiveVisionApiKey(),
                 buildSystemPrompt(context),
                 new JSONObject().put("role", "user").put("content", content)
         );
@@ -77,7 +81,9 @@ public class AiAccountingClient {
 
     public String transcribeAudio(byte[] audioBytes, String fileName, String mimeType) throws Exception {
         ensureAudioReady();
-        HttpURLConnection connection = openConnection(resolveUrl("/audio/transcriptions"), false);
+        String baseUrl = config.getEffectiveAudioBaseUrl();
+        String apiKey = config.getEffectiveAudioApiKey();
+        HttpURLConnection connection = openConnectionWithEndpoint(resolveUrlWithBase(baseUrl, "/audio/transcriptions"), apiKey, false);
         String boundary = "----BudgetAppBoundary" + System.currentTimeMillis();
         connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
         connection.setDoOutput(true);
@@ -113,8 +119,10 @@ public class AiAccountingClient {
             result.textMessage = "未配置文本模型";
         } else {
             try {
-                chat(
+                chatWithEndpoint(
                         config.textModel,
+                        config.getEffectiveTextBaseUrl(),
+                        config.getEffectiveTextApiKey(),
                         "你是接口测试助手，只返回 ok。",
                         new JSONObject().put("role", "user").put("content", "hi")
                 );
@@ -133,7 +141,8 @@ public class AiAccountingClient {
                         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9p+1tWwAAAAASUVORK5CYII=",
                         Base64.DEFAULT
                 );
-                probeVision("请读取这张图片，并且只回复 ok。", tinyPng, "image/png");
+                probeVisionWithEndpoint("请读取这张图片，并且只回复 ok。", tinyPng, "image/png",
+                        config.getEffectiveVisionBaseUrl(), config.getEffectiveVisionApiKey());
                 result.visionOk = true;
                 result.visionMessage = "可用";
             } catch (Exception e) {
@@ -166,7 +175,11 @@ public class AiAccountingClient {
     }
 
     private String chat(String model, String systemPrompt, JSONObject userMessage) throws Exception {
-        HttpURLConnection connection = openConnection(resolveUrl("/chat/completions"), true);
+        return chatWithEndpoint(model, config.baseUrl, config.apiKey, systemPrompt, userMessage);
+    }
+
+    private String chatWithEndpoint(String model, String baseUrl, String apiKey, String systemPrompt, JSONObject userMessage) throws Exception {
+        HttpURLConnection connection = openConnectionWithEndpoint(resolveUrlWithBase(baseUrl, "/chat/completions"), apiKey, true);
         connection.setDoOutput(true);
 
         JSONObject payload = new JSONObject();
@@ -201,14 +214,20 @@ public class AiAccountingClient {
     }
 
     private String probeVision(String prompt, byte[] imageBytes, String mimeType) throws Exception {
+        return probeVisionWithEndpoint(prompt, imageBytes, mimeType, config.baseUrl, config.apiKey);
+    }
+
+    private String probeVisionWithEndpoint(String prompt, byte[] imageBytes, String mimeType, String baseUrl, String apiKey) throws Exception {
         String base64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP);
         JSONArray content = new JSONArray();
         content.put(new JSONObject().put("type", "text").put("text", prompt));
         JSONObject imageUrl = new JSONObject();
         imageUrl.put("url", "data:" + mimeType + ";base64," + base64);
         content.put(new JSONObject().put("type", "image_url").put("image_url", imageUrl));
-        return chat(
+        return chatWithEndpoint(
                 config.visionModel,
+                baseUrl,
+                apiKey,
                 "你是视觉能力测试助手，读取图片后只回复 ok。",
                 new JSONObject().put("role", "user").put("content", content)
         );
@@ -257,11 +276,15 @@ public class AiAccountingClient {
     }
 
     private HttpURLConnection openConnection(String url, boolean jsonContentType) throws Exception {
+        return openConnectionWithEndpoint(url, config.apiKey, jsonContentType);
+    }
+
+    private HttpURLConnection openConnectionWithEndpoint(String url, String apiKey, boolean jsonContentType) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setRequestMethod("POST");
         connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
         connection.setReadTimeout(READ_TIMEOUT_MS);
-        connection.setRequestProperty("Authorization", "Bearer " + config.apiKey.trim());
+        connection.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
         if (jsonContentType) {
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
         }
@@ -269,7 +292,11 @@ public class AiAccountingClient {
     }
 
     private String resolveUrl(String endpoint) throws Exception {
-        String raw = config.baseUrl == null ? "" : config.baseUrl.trim();
+        return resolveUrlWithBase(config.baseUrl, endpoint);
+    }
+
+    private String resolveUrlWithBase(String baseUrl, String endpoint) throws Exception {
+        String raw = baseUrl == null ? "" : baseUrl.trim();
         if (raw.isEmpty()) {
             throw new IOException("请先填写 Base URL。");
         }
@@ -603,7 +630,7 @@ public class AiAccountingClient {
     }
 
     private void ensureConfig() {
-        if (config == null || !config.hasSharedConnection()) {
+        if (config == null) {
             throw new IllegalStateException("AI 配置不完整。");
         }
     }

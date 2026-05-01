@@ -1836,12 +1836,28 @@ public class RecordFragment extends Fragment {
                             if (finalAssetId != 0) {
                                 AssetAccount originalAsset = db.assetAccountDao().getAssetByIdSync(finalAssetId);
                                 if (originalAsset != null) {
-                                    if (finalType == 0 || finalType == 4) {
-                                        // 支出 / 借出：原资产余额减少
-                                        originalAsset.amount -= amount;
-                                    } else if (finalType == 1 || finalType == 3) {
-                                        // 收入 / 借入(负债)：原资产余额增加
-                                        originalAsset.amount += amount;
+                                    // 根据资产类型和交易类型决定余额变化
+                                    if (originalAsset.type == 0) {
+                                        // 普通资产(0)：支出/借出减少，收入/借入增加
+                                        if (finalType == 0 || finalType == 4) {
+                                            originalAsset.amount -= amount;
+                                        } else if (finalType == 1 || finalType == 3) {
+                                            originalAsset.amount += amount;
+                                        }
+                                    } else if (originalAsset.type == 1) {
+                                        // 负债资产(1)：支出增加负债，收入减少负债（还债）
+                                        if (finalType == 0 || finalType == 4) {
+                                            originalAsset.amount += amount;
+                                        } else if (finalType == 1 || finalType == 3) {
+                                            originalAsset.amount -= amount;
+                                        }
+                                    } else if (originalAsset.type == 2) {
+                                        // 借出资产(2)：支出增加借出，收入减少借出（对方还钱）
+                                        if (finalType == 0 || finalType == 4) {
+                                            originalAsset.amount += amount;
+                                        } else if (finalType == 1 || finalType == 3) {
+                                            originalAsset.amount -= amount;
+                                        }
                                     }
                                     originalAsset.updateTime = System.currentTimeMillis();
                                     db.assetAccountDao().update(originalAsset);

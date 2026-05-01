@@ -143,11 +143,19 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        android:text="共享连接信息"
+                        android:layout_marginBottom="8dp"
+                        android:text="默认连接信息"
                         android:textColor="@color/app_yellow"
                         android:textSize="14sp"
                         android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:text="未单独配置时，所有模型将使用此连接信息"
+                        android:textColor="#888888"
+                        android:textSize="11sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -208,8 +216,8 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        android:text="分能力模型"
+                        android:layout_marginBottom="8dp"
+                        android:text="文本模型配置"
                         android:textColor="@color/app_yellow"
                         android:textSize="14sp"
                         android:textStyle="bold" />
@@ -217,7 +225,15 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="文本模型（必填）"
+                        android:layout_marginBottom="16dp"
+                        android:text="必填 · 用于文本识别和 AI 对话"
+                        android:textColor="#888888"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="模型名称"
                         android:textColor="#888888"
                         android:textSize="12sp" />
 
@@ -248,7 +264,80 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="视觉模型（可选）"
+                        android:text="独立接口地址（可选）"
+                        android:textColor="#888888"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/et_text_base_url"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:hint="留空则使用默认连接信息"
+                        android:paddingVertical="12dp"
+                        android:textSize="14sp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginBottom="16dp"
+                        android:background="#F0F0F0" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="独立 API Key（可选）"
+                        android:textColor="#888888"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/et_text_api_key"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:hint="留空则使用默认连接信息"
+                        android:inputType="textPassword"
+                        android:paddingVertical="12dp"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="16dp"
+                app:cardBackgroundColor="@color/white"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:text="视觉模型配置"
+                        android:textColor="@color/app_yellow"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:text="可选 · 用于图片识别（截图记账）"
+                        android:textColor="#888888"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="模型名称"
                         android:textColor="#888888"
                         android:textSize="12sp" />
 
@@ -279,7 +368,80 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="音频模型（可选）"
+                        android:text="独立接口地址（可选）"
+                        android:textColor="#888888"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/et_vision_base_url"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:hint="留空则使用文本模型配置"
+                        android:paddingVertical="12dp"
+                        android:textSize="14sp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginBottom="16dp"
+                        android:background="#F0F0F0" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="独立 API Key（可选）"
+                        android:textColor="#888888"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/et_vision_api_key"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:hint="留空则使用文本模型配置"
+                        android:inputType="textPassword"
+                        android:paddingVertical="12dp"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="16dp"
+                app:cardBackgroundColor="@color/white"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:text="音频模型配置"
+                        android:textColor="@color/app_yellow"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:text="可选 · 用于语音识别（语音记账）"
+                        android:textColor="#888888"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="模型名称"
                         android:textColor="#888888"
                         android:textSize="12sp" />
 
@@ -299,6 +461,52 @@
                         android:text="音频模型：未配置"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="16dp"
+                        android:background="#F0F0F0" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="独立接口地址（可选）"
+                        android:textColor="#888888"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/et_audio_base_url"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:hint="留空则使用文本模型配置"
+                        android:paddingVertical="12dp"
+                        android:textSize="14sp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginBottom="16dp"
+                        android:background="#F0F0F0" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="独立 API Key（可选）"
+                        android:textColor="#888888"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/et_audio_api_key"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:hint="留空则使用文本模型配置"
+                        android:inputType="textPassword"
+                        android:paddingVertical="12dp"
+                        android:textSize="14sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

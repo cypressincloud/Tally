@@ -24,9 +24,19 @@ public class AiSettingActivity extends AppCompatActivity {
 
     private EditText etBaseUrl;
     private EditText etApiKey;
+    
     private EditText etTextModel;
+    private EditText etTextBaseUrl;
+    private EditText etTextApiKey;
+    
     private EditText etVisionModel;
+    private EditText etVisionBaseUrl;
+    private EditText etVisionApiKey;
+    
     private EditText etAudioModel;
+    private EditText etAudioBaseUrl;
+    private EditText etAudioApiKey;
+    
     private SwitchCompat switchAi;
     private Button btnTest;
     private TextView tvTextStatus;
@@ -61,9 +71,19 @@ public class AiSettingActivity extends AppCompatActivity {
         switchAi = findViewById(R.id.switch_ai_enable);
         etBaseUrl = findViewById(R.id.et_base_url);
         etApiKey = findViewById(R.id.et_api_key);
+        
         etTextModel = findViewById(R.id.et_text_model);
+        etTextBaseUrl = findViewById(R.id.et_text_base_url);
+        etTextApiKey = findViewById(R.id.et_text_api_key);
+        
         etVisionModel = findViewById(R.id.et_vision_model);
+        etVisionBaseUrl = findViewById(R.id.et_vision_base_url);
+        etVisionApiKey = findViewById(R.id.et_vision_api_key);
+        
         etAudioModel = findViewById(R.id.et_audio_model);
+        etAudioBaseUrl = findViewById(R.id.et_audio_base_url);
+        etAudioApiKey = findViewById(R.id.et_audio_api_key);
+        
         btnTest = findViewById(R.id.btn_test_connection);
         Button btnSave = findViewById(R.id.btn_save_ai_config);
         tvTextStatus = findViewById(R.id.tv_text_status);
@@ -74,9 +94,19 @@ public class AiSettingActivity extends AppCompatActivity {
         switchAi.setChecked(config.enabled);
         etBaseUrl.setText(config.baseUrl);
         etApiKey.setText(config.apiKey);
+        
         etTextModel.setText(config.textModel);
+        etTextBaseUrl.setText(config.textBaseUrl);
+        etTextApiKey.setText(config.textApiKey);
+        
         etVisionModel.setText(config.visionModel);
+        etVisionBaseUrl.setText(config.visionBaseUrl);
+        etVisionApiKey.setText(config.visionApiKey);
+        
         etAudioModel.setText(config.audioModel);
+        etAudioBaseUrl.setText(config.audioBaseUrl);
+        etAudioApiKey.setText(config.audioApiKey);
+        
         showCachedCapabilities(config);
 
         // 添加AI分类关键字规则入口点击事件
@@ -89,18 +119,30 @@ public class AiSettingActivity extends AppCompatActivity {
         btnSave.setOnClickListener(v -> {
             AiConfig newConfig = buildConfigFromInput();
             if (newConfig.enabled && !newConfig.isTextReady()) {
-                Toast.makeText(this, "启用 AI 记账前，请至少填写 Base URL、API Key 和文本模型。", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "启用 AI 记账前，请至少配置文本模型（填写模型名称，并确保有可用的连接信息）。", Toast.LENGTH_LONG).show();
                 return;
             }
 
             AiConfig cachedConfig = AiConfig.load(this);
-            if (cachedConfig.matchesSharedEndpoint(newConfig) && safeEquals(cachedConfig.textModel, newConfig.textModel)) {
+            
+            // 保留文本模型测试结果（如果配置未变）
+            if (matchesEndpoint(cachedConfig.getEffectiveTextBaseUrl(), cachedConfig.getEffectiveTextApiKey(),
+                    newConfig.getEffectiveTextBaseUrl(), newConfig.getEffectiveTextApiKey())
+                    && safeEquals(cachedConfig.textModel, newConfig.textModel)) {
                 newConfig.textTestOk = cachedConfig.textTestOk;
             }
-            if (cachedConfig.matchesSharedEndpoint(newConfig) && safeEquals(cachedConfig.visionModel, newConfig.visionModel)) {
+            
+            // 保留视觉模型测试结果（如果配置未变）
+            if (matchesEndpoint(cachedConfig.getEffectiveVisionBaseUrl(), cachedConfig.getEffectiveVisionApiKey(),
+                    newConfig.getEffectiveVisionBaseUrl(), newConfig.getEffectiveVisionApiKey())
+                    && safeEquals(cachedConfig.visionModel, newConfig.visionModel)) {
                 newConfig.visionTestOk = cachedConfig.visionTestOk;
             }
-            if (cachedConfig.matchesSharedEndpoint(newConfig) && safeEquals(cachedConfig.audioModel, newConfig.audioModel)) {
+            
+            // 保留音频模型测试结果（如果配置未变）
+            if (matchesEndpoint(cachedConfig.getEffectiveAudioBaseUrl(), cachedConfig.getEffectiveAudioApiKey(),
+                    newConfig.getEffectiveAudioBaseUrl(), newConfig.getEffectiveAudioApiKey())
+                    && safeEquals(cachedConfig.audioModel, newConfig.audioModel)) {
                 newConfig.audioTestOk = cachedConfig.audioTestOk;
             }
 
@@ -129,22 +171,29 @@ public class AiSettingActivity extends AppCompatActivity {
     private AiConfig buildConfigFromInput() {
         AiConfig config = new AiConfig();
         config.enabled = switchAi.isChecked();
+        
         config.baseUrl = etBaseUrl.getText().toString().trim();
         config.apiKey = etApiKey.getText().toString().trim();
+        
         config.textModel = etTextModel.getText().toString().trim();
+        config.textBaseUrl = etTextBaseUrl.getText().toString().trim();
+        config.textApiKey = etTextApiKey.getText().toString().trim();
+        
         config.visionModel = etVisionModel.getText().toString().trim();
+        config.visionBaseUrl = etVisionBaseUrl.getText().toString().trim();
+        config.visionApiKey = etVisionApiKey.getText().toString().trim();
+        
         config.audioModel = etAudioModel.getText().toString().trim();
+        config.audioBaseUrl = etAudioBaseUrl.getText().toString().trim();
+        config.audioApiKey = etAudioApiKey.getText().toString().trim();
+        
         return config;
     }
 
     private void testConnection() {
         AiConfig config = buildConfigFromInput();
-        if (!config.hasSharedConnection()) {
-            Toast.makeText(this, "请先填写 Base URL 和 API Key。", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (config.textModel.isEmpty()) {
-            Toast.makeText(this, "请先填写文本模型。", Toast.LENGTH_SHORT).show();
+        if (!config.isTextReady()) {
+            Toast.makeText(this, "请先配置文本模型（填写模型名称，并确保有可用的连接信息）。", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -170,6 +219,14 @@ public class AiSettingActivity extends AppCompatActivity {
                 }
             });
         }).start();
+    }
+
+    private boolean matchesEndpoint(String url1, String key1, String url2, String key2) {
+        String u1 = url1 == null ? "" : url1.trim();
+        String k1 = key1 == null ? "" : key1.trim();
+        String u2 = url2 == null ? "" : url2.trim();
+        String k2 = key2 == null ? "" : key2.trim();
+        return u1.equals(u2) && k1.equals(k2);
     }
 
     private boolean safeEquals(String left, String right) {
