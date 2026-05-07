@@ -1,71 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#00000000">
+    android:layout_height="wrap_content"
+    android:layout_margin="24dp"
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="28dp"
+    app:cardElevation="0dp">
 
     <LinearLayout
-        android:layout_width="320dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:background="@drawable/bg_bottom_sheet_rounded"
         android:orientation="vertical"
         android:padding="24dp">
 
         <TextView
             android:id="@+id/tv_permission_title"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="权限请求"
-            android:textSize="18sp"
-            android:textStyle="bold"
+            android:gravity="center"
+            android:text="恢复默认提示词"
             android:textColor="?android:attr/textColorPrimary"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="12dp"/>
+            android:textSize="20sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tv_permission_message"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="为了实现核心功能，我们需要获取此权限。"
-            android:textSize="16sp"
-            android:textColor="?android:attr/textColorSecondary"
+            android:layout_marginTop="16dp"
             android:gravity="center"
-            android:lineSpacingExtra="4dp"
-            android:layout_marginBottom="24dp"/>
+            android:lineSpacingExtra="5dp"
+            android:text="确定要清除当前的自定义配置，并恢复为系统默认状态吗？\n此操作不可撤销。"
+            android:textColor="#888888"
+            android:textSize="14sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
             android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
+            <Button
                 android:id="@+id/btn_cancel_permission"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                 android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_weight="1"
+                android:layout_height="56dp"
                 android:layout_marginEnd="8dp"
-                android:backgroundTint="@color/input_bg"
-                android:text="取 消"
-                android:textColor="@color/text_primary"
-                app:cornerRadius="16dp"
-                app:elevation="0dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_grant_permission"
-                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
                 android:layout_weight="1"
-                android:backgroundTint="?android:attr/colorPrimary"
-                android:text="去授权"
-                android:textColor="@color/text_white"
+                android:backgroundTint="@color/input_bg"
+                android:text="取消"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 app:cornerRadius="16dp"
                 app:elevation="0dp" />
+
+            <Button
+                android:id="@+id/btn_grant_permission"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:backgroundTint="@color/income_red"
+                android:text="确定恢复"
+                android:textAllCaps="false"
+                android:textColor="@color/real_white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="16dp" />
         </LinearLayout>
 
     </LinearLayout>
-</FrameLayout>
+</androidx.cardview.widget.CardView>

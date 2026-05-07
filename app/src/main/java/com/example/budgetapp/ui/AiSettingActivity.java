@@ -134,6 +134,12 @@ public class AiSettingActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
+        // 添加AI识别提示词入口点击事件
+        findViewById(R.id.card_ai_prompt).setOnClickListener(v -> {
+            android.content.Intent intent = new android.content.Intent(this, AiPromptEditorActivity.class);
+            startActivity(intent);
+        });
+
         // 添加AI记账配置指南入口点击事件（在默认连接信息标题右边）
         findViewById(R.id.tv_ai_guide).setOnClickListener(v -> {
             Intent intent = new Intent(this, AiGuideActivity.class);

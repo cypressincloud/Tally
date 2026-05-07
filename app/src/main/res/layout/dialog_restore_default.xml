@@ -18,28 +18,20 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:text="提示"
+            android:text="恢复默认提示词"
             android:textColor="?android:attr/textColorPrimary"
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <LinearLayout
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:background="@drawable/bg_input_field"
-            android:padding="16dp"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/tv_message"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="需要先开启照片备注功能"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="14sp" />
-        </LinearLayout>
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:lineSpacingExtra="5dp"
+            android:text="确定要清除当前的自定义配置，并恢复为系统默认状态吗？\n此操作不可撤销。"
+            android:textColor="#888888"
+            android:textSize="14sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -47,30 +39,27 @@
             android:layout_marginTop="32dp"
             android:orientation="horizontal">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_cancel"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                 android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_marginEnd="8dp"
+                android:layout_height="52dp"
                 android:layout_weight="1"
+                android:layout_marginEnd="8dp"
                 android:backgroundTint="@color/input_bg"
-                android:text="取消"
-                android:textAllCaps="false"
+                android:text="取 消"
                 android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold"
                 app:cornerRadius="16dp"
                 app:elevation="0dp" />
 
-            <Button
-                android:id="@+id/btn_go_settings"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_confirm"
                 android:layout_width="0dp"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                android:backgroundTint="@color/app_blue"
-                android:text="去设置"
+                android:backgroundTint="@color/income_red"
+                android:text="确定恢复"
                 android:textAllCaps="false"
                 android:textColor="@color/real_white"
                 android:textSize="16sp"

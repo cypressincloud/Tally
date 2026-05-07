@@ -66,6 +66,12 @@
             android:theme="@style/Theme.BudgetApp" />
 
         <activity
+            android:name=".ui.AiPromptEditorActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BudgetApp" />
+
+        <activity
             android:name=".ui.AiChatActivity"
             android:exported="true"
             android:screenOrientation="portrait"
