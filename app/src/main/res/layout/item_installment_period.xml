@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/card_period"
+    android:layout_width="60dp"
+    android:layout_height="60dp"
+    android:layout_margin="6dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="0dp">
+
+    <TextView
+        android:id="@+id/tv_period_number"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:text="1"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+</androidx.cardview.widget.CardView>

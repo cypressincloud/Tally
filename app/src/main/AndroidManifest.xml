@@ -166,6 +166,12 @@
             android:exported="false"
             android:theme="@style/Theme.BudgetApp" />
 
+        <activity
+            android:name=".ui.InstallmentDetailActivity"
+            android:label="分期详情"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
         <service
             android:name=".service.QuickAddTileService"
             android:icon="@drawable/ic_qs_record"

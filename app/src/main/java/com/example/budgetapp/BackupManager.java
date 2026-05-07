@@ -621,13 +621,30 @@ public class BackupManager {
                 t.amount = Math.abs(parseDoubleSafe(getCellText(row.getCell(amountIdx))));
 
                 // 3. 时间与记录标识映射
-                // 咔皮的日期通常是 2026/05/06，时间是 18:58:46
-                String combinedDateTime = dateStr + " " + timeStr;
-                Date dateObj;
+                // 兼容带斜杠或带横杠的日期格式
+                String cleanDateStr = dateStr.replace("/", "-");
+                String combinedDateTime = cleanDateStr + " " + timeStr;
+
+                Date dateObj = null;
+                SimpleDateFormat parserSdf1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                SimpleDateFormat parserSdf2 = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+
                 try {
-                    dateObj = parserSdf.parse(combinedDateTime);
-                    t.date = (dateObj != null) ? dateObj.getTime() : System.currentTimeMillis();
+                    // 先尝试带秒的格式
+                    dateObj = parserSdf1.parse(combinedDateTime);
                 } catch (Exception e) {
+                    try {
+                        // 如果失败，尝试不带秒的格式
+                        dateObj = parserSdf2.parse(combinedDateTime);
+                    } catch (Exception e2) {
+                        // ignore
+                    }
+                }
+
+                // 如果解析成功使用真实时间，失败则作为兜底使用当前时间
+                if (dateObj != null) {
+                    t.date = dateObj.getTime();
+                } else {
                     dateObj = new Date();
                     t.date = dateObj.getTime();
                 }

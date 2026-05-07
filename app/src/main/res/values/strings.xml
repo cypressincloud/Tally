@@ -7,4 +7,13 @@
     <string name="widget_name_overtime">加班薪资统计</string>
     <string name="widget_name_budget">今日预算卡片</string>
     <string name="edit_rule">编辑规则</string>
+
+    <!-- 资产类型数组 -->
+    <string-array name="asset_types">
+        <item>资产</item>
+        <item>理财</item>
+        <item>负债</item>
+        <item>借出</item>
+        <item>分期</item>
+    </string-array>
 </resources>

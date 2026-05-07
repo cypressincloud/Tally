@@ -1,10 +1,14 @@
 // src/main/java/com/example/budgetapp/ui/CalendarAdapter.java
 package com.example.budgetapp.ui;
 
+import android.animation.ArgbEvaluator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.InsetDrawable;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -280,12 +284,8 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
 
         // --- 样式优先级：选中 > 今天 > 续费日期 > 普通 ---
         if (isSelected) {
-            // [被选中状态]：显示黄色边框
-            holder.itemView.setBackgroundResource(R.drawable.bg_selected_date);
-            Drawable bg = holder.itemView.getBackground();
-            if (bg != null) bg.setTint(themeColor);
-
-            holder.tvDay.setTextColor(defaultDayColor);
+            // [被选中状态]：显示蓝色边框，带有由浅入深的过渡动画
+            applySelectedDateAnimation(holder, themeColor, defaultDayColor);
             holder.tvDay.setAlpha(1.0f);
             holder.itemView.setSelected(true);
 
@@ -438,6 +438,66 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             }
         }
         return false;
+    }
+
+    /**
+     * 为选中的日期应用由浅入深的快速过渡动画（边框缩放+颜色渐变）
+     * @param holder ViewHolder
+     * @param targetColor 目标颜色（主题色）
+     * @param textColor 文字颜色
+     */
+    private void applySelectedDateAnimation(ViewHolder holder, int targetColor, int textColor) {
+        Context context = holder.itemView.getContext();
+        
+        // 创建圆角矩形边框 Shape
+        GradientDrawable shape = new GradientDrawable();
+        shape.setShape(GradientDrawable.RECTANGLE);
+        shape.setColor(Color.TRANSPARENT);
+        
+        // 设置圆角
+        float radius = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 12, context.getResources().getDisplayMetrics());
+        shape.setCornerRadius(radius);
+        
+        // 设置边框（初始为浅色）
+        float strokeWidth = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 1.5f, context.getResources().getDisplayMetrics());
+        
+        // 创建 Inset 缩进（初始值较大，用于缩放效果）
+        int baseInset = (int) TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 4, context.getResources().getDisplayMetrics());
+        
+        // 应用文字颜色
+        holder.tvDay.setTextColor(textColor);
+        
+        // 创建颜色动画：从浅色（15%透明度）到深色（100%不透明）
+        int startColor = androidx.core.graphics.ColorUtils.setAlphaComponent(targetColor, 38); // 15% 透明度
+        int endColor = targetColor; // 100% 不透明
+        
+        // 创建组合动画：颜色 + 边框缩放
+        ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(90); // 90ms 极速动画
+        animator.addUpdateListener(animation -> {
+            float progress = (float) animation.getAnimatedValue();
+            
+            // 1. 颜色插值
+            int animatedColor = (int) new ArgbEvaluator().evaluate(progress, startColor, endColor);
+            shape.setStroke((int) strokeWidth, animatedColor);
+            
+            // 2. 边框缩放效果：从 0.80 到 1.0（通过调整 inset 实现）
+            // progress: 0 -> 1, scale: 0.80 -> 1.0
+            float scale = 0.80f + (0.20f * progress);
+            // 将缩放转换为 inset 的变化：缩放越小，inset 越大
+            int extraInset = (int) (baseInset * (1f - scale) * 2.5f);
+            int currentInset = baseInset + extraInset;
+            
+            InsetDrawable insetDrawable = new InsetDrawable(shape, currentInset, currentInset, currentInset, currentInset);
+            holder.itemView.setBackground(insetDrawable);
+            holder.itemView.invalidate();
+        });
+        
+        // 启动动画
+        animator.start();
     }
 
     @Override

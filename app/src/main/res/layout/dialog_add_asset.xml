@@ -23,41 +23,16 @@
             android:textColor="@color/text_primary"
             android:gravity="center" />
 
-        <RadioGroup
-            android:id="@+id/rg_asset_type"
+        <!-- 改为 Spinner 下拉框 -->
+        <Spinner
+            android:id="@+id/spinner_asset_type"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginTop="16dp">
-
-            <RadioButton
-                android:id="@+id/rb_asset"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="资产"
-                android:layout_marginEnd="16dp"/>
-
-            <RadioButton
-                android:id="@+id/rb_investment"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="16dp"
-                android:text="理财"/>
-
-            <RadioButton
-                android:id="@+id/rb_liability"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="负债"
-                android:layout_marginEnd="16dp"/>
-
-            <RadioButton
-                android:id="@+id/rb_lent"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="借出"/>
-        </RadioGroup>
+            android:layout_height="56dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_input_field"
+            android:popupBackground="@drawable/bg_input_field"
+            android:popupElevation="8dp"
+            android:entries="@array/asset_types" />
 
         <EditText
             android:id="@+id/et_asset_name"
@@ -71,6 +46,52 @@
             android:textColorHint="@color/text_secondary"
             android:paddingHorizontal="16dp"
             android:textSize="16sp" />
+
+        <!-- 分期输入表单（选择分期时显示） -->
+        <LinearLayout
+            android:id="@+id/layout_installment_fields"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/et_total_installments"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_input_field"
+                android:hint="总期数（如：12）"
+                android:inputType="number"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:paddingHorizontal="16dp"
+                android:textSize="16sp" />
+
+            <EditText
+                android:id="@+id/et_installment_amount"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_input_field"
+                android:hint="每期金额（如：500.00）"
+                android:inputType="numberDecimal"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:paddingHorizontal="16dp"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/tv_total_amount_display"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="总金额：¥0.00"
+                android:textColor="@color/app_blue"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="16dp" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

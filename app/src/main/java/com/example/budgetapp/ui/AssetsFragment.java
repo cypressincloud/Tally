@@ -322,8 +322,8 @@ public class AssetsFragment extends Fragment {
 
             for (AssetAccount acc : allAccounts) {
                 // 1. 统计各自的分类总额（不论是否计入总资产，面板上的负债/借出总额应如实显示）
-                if (acc.type == 1) {
-                    totalLiability += acc.amount;
+                if (acc.type == 1 || acc.type == 4) {
+                    totalLiability += acc.amount; // 负债和分期都计入负债统计
                 } else if (acc.type == 2) {
                     totalLent += acc.amount;
                 }
@@ -331,11 +331,11 @@ public class AssetsFragment extends Fragment {
                 // 2. 统计顶部的大字“总资产”（根据是否勾选了计入总资产来加减）
                 if (acc.isIncludedInTotal) {
                     if (acc.type == 0 || acc.type == 3) {
-                        totalAsset += acc.amount; // 资产和理财：增加总资产
+                        totalAsset += acc.amount; // 资产和理财
                     } else if (acc.type == 2) {
-                        totalAsset += acc.amount; // 借出（别人欠我的钱）：增加总资产
-                    } else if (acc.type == 1) {
-                        totalAsset -= acc.amount; // 负债（我欠别人的钱）：扣减总资产
+                        totalAsset += acc.amount; // 借出
+                    } else if (acc.type == 1 || acc.type == 4) {
+                        totalAsset -= acc.amount; // 负债和分期（减少总资产）
                     }
                 }
             }
@@ -356,7 +356,7 @@ public class AssetsFragment extends Fragment {
                 String symbol = (acc.currencySymbol != null && !acc.currencySymbol.isEmpty()) ? acc.currencySymbol : "¥";
 
                 // 1. 统计各自的分类总额
-                if (acc.type == 1) {
+                if (acc.type == 1 || acc.type == 4) {
                     liabilityMap.put(symbol, liabilityMap.getOrDefault(symbol, 0.0) + acc.amount);
                 } else if (acc.type == 2) {
                     lentMap.put(symbol, lentMap.getOrDefault(symbol, 0.0) + acc.amount);
@@ -368,9 +368,9 @@ public class AssetsFragment extends Fragment {
                     if (acc.type == 0 || acc.type == 3) {
                         currentTotal += acc.amount; // 资产和理财
                     } else if (acc.type == 2) {
-                        currentTotal += acc.amount; // 借出：加
-                    } else if (acc.type == 1) {
-                        currentTotal -= acc.amount; // 负债：减
+                        currentTotal += acc.amount; // 借出
+                    } else if (acc.type == 1 || acc.type == 4) {
+                        currentTotal -= acc.amount; // 负债和分期
                     }
                     assetMap.put(symbol, currentTotal);
                 }
@@ -407,7 +407,12 @@ public class AssetsFragment extends Fragment {
             // 当选中资产(0)时，同时显示普通资产(0)和理财(3)
             if (currentType == 0 && (acc.type == 0 || acc.type == 3)) {
                 filteredList.add(acc);
-            } else if (acc.type == currentType) {
+            } 
+            // 【新增】当选中负债(1)时，同时显示普通负债(1)和分期(4)
+            else if (currentType == 1 && (acc.type == 1 || acc.type == 4)) {
+                filteredList.add(acc);
+            }
+            else if (acc.type == currentType) {
                 filteredList.add(acc);
             }
         }
@@ -504,13 +509,20 @@ public class AssetsFragment extends Fragment {
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 
         TextView tvTitle = view.findViewById(R.id.tv_dialog_title);
-        RadioGroup rgType = view.findViewById(R.id.rg_asset_type);
+        // 【修改】将 RadioGroup 改为 Spinner
+        android.widget.Spinner spinnerType = view.findViewById(R.id.spinner_asset_type);
         EditText etName = view.findViewById(R.id.et_asset_name);
         EditText etAmount = view.findViewById(R.id.et_asset_amount);
         Button btnCurrency = view.findViewById(R.id.btn_currency);
         Button btnCancel = view.findViewById(R.id.btn_cancel);
         Button btnSave = view.findViewById(R.id.btn_save);
         Button btnDelete = view.findViewById(R.id.btn_delete);
+
+        // 【新增】分期输入表单控件
+        LinearLayout layoutInstallment = view.findViewById(R.id.layout_installment_fields);
+        EditText etTotalInstallments = view.findViewById(R.id.et_total_installments);
+        EditText etInstallmentAmount = view.findViewById(R.id.et_installment_amount);
+        TextView tvTotalAmountDisplay = view.findViewById(R.id.tv_total_amount_display);
 
         // 【新增 1】初始化 Spinner
         android.widget.Spinner spinnerInclude = view.findViewById(R.id.spinner_include_in_total);
@@ -627,6 +639,13 @@ public class AssetsFragment extends Fragment {
                 }
                 etExpected.setText(String.format("预计结算资产: %.2f", existing.expectedReturn));
             }
+
+            // 【新增】回显分期数据
+            if (existing != null && existing.type == 4) {
+                etTotalInstallments.setText(String.valueOf(existing.totalInstallments));
+                etInstallmentAmount.setText(String.format("%.2f", existing.installmentAmount));
+            }
+
         } else {
             btnCancel.setVisibility(View.VISIBLE);
             btnDelete.setVisibility(View.GONE);
@@ -694,40 +713,71 @@ public class AssetsFragment extends Fragment {
         spinnerDepositType.setOnItemSelectedListener(spinnerListener);
         spinnerInterestType.setOnItemSelectedListener(spinnerListener);
 
-        // 切换资产类型时的 UI 更新
+        // 【新增】分期金额自动计算
+        android.text.TextWatcher installmentWatcher = new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                try {
+                    int periods = etTotalInstallments.getText().toString().isEmpty() ? 0
+                            : Integer.parseInt(etTotalInstallments.getText().toString());
+                    double amount = etInstallmentAmount.getText().toString().isEmpty() ? 0.0
+                            : Double.parseDouble(etInstallmentAmount.getText().toString());
+                    double total = periods * amount;
+                    tvTotalAmountDisplay.setText(String.format("总金额：¥%.2f", total));
+                } catch (Exception e) {
+                    tvTotalAmountDisplay.setText("总金额：¥0.00");
+                }
+            }
+        };
+        etTotalInstallments.addTextChangedListener(installmentWatcher);
+        etInstallmentAmount.addTextChangedListener(installmentWatcher);
+
+        // 【修改】切换资产类型时的 UI 更新（改为 Spinner 逻辑）
         Runnable updateLabels = () -> {
-            int selectedId = rgType.getCheckedRadioButtonId();
+            int selectedPosition = spinnerType.getSelectedItemPosition();
+            // 0:资产, 1:理财, 2:负债, 3:借出, 4:分期
             String titleSuffix = "";
             String nameHint = "";
-            String amountHint = ""; // 动态控制金额提示词
+            String amountHint = "";
             layoutInvestment.setVisibility(View.GONE);
+            layoutInstallment.setVisibility(View.GONE);
+            etAmount.setVisibility(View.VISIBLE);
 
-            if (selectedId == R.id.rb_asset) {
+            if (selectedPosition == 0) { // 资产
                 titleSuffix = "资产";
                 nameHint = "资产名称";
                 amountHint = "资产金额";
-            } else if (selectedId == R.id.rb_liability) {
-                titleSuffix = "负债";
-                nameHint = "负债对象";
-                amountHint = "负债金额";
-            } else if (selectedId == R.id.rb_lent) {
-                titleSuffix = "借出";
-                nameHint = "借款对象";
-                amountHint = "借出金额";
-            } else if (selectedId == R.id.rb_investment) {
+            } else if (selectedPosition == 1) { // 理财
                 titleSuffix = "理财";
                 nameHint = "理财产品或银行名称";
                 amountHint = "理财本金";
                 layoutInvestment.setVisibility(View.VISIBLE);
                 calculateExpected.run();
+            } else if (selectedPosition == 2) { // 负债
+                titleSuffix = "负债";
+                nameHint = "负债对象";
+                amountHint = "负债金额";
+            } else if (selectedPosition == 3) { // 借出
+                titleSuffix = "借出";
+                nameHint = "借款对象";
+                amountHint = "借出金额";
+            } else if (selectedPosition == 4) { // 分期
+                titleSuffix = "分期";
+                nameHint = "分期对象（如：花呗、信用卡）";
+                amountHint = "";
+                layoutInstallment.setVisibility(View.VISIBLE);
+                etAmount.setVisibility(View.GONE); // 隐藏普通金额输入
             }
 
-            // 【新增 3】如果是新建资产，根据选中的类型自动切换“计入/不计入”的默认状态
             if (existing == null) {
-                if (selectedId == R.id.rb_asset) {
-                    spinnerInclude.setSelection(0); // 资产默认“计入总资产”
+                if (selectedPosition == 0) { // 资产
+                    spinnerInclude.setSelection(0);
                 } else {
-                    spinnerInclude.setSelection(1); // 负债、借出、理财默认“不计入总资产”
+                    spinnerInclude.setSelection(1);
                 }
             }
 
@@ -736,13 +786,25 @@ public class AssetsFragment extends Fragment {
             etAmount.setHint(amountHint);
         };
 
-        rgType.setOnCheckedChangeListener((group, checkedId) -> updateLabels.run());
+        // 【修改】Spinner 选择监听
+        spinnerType.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                updateLabels.run();
+            }
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
 
+        // 【修改】设置初始选中项（type -> spinner position）
         int targetType = (existing != null) ? existing.type : initType;
-        if (targetType == 1) rgType.check(R.id.rb_liability);
-        else if (targetType == 2) rgType.check(R.id.rb_lent);
-        else if (targetType == 3) rgType.check(R.id.rb_investment);
-        else rgType.check(R.id.rb_asset);
+        int spinnerPosition = 0;
+        if (targetType == 0) spinnerPosition = 0;      // 资产
+        else if (targetType == 1) spinnerPosition = 2; // 负债
+        else if (targetType == 2) spinnerPosition = 3; // 借出
+        else if (targetType == 3) spinnerPosition = 1; // 理财
+        else if (targetType == 4) spinnerPosition = 4; // 分期
+        spinnerType.setSelection(spinnerPosition);
 
         updateLabels.run();
 
@@ -770,17 +832,35 @@ public class AssetsFragment extends Fragment {
 
         btnSave.setOnClickListener(v -> {
             String name = etName.getText().toString().trim();
-            String amountStr = etAmount.getText().toString().trim();
-            if (name.isEmpty() || amountStr.isEmpty()) return;
+            if (name.isEmpty()) {
+                Toast.makeText(getContext(), "请输入名称", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-            double amount = 0;
-            try { amount = Double.parseDouble(amountStr); } catch (NumberFormatException e) { return; }
-
+            // 【修改】获取选中的类型（spinner position -> type）
+            int selectedPosition = spinnerType.getSelectedItemPosition();
             int finalType = 0;
-            int selectedId = rgType.getCheckedRadioButtonId();
-            if (selectedId == R.id.rb_liability) finalType = 1;
-            else if (selectedId == R.id.rb_lent) finalType = 2;
-            else if (selectedId == R.id.rb_investment) finalType = 3;
+            if (selectedPosition == 0) finalType = 0;      // 资产
+            else if (selectedPosition == 1) finalType = 3; // 理财
+            else if (selectedPosition == 2) finalType = 1; // 负债
+            else if (selectedPosition == 3) finalType = 2; // 借出
+            else if (selectedPosition == 4) finalType = 4; // 分期
+
+            // 【修改】分期类型不需要验证 amount 字段
+            double amount = 0;
+            if (finalType != 4) {
+                String amountStr = etAmount.getText().toString().trim();
+                if (amountStr.isEmpty()) {
+                    Toast.makeText(getContext(), "请输入金额", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                try { 
+                    amount = Double.parseDouble(amountStr); 
+                } catch (NumberFormatException e) { 
+                    Toast.makeText(getContext(), "金额格式不正确", Toast.LENGTH_SHORT).show();
+                    return; 
+                }
+            }
 
             String symbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
 
@@ -819,6 +899,19 @@ public class AssetsFragment extends Fragment {
                     accountToSave.durationMonths = 0;
                     accountToSave.interestRate = 0.0;
                     accountToSave.expectedReturn = amount;
+                }
+            }
+
+            // 【新增】保存分期数据
+            if (finalType == 4) {
+                try {
+                    accountToSave.totalInstallments = Integer.parseInt(etTotalInstallments.getText().toString());
+                    accountToSave.installmentAmount = Double.parseDouble(etInstallmentAmount.getText().toString());
+                    accountToSave.amount = accountToSave.getTotalAmount(); // 总金额
+                    accountToSave.paidInstallments = "[]"; // 初始为空
+                } catch (Exception e) {
+                    Toast.makeText(getContext(), "请输入有效的分期信息", Toast.LENGTH_SHORT).show();
+                    return;
                 }
             }
 
@@ -896,12 +989,34 @@ public class AssetsFragment extends Fragment {
                 NormalVH normalHolder = (NormalVH) holder;
                 normalHolder.tvName.setText(item.name);
 
-                String amountStr = String.format("%.2f", item.amount);
-                if (isCurrencyEnabled) {
-                    normalHolder.tvAmount.setText(symbol + amountStr);
+                // 获取货币单位开启状态 (保持与 AssetsFragment 其它地方一致)
+                String displaySymbol = isCurrencyEnabled ? symbol : ""; // 如果没开启，则为空字符串
+
+                if (item.type == 4) {
+                    // 1. 右侧主金额：剩余待还总额
+                    String remainingAmountStr = String.format("%.2f", item.getRemainingAmount());
+                    normalHolder.tvAmount.setText(displaySymbol + remainingAmountStr);
+                    normalHolder.tvAmount.setTextSize(18);
+
+                    // 2. 左下角副标题：还款进度与每期金额 (注意这里的 displaySymbol)
+                    String installmentInfo = String.format("还剩 %d/%d 期 | %s%.2f/期",
+                            item.getRemainingInstallments(),
+                            item.totalInstallments,
+                            displaySymbol, // 只有开启时才会显示符号
+                            item.installmentAmount);
+
+                    normalHolder.tvNote.setText(installmentInfo);
+                    normalHolder.tvNote.setVisibility(View.VISIBLE);
+                    normalHolder.tvNote.setTextSize(12);
+                    normalHolder.tvNote.setPadding(0, 4, 0, 0);
                 } else {
-                    normalHolder.tvAmount.setText(amountStr);
+                    // 普通资产/负债...
+                    String amountStr = String.format("%.2f", item.amount);
+                    normalHolder.tvAmount.setText(displaySymbol + amountStr);
+                    normalHolder.tvAmount.setTextSize(18);
+                    normalHolder.tvNote.setVisibility(View.GONE);
                 }
+                // ================= UI 布局优化结束 =================
 
                 boolean isDefault = (item.id == defaultAssetId);
                 // 只要 colorType 大于 0，都算自定义颜色
@@ -944,6 +1059,8 @@ public class AssetsFragment extends Fragment {
                 if (isDefault || isCustomColor) {
                     normalHolder.tvName.setTextColor(android.graphics.Color.WHITE);
                     normalHolder.tvAmount.setTextColor(android.graphics.Color.WHITE);
+                    // 副标题也需要反色（使用半透明白色，以区分主次）
+                    normalHolder.tvNote.setTextColor(androidx.core.graphics.ColorUtils.setAlphaComponent(android.graphics.Color.WHITE, 204)); // 80% 不透明度
                 } else {
                     // 恢复默认字体颜色
                     try {
@@ -952,9 +1069,16 @@ public class AssetsFragment extends Fragment {
                         normalHolder.tvName.setTextColor(Color.BLACK);
                     }
 
+                    // 副标题使用次要文字颜色
+                    try {
+                        normalHolder.tvNote.setTextColor(context.getColor(R.color.text_secondary));
+                    } catch (Exception e) {
+                        normalHolder.tvNote.setTextColor(Color.parseColor("#888888"));
+                    }
+
                     if (item.type == 0) {
                         normalHolder.tvAmount.setTextColor(context.getColor(R.color.app_blue));
-                    } else if (item.type == 1) {
+                    } else if (item.type == 1 || item.type == 4) { // 分期(4)和负债一样显示绿色
                         normalHolder.tvAmount.setTextColor(context.getColor(R.color.expense_green));
                     } else {
                         normalHolder.tvAmount.setTextColor(context.getColor(R.color.income_red));
@@ -966,8 +1090,6 @@ public class AssetsFragment extends Fragment {
                 if (bg != null) {
                     bg.mutate().setAlpha(isCustomBg ? 230 : 255);
                 }
-
-                normalHolder.tvNote.setVisibility(View.GONE);
             }
             else if (holder instanceof InvestmentVH) {
                 InvestmentVH invHolder = (InvestmentVH) holder;
@@ -1021,7 +1143,17 @@ public class AssetsFragment extends Fragment {
                 }
             }
 
-            holder.itemView.setOnClickListener(v -> listener.onClick(item));
+            holder.itemView.setOnClickListener(v -> {
+                // 【新增】分期类型点击跳转到详情页面
+                if (item.type == 4) {
+                    android.content.Intent intent = new android.content.Intent(
+                            v.getContext(), InstallmentDetailActivity.class);
+                    intent.putExtra("account_id", item.id);
+                    v.getContext().startActivity(intent);
+                } else {
+                    listener.onClick(item);
+                }
+            });
             holder.itemView.setOnLongClickListener(v -> {
                 longListener.onLongClick(item);
                 return true;

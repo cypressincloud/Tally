@@ -10,7 +10,7 @@ import androidx.annotation.NonNull;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 21, exportSchema = false)
+@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 22, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract TransactionDao transactionDao();
@@ -159,6 +159,16 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    // 【新增】21 -> 22 的迁移逻辑：添加分期相关字段
+    static final Migration MIGRATION_21_22 = new Migration(21, 22) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE asset_accounts ADD COLUMN totalInstallments INTEGER NOT NULL DEFAULT 0");
+            database.execSQL("ALTER TABLE asset_accounts ADD COLUMN installmentAmount REAL NOT NULL DEFAULT 0.0");
+            database.execSQL("ALTER TABLE asset_accounts ADD COLUMN paidInstallments TEXT DEFAULT '[]'");
+        }
+    };
+
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
@@ -173,7 +183,7 @@ public abstract class AppDatabase extends RoomDatabase {
                                     MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                                     MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
                                     MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
-                                    MIGRATION_20_21
+                                    MIGRATION_20_21, MIGRATION_21_22
                             )
                             .fallbackToDestructiveMigration()
                             .build();
