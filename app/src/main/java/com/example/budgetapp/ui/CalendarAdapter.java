@@ -392,7 +392,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
 
         holder.itemView.setOnClickListener(v -> {
             // 修改为 KEYBOARD_TAP (模拟键盘敲击的清脆感)
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             listener.onDateClick(date);
         });
     }

@@ -91,7 +91,7 @@ public double getTotalAmount() {
     
     <EditText
         android:id="@+id/et_installment_name"
-        android:hint="分期对象（如：花呗、信用卡）" />
+        android:hint="分期对象" />
     
     <EditText
         android:id="@+id/et_total_installments"

@@ -177,7 +177,7 @@ public class QuickAddTileService extends TileService {
                 updateDotUi.run();
 
                 ivExcludeBudget.setOnClickListener(v -> {
-                    v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
                     isExcludedFromBudget[0] = !isExcludedFromBudget[0];
                     updateDotUi.run();
                     Toast.makeText(this, isExcludedFromBudget[0] ? "该笔账单将不计入预算" : "该笔账单正常计入预算", Toast.LENGTH_SHORT).show();

@@ -311,7 +311,7 @@ public class RecordFragment extends Fragment {
         FloatingActionButton btnQuickRecord = view.findViewById(R.id.btn_quick_record);
         if (btnQuickRecord != null) {
             btnQuickRecord.setOnClickListener(v -> {
-                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
                 SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
                 int quickMode = prefs.getInt("quick_record_mode", 0);
                 if (quickMode == 1) {
@@ -334,7 +334,7 @@ public class RecordFragment extends Fragment {
         btnQuickRecord.setOnLongClickListener(v -> {
             AiConfig config = AiConfig.load(requireContext());
             if (config.isEnabledAndReady()) {
-                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                // 移除显式振动调用，使用系统默认的长按振动反馈（与统计标签长按一致）
                 startActivity(new Intent(requireContext(), AiChatActivity.class));
                 return true;
             } else {
@@ -426,7 +426,7 @@ public class RecordFragment extends Fragment {
         });
 
         tvMonthTitle.setOnClickListener(v -> {
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             showCustomDatePicker();
         });
 
@@ -751,7 +751,7 @@ public class RecordFragment extends Fragment {
         npDay.setValue(curDay);
 
         NumberPicker.OnValueChangeListener dateChangeListener = (picker, oldVal, newVal) -> {
-            picker.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            picker.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             int y = npYear.getValue();
             int m = npMonth.getValue();
             int newMaxDays = YearMonth.of(y, m).lengthOfMonth();
@@ -772,7 +772,7 @@ public class RecordFragment extends Fragment {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnConfirm.setOnClickListener(v -> {
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             int year = npYear.getValue();
             int month = npMonth.getValue();
             int day = npDay.getValue();
@@ -1601,7 +1601,7 @@ public class RecordFragment extends Fragment {
         // 【修改】RadioGroup 切换监听逻辑，加入震动反馈与动态显示隐藏
         rgType.setOnCheckedChangeListener((g, id) -> {
             // 触发清脆震动反馈
-            g.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            g.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
 
             if (id == R.id.rb_liability || id == R.id.rb_lend) {
                 // 选择负债或借出时，显示对象输入框，隐藏分类选择
@@ -1761,7 +1761,7 @@ public class RecordFragment extends Fragment {
         }
 
         btnSave.setOnClickListener(v -> {
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
 
             String amountStr = etAmount.getText().toString();
             if (!amountStr.isEmpty()) {

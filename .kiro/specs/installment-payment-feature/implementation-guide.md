@@ -148,7 +148,7 @@ Runnable updateLabels = () -> {
         amountHint = "借出金额";
     } else if (selectedPosition == 4) { // 分期
         titleSuffix = "分期";
-        nameHint = "分期对象（如：花呗、信用卡）";
+        nameHint = "分期对象";
         amountHint = "";
         layoutInstallment.setVisibility(View.VISIBLE);
         etAmount.setVisibility(View.GONE); // 隐藏普通金额输入

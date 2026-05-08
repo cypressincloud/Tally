@@ -234,7 +234,7 @@ public class InstallmentDetailActivity extends AppCompatActivity {
 
         // 回显当前数据
         etName.setText(account.name);
-        etName.setHint("分期对象（如：花呗、信用卡）");
+        etName.setHint("分期对象");
         etTotalInstallments.setText(String.valueOf(account.totalInstallments));
         etInstallmentAmount.setText(String.format("%.2f", account.installmentAmount));
 
@@ -421,7 +421,7 @@ public class InstallmentDetailActivity extends AppCompatActivity {
 
             holder.itemView.setOnClickListener(v -> {
                 // 添加触摸振动反馈
-                v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
                 listener.onPeriodClick(period);
             });
         }

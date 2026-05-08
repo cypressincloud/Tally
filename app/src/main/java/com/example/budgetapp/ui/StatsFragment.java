@@ -960,17 +960,17 @@ public class StatsFragment extends Fragment {
         });
 
         btnPrev.setOnClickListener(v -> {
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); // 增加震动反馈
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK); // 增加震动反馈
             changeDate(-1);
         });
 
         btnNext.setOnClickListener(v -> {
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); // 增加震动反馈
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK); // 增加震动反馈
             changeDate(1);
         });
         tvDateRange.setOnClickListener(v -> {
             // 添加 CLOCK_TICK 清脆振动反馈
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             showCustomDatePicker();
         });
     }
@@ -1105,7 +1105,7 @@ public class StatsFragment extends Fragment {
         npDay.setValue(curDay);
         NumberPicker.OnValueChangeListener dateChangeListener = (picker, oldVal, newVal) -> {
             // 新增：在数值发生变化（即滚动）时触发清脆的滴答振动
-            picker.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            picker.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
 
             int y = npYear.getValue();
             int m = npMonth.getValue();

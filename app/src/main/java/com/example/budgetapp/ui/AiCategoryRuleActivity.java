@@ -246,7 +246,7 @@ public class AiCategoryRuleActivity extends AppCompatActivity {
         // RadioGroup切换监听
         rgType.setOnCheckedChangeListener((group, checkedId) -> {
             // 触发震动反馈
-            group.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            group.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             
             isExpense[0] = (checkedId == R.id.rb_expense);
             

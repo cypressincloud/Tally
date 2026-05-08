@@ -158,7 +158,7 @@ public class AiChatActivity extends AppCompatActivity {
                 switch (event.getAction()) {
                     case android.view.MotionEvent.ACTION_DOWN:
                         v.getParent().requestDisallowInterceptTouchEvent(true);
-                        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                        v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
                         startY = event.getY();
                         // 显示遮罩层
                         voiceRecordingOverlay.setVisibility(View.VISIBLE);

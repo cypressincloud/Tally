@@ -109,7 +109,7 @@ public class AssetsFragment extends Fragment {
 
         view.findViewById(R.id.fab_add_asset).setOnClickListener(v -> {
             // 添加触摸振动反馈
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             showAddOrEditDialog(null, currentType);
         });
 
@@ -117,7 +117,7 @@ public class AssetsFragment extends Fragment {
         View fabTransfer = view.findViewById(R.id.fab_transfer_asset);
         if (fabTransfer != null) {
             fabTransfer.setOnClickListener(v -> {
-                v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
                 if (allAccounts == null || allAccounts.size() < 2) {
                     Toast.makeText(getContext(), "至少需要两个资产账户才能进行转移", Toast.LENGTH_SHORT).show();
                     return;
@@ -128,7 +128,7 @@ public class AssetsFragment extends Fragment {
 
         // 新增转移按钮监听
         view.findViewById(R.id.fab_transfer_asset).setOnClickListener(v -> {
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             if (allAccounts == null || allAccounts.size() < 2) {
                 Toast.makeText(getContext(), "至少需要两个资产账户才能进行转移", Toast.LENGTH_SHORT).show();
                 return;
@@ -767,7 +767,7 @@ public class AssetsFragment extends Fragment {
                 amountHint = "借出金额";
             } else if (selectedPosition == 4) { // 分期
                 titleSuffix = "分期";
-                nameHint = "分期对象（如：花呗、信用卡）";
+                nameHint = "分期对象";
                 amountHint = "";
                 layoutInstallment.setVisibility(View.VISIBLE);
                 etAmount.setVisibility(View.GONE); // 隐藏普通金额输入

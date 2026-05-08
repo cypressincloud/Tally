@@ -203,7 +203,7 @@ public class DetailsFragment extends Fragment {
         tvDateRange = view.findViewById(R.id.tv_current_date_range);
 
         tvDateRange.setOnClickListener(v -> {
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             showCustomDatePicker();
         });
 
@@ -357,7 +357,7 @@ public class DetailsFragment extends Fragment {
         npDay.setValue(curDay);
 
         NumberPicker.OnValueChangeListener dateChangeListener = (picker, oldVal, newVal) -> {
-            picker.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            picker.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             int y = npYear.getValue();
             int m = npMonth.getValue();
             int newMaxDays = java.time.YearMonth.of(y, m).lengthOfMonth();
@@ -377,7 +377,7 @@ public class DetailsFragment extends Fragment {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnConfirm.setOnClickListener(v -> {
-            v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
             int year = npYear.getValue();
             int month = npMonth.getValue();
             int day = npDay.getValue();
