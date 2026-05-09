@@ -113,7 +113,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:padding="20dp"
-                    android:text="自动资产设置"
+                    android:text="资产设置"
                     android:textSize="16sp"
                     android:background="?android:attr/selectableItemBackground"
                     android:textColor="?android:attr/textColorPrimary"/>

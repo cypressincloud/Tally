@@ -37,12 +37,16 @@ import java.util.Map;
 public class AutoAssetActivity extends AppCompatActivity {
 
     private SwitchCompat switchAutoAsset;
+    private SwitchCompat switchShowAllAssets;
     private RecyclerView rvRules;
     private RuleAdapter adapter;
     private List<AutoAssetManager.AssetRule> ruleList = new ArrayList<>();
 
     private List<AssetAccount> cachedAssets = new ArrayList<>();
     private List<AppItem> cachedApps = new ArrayList<>();
+    
+    private static final String PREF_NAME = "asset_display_prefs";
+    private static final String KEY_SHOW_ALL_ASSETS = "show_all_assets_in_total";
 
     private static class AppItem {
         String packageName;
@@ -90,6 +94,16 @@ public class AutoAssetActivity extends AppCompatActivity {
         switchAutoAsset.setOnCheckedChangeListener((v, isChecked) -> {
             AutoAssetManager.setEnabled(this, isChecked);
             String msg = isChecked ? "已开启自动资产关联" : "已关闭自动资产关联";
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+        });
+
+        // 初始化"总资产显示所有资产"开关
+        switchShowAllAssets = findViewById(R.id.switchShowAllAssets);
+        android.content.SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        switchShowAllAssets.setChecked(prefs.getBoolean(KEY_SHOW_ALL_ASSETS, false));
+        switchShowAllAssets.setOnCheckedChangeListener((v, isChecked) -> {
+            prefs.edit().putBoolean(KEY_SHOW_ALL_ASSETS, isChecked).apply();
+            String msg = isChecked ? "总资产将显示所有类型资产" : "总资产将仅显示勾选项";
             Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         });
 

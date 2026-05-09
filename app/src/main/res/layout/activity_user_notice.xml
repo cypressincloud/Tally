@@ -79,7 +79,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="• 记账助手设置：&quot;开启屏幕自动记账&quot;关闭，&quot;开启资产功能&quot;开启\n• 自动资产设置：&quot;开启自动资产&quot;关闭\n• 分类预设管理：&quot;开启二级分类&quot;关闭\n• 记账界面默认显示：&quot;结余&quot;\n• 货币单位设置：&quot;开启货币单位&quot;关闭，默认&quot;￥&quot;\n• 照片备注设置：&quot;开启照片备份&quot;关闭。备份为纯本地存储（原理是复制一份至指定路径），推荐新建以&quot;.&quot;开头（如 .Tally）的空白文件夹作为存储路径\n• WebDAV 云备份：&quot;自动同步&quot;关闭。需配置 WebDAV 服务器地址、用户名和密码，支持坚果云等网盘服务。开启自动同步后，每次记账、修改资产、修改分类等操作都会自动备份到云端\n• AI 记账配置：&quot;启用 AI 记账&quot;关闭。需配置兼容 OpenAI 的 API 服务（如 DeepSeek、通义千问等），支持文本、图片、语音识别。可设置 AI 分类关键字规则，自动应用分类\n• 主题设置：&quot;跟随系统&quot;\n• 极简模式：关闭\n\n💡 隐藏彩蛋：长按当前界面左上角的&quot;用户须知&quot;标题，可以取消激活高级设置。"
+                    android:text="• 记账助手设置：&quot;开启屏幕自动记账&quot;关闭，&quot;开启资产功能&quot;开启\n• 资产设置：&quot;开启自动资产&quot;关闭\n• 分类预设管理：&quot;开启二级分类&quot;关闭\n• 记账界面默认显示：&quot;结余&quot;\n• 货币单位设置：&quot;开启货币单位&quot;关闭，默认&quot;￥&quot;\n• 照片备注设置：&quot;开启照片备份&quot;关闭。备份为纯本地存储（原理是复制一份至指定路径），推荐新建以&quot;.&quot;开头（如 .Tally）的空白文件夹作为存储路径\n• WebDAV 云备份：&quot;自动同步&quot;关闭。需配置 WebDAV 服务器地址、用户名和密码，支持坚果云等网盘服务。开启自动同步后，每次记账、修改资产、修改分类等操作都会自动备份到云端\n• AI 记账配置：&quot;启用 AI 记账&quot;关闭。需配置兼容 OpenAI 的 API 服务（如 DeepSeek、通义千问等），支持文本、图片、语音识别。可设置 AI 分类关键字规则，自动应用分类\n• 主题设置：&quot;跟随系统&quot;\n• 极简模式：关闭\n\n💡 隐藏彩蛋：长按当前界面左上角的&quot;用户须知&quot;标题，可以取消激活高级设置。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="8dp"
                     android:layout_marginTop="12dp"
@@ -148,7 +148,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Tally的自动记账功能依赖于无障碍权限，下面的原理适用于&quot;记账助手设置&quot;、&quot;自动记账设置&quot;：\n\n• 触发机制：只要在指定的应用内的屏幕出现了设定的关键字，就会触发自动记账（弹出悬浮窗、自动输入对应的金额）。例如，在&quot;微信&quot;这个应用设定关键字&quot;微信&quot;，那么每次打开&quot;微信&quot;都会触发自动记账。\n• 注意事项：无障碍不识别图片。\n• 资产关联：&quot;自动资产设置&quot;是对自动记账功能的补充，如果没有设定相关的自动资产，那么记账会关联默认资产（长按资产设置默认资产）。"
+                    android:text="Tally的自动记账功能依赖于无障碍权限，下面的原理适用于&quot;记账助手设置&quot;、&quot;自动记账设置&quot;：\n\n• 触发机制：只要在指定的应用内的屏幕出现了设定的关键字，就会触发自动记账（弹出悬浮窗、自动输入对应的金额）。例如，在&quot;微信&quot;这个应用设定关键字&quot;微信&quot;，那么每次打开&quot;微信&quot;都会触发自动记账。\n• 注意事项：无障碍不识别图片。\n• 资产关联：&quot;资产设置&quot;是对自动记账功能的补充，如果没有设定相关的自动资产，那么记账会关联默认资产（长按资产设置默认资产）。"
                     android:textSize="15sp"
                     android:lineSpacingExtra="8dp"
                     android:layout_marginTop="12dp"

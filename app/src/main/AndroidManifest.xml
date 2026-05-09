@@ -149,7 +149,7 @@
             android:exported="false"/>
 
         <activity android:name=".ui.AutoAssetActivity"
-            android:label="自动资产设置"
+            android:label="资产设置"
             android:exported="false"
             android:theme="@style/Theme.BudgetApp" />
 
