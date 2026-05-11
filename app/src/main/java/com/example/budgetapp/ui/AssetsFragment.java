@@ -320,10 +320,6 @@ public class AssetsFragment extends Fragment {
             double totalLiability = 0;
             double totalLent = 0;
 
-            // 读取"总资产显示所有资产"开关状态
-            SharedPreferences assetPrefs = requireContext().getSharedPreferences("asset_display_prefs", Context.MODE_PRIVATE);
-            boolean showAllAssets = assetPrefs.getBoolean("show_all_assets_in_total", false);
-
             for (AssetAccount acc : allAccounts) {
                 // 1. 统计各自的分类总额（不论是否计入总资产，面板上的负债/借出总额应如实显示）
                 if (acc.type == 1 || acc.type == 4) {
@@ -332,26 +328,14 @@ public class AssetsFragment extends Fragment {
                     totalLent += acc.amount;
                 }
 
-                // 2. 统计顶部的大字"总资产"
-                if (showAllAssets) {
-                    // 开关开启：显示所有类型资产
+                // 2. 统计顶部的大字"总资产"（根据是否勾选了计入总资产来加减）
+                if (acc.isIncludedInTotal) {
                     if (acc.type == 0 || acc.type == 3) {
                         totalAsset += acc.amount; // 资产和理财
                     } else if (acc.type == 2) {
                         totalAsset += acc.amount; // 借出
                     } else if (acc.type == 1 || acc.type == 4) {
                         totalAsset -= acc.amount; // 负债和分期（减少总资产）
-                    }
-                } else {
-                    // 开关关闭：仅显示勾选了"计入总资产"的项
-                    if (acc.isIncludedInTotal) {
-                        if (acc.type == 0 || acc.type == 3) {
-                            totalAsset += acc.amount; // 资产和理财
-                        } else if (acc.type == 2) {
-                            totalAsset += acc.amount; // 借出
-                        } else if (acc.type == 1 || acc.type == 4) {
-                            totalAsset -= acc.amount; // 负债和分期（减少总资产）
-                        }
                     }
                 }
             }
@@ -379,30 +363,16 @@ public class AssetsFragment extends Fragment {
                 }
 
                 // 2. 统计顶部的大字“总资产”
-                if (showAllAssets) {
-                    // 开关开启：显示所有类型资产
-                    double currentTotal = assetMap.getOrDefault(symbol, 0.0);
-                    if (acc.type == 0 || acc.type == 3) {
-                        currentTotal += acc.amount; // 资产和理财
-                    } else if (acc.type == 2) {
-                        currentTotal += acc.amount; // 借出
-                    } else if (acc.type == 1 || acc.type == 4) {
-                        currentTotal -= acc.amount; // 负债和分期
-                    }
-                    assetMap.put(symbol, currentTotal);
-                } else {
-                    // 开关关闭：仅显示勾选了"计入总资产"的项
-                    if (acc.isIncludedInTotal) {
-                        double currentTotal = assetMap.getOrDefault(symbol, 0.0);
-                        if (acc.type == 0 || acc.type == 3) {
-                            currentTotal += acc.amount; // 资产和理财
-                        } else if (acc.type == 2) {
-                            currentTotal += acc.amount; // 借出
-                        } else if (acc.type == 1 || acc.type == 4) {
-                            currentTotal -= acc.amount; // 负债和分期
-                        }
-                        assetMap.put(symbol, currentTotal);
-                    }
+                if (acc.isIncludedInTotal) {
+                double currentTotal = assetMap.getOrDefault(symbol, 0.0);
+                if (acc.type == 0 || acc.type == 3) {
+                    currentTotal += acc.amount; // 资产和理财
+                } else if (acc.type == 2) {
+                    currentTotal += acc.amount; // 借出
+                } else if (acc.type == 1 || acc.type == 4) {
+                    currentTotal -= acc.amount; // 负债和分期
+                }
+                assetMap.put(symbol, currentTotal);
                 }
             }
 
@@ -416,7 +386,7 @@ public class AssetsFragment extends Fragment {
             tvTotalAssets.setText(formatMultiCurrency(assetMap));
             tvTotalLiability.setText(formatMultiCurrency(liabilityMap));
             tvTotalLent.setText(formatMultiCurrency(lentMap));
-        }
+                }
 
         refreshList();
     }
@@ -432,18 +402,29 @@ public class AssetsFragment extends Fragment {
     }
 
     private void refreshList() {
+        // 读取"总资产显示所有资产"开关状态
+        SharedPreferences assetPrefs = requireContext().getSharedPreferences("asset_display_prefs", Context.MODE_PRIVATE);
+        boolean showAllAssets = assetPrefs.getBoolean("show_all_assets_in_total", false);
+        
         List<AssetAccount> filteredList = new ArrayList<>();
-        for (AssetAccount acc : allAccounts) {
-            // 当选中资产(0)时，同时显示普通资产(0)和理财(3)
-            if (currentType == 0 && (acc.type == 0 || acc.type == 3)) {
-                filteredList.add(acc);
-            } 
-            // 【新增】当选中负债(1)时，同时显示普通负债(1)和分期(4)
-            else if (currentType == 1 && (acc.type == 1 || acc.type == 4)) {
-                filteredList.add(acc);
-            }
-            else if (acc.type == currentType) {
-                filteredList.add(acc);
+        
+        if (currentType == 0 && showAllAssets) {
+            // 开关开启时，在"我的资产"页面显示所有类型的资产
+            filteredList.addAll(allAccounts);
+        } else {
+            // 开关关闭时，按原有逻辑筛选
+            for (AssetAccount acc : allAccounts) {
+                // 当选中资产(0)时，同时显示普通资产(0)和理财(3)
+                if (currentType == 0 && (acc.type == 0 || acc.type == 3)) {
+                    filteredList.add(acc);
+                } 
+                // 【新增】当选中负债(1)时，同时显示普通负债(1)和分期(4)
+                else if (currentType == 1 && (acc.type == 1 || acc.type == 4)) {
+                    filteredList.add(acc);
+                }
+                else if (acc.type == currentType) {
+                    filteredList.add(acc);
+                }
             }
         }
 

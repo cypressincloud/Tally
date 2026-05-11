@@ -103,7 +103,7 @@ public class AutoAssetActivity extends AppCompatActivity {
         switchShowAllAssets.setChecked(prefs.getBoolean(KEY_SHOW_ALL_ASSETS, false));
         switchShowAllAssets.setOnCheckedChangeListener((v, isChecked) -> {
             prefs.edit().putBoolean(KEY_SHOW_ALL_ASSETS, isChecked).apply();
-            String msg = isChecked ? "总资产将显示所有类型资产" : "总资产将仅显示勾选项";
+            String msg = isChecked ? "总资产将显示所有类型资产" : "总资产将仅显示资产";
             Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         });
 
