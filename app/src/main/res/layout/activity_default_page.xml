@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/bar_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:paddingBottom="24dp"
+        android:paddingTop="8dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="应用默认页面设置"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"/>
+    </LinearLayout>
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="20dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="明细模块显示快捷按钮"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="显示'记一笔'按钮，长按进入AI记账助手"
+                    android:textSize="12sp"
+                    android:textColor="#888888"
+                    android:layout_marginTop="4dp"/>
+            </LinearLayout>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switchDetailsQuickButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:thumb="@drawable/switch_thumb_custom"
+                app:track="@drawable/switch_track_custom"
+                app:showText="false"
+                app:thumbTint="@null"
+                app:trackTint="@null"
+                android:background="@null"/>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@color/white">
+
+        <RadioGroup
+            android:id="@+id/radioGroupDefaultPage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <RadioButton
+                android:id="@+id/radioRecord"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="记账"
+                android:textSize="16sp"
+                android:padding="12dp"
+                android:textColor="?android:attr/textColorPrimary"/>
+
+            <RadioButton
+                android:id="@+id/radioDetails"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="明细"
+                android:textSize="16sp"
+                android:padding="12dp"
+                android:textColor="?android:attr/textColorPrimary"/>
+
+            <RadioButton
+                android:id="@+id/radioBudget"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="预算"
+                android:textSize="16sp"
+                android:padding="12dp"
+                android:textColor="?android:attr/textColorPrimary"/>
+
+            <RadioButton
+                android:id="@+id/radioAssets"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="资产"
+                android:textSize="16sp"
+                android:padding="12dp"
+                android:textColor="?android:attr/textColorPrimary"/>
+
+            <RadioButton
+                android:id="@+id/radioStats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="统计"
+                android:textSize="16sp"
+                android:padding="12dp"
+                android:textColor="?android:attr/textColorPrimary"/>
+
+        </RadioGroup>
+    </androidx.cardview.widget.CardView>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="选择应用启动时默认显示的页面"
+        android:textSize="12sp"
+        android:textColor="#888888"
+        android:layout_marginTop="16dp"
+        android:gravity="center"/>
+
+</LinearLayout>

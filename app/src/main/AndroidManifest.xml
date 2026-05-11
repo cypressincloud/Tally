@@ -153,6 +153,11 @@
             android:exported="false"
             android:theme="@style/Theme.BudgetApp" />
 
+        <activity android:name=".ui.DefaultPageActivity"
+            android:label="应用默认页面设置"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
         <activity
             android:name=".ui.YearCalendarActivity"
             android:label="年度账单"

@@ -195,6 +195,33 @@ public class MainActivity extends AppCompatActivity {
             NavController navController = navHostFragment.getNavController();
             NavigationUI.setupWithNavController(bottomNav, navController);
 
+            // 【新增】读取默认页面设置并跳转
+            int defaultPage = prefs.getInt("default_page", 0); // 0 = 记账
+            int targetNavId = R.id.nav_record; // 默认记账页面
+            
+            switch (defaultPage) {
+                case 0: // 记账
+                    targetNavId = R.id.nav_record;
+                    break;
+                case 1: // 明细
+                    targetNavId = R.id.nav_details;
+                    break;
+                case 2: // 预算
+                    targetNavId = R.id.nav_budget;
+                    break;
+                case 3: // 资产
+                    targetNavId = R.id.nav_assets;
+                    break;
+                case 4: // 统计
+                    targetNavId = R.id.nav_stats;
+                    break;
+            }
+            
+            // 如果不是默认的记账页面，则跳转到指定页面
+            if (targetNavId != R.id.nav_record) {
+                navController.navigate(targetNavId);
+            }
+
             bottomNav.setOnItemSelectedListener(item -> {
                 // 添加触摸振动反馈
                 bottomNav.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
@@ -507,5 +534,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
     // ==============================================================================
+
+    /**
+     * 切换到记账页面（供其他 Fragment 调用）
+     */
+    public void switchToRecordPage() {
+        BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_record);
+        }
+    }
 
 }
