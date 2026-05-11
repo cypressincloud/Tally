@@ -87,6 +87,16 @@ public final class AssetIconHelper {
         view.findViewById(R.id.btn_preview_svg).setOnClickListener(v ->
                 updatePreview(ivPreview, tvPreviewState, etSvg.getText().toString()));
 
+        view.findViewById(R.id.btn_get_icon).setOnClickListener(v -> {
+            try {
+                android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                intent.setData(android.net.Uri.parse("https://www.iconfont.cn/?spm=a313x.user_detail.i3.d4d0a486a.25553a81auY3Jo"));
+                context.startActivity(intent);
+            } catch (Exception e) {
+                Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show();
+            }
+        });
+
         view.findViewById(R.id.btn_clear_svg).setOnClickListener(v -> {
             etSvg.setText("");
             updatePreview(ivPreview, tvPreviewState, "");
