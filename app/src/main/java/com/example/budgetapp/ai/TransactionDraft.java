@@ -17,6 +17,14 @@ public class TransactionDraft {
     public String currencySymbol;
     public boolean excludeFromBudget;
     public String photoPath; // 截图保存路径
+    
+    // 转账相关字段
+    public boolean isTransfer; // 是否为转账
+    public String fromAsset; // 转出资产名称（AI识别的原始文本）
+    public String toAsset; // 转入资产名称（AI识别的原始文本）
+    public int fromAssetId; // 转出资产ID
+    public int toAssetId; // 转入资产ID
+    public double discount; // 优惠金额（如还款优惠）
 
     public Transaction toTransaction() {
         Transaction transaction = new Transaction();

@@ -18,6 +18,10 @@ public class TransactionDraftMapper {
 
     public static TransactionDraft fromJson(Context context, JSONObject object) {
         TransactionDraft draft = new TransactionDraft();
+        
+        // 检查是否为转账
+        draft.isTransfer = object.optBoolean("isTransfer", false);
+        
         draft.type = normalizeType(object.opt("type"));
         draft.amount = Math.max(0d, object.optDouble("amount", 0d));
         draft.note = firstNonEmpty(
@@ -52,36 +56,69 @@ public class TransactionDraftMapper {
                 ? prefs.getString("default_currency_symbol", "¥")
                 : "¥";
 
-        String rawCategory = firstNonEmpty(
-                object.optString("category", ""),
-                object.optString("mainCategory", ""),
-                object.optString("primaryCategory", "")
-        );
-        String rawSubCategory = firstNonEmpty(
-                object.optString("subCategory", ""),
-                object.optString("subcategory", ""),
-                object.optString("secondaryCategory", "")
-        );
-        String rawAsset = firstNonEmpty(
-                object.optString("asset", ""),
-                object.optString("assetName", ""),
-                object.optString("account", ""),
-                object.optString("paymentAccount", ""),
-                object.optString("paymentMethod", ""),
-                object.optString("wallet", ""),
-                object.optString("sourceAsset", ""),
-                object.optString("destinationAsset", "")
-        );
+        // 处理转账相关字段
+        if (draft.isTransfer) {
+            draft.fromAsset = firstNonEmpty(
+                    object.optString("fromAsset", ""),
+                    object.optString("sourceAsset", ""),
+                    object.optString("from", "")
+            );
+            draft.toAsset = firstNonEmpty(
+                    object.optString("toAsset", ""),
+                    object.optString("destinationAsset", ""),
+                    object.optString("to", "")
+            );
+            draft.discount = Math.max(0d, object.optDouble("discount", 0d));
+            
+            // 解析转出和转入资产ID
+            draft.fromAssetId = resolveAssetId(context, draft.fromAsset, "");
+            draft.toAssetId = resolveAssetId(context, draft.toAsset, "");
+            
+            // 转账类型强制为2，分类为"资产互转"
+            draft.type = 2;
+            draft.category = "资产互转";
+            draft.subCategory = "";
+            
+            // 如果note为空，自动生成
+            if (draft.note.isEmpty() && !draft.fromAsset.isEmpty() && !draft.toAsset.isEmpty()) {
+                draft.note = draft.fromAsset + " -> " + draft.toAsset;
+            }
+            
+            // 转账不关联单一资产账户
+            draft.assetId = 0;
+        } else {
+            // 普通记账逻辑
+            String rawCategory = firstNonEmpty(
+                    object.optString("category", ""),
+                    object.optString("mainCategory", ""),
+                    object.optString("primaryCategory", "")
+            );
+            String rawSubCategory = firstNonEmpty(
+                    object.optString("subCategory", ""),
+                    object.optString("subcategory", ""),
+                    object.optString("secondaryCategory", "")
+            );
+            String rawAsset = firstNonEmpty(
+                    object.optString("asset", ""),
+                    object.optString("assetName", ""),
+                    object.optString("account", ""),
+                    object.optString("paymentAccount", ""),
+                    object.optString("paymentMethod", ""),
+                    object.optString("wallet", ""),
+                    object.optString("sourceAsset", ""),
+                    object.optString("destinationAsset", "")
+            );
 
-        normalizeCategories(context, draft, rawCategory, rawSubCategory);
-        draft.assetId = resolveAssetId(context, rawAsset, draft.note);
+            normalizeCategories(context, draft, rawCategory, rawSubCategory);
+            draft.assetId = resolveAssetId(context, rawAsset, draft.note);
 
-        if (draft.note.isEmpty()) {
-            draft.note = firstNonEmpty(rawSubCategory, rawCategory, rawAsset);
+            if (draft.note.isEmpty()) {
+                draft.note = firstNonEmpty(rawSubCategory, rawCategory, rawAsset);
+            }
+            
+            // 应用AI分类关键字规则
+            com.example.budgetapp.util.AiCategoryRuleManager.applyRules(context, draft);
         }
-        
-        // 应用AI分类关键字规则
-        com.example.budgetapp.util.AiCategoryRuleManager.applyRules(context, draft);
         
         return draft;
     }

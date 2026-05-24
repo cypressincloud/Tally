@@ -22,6 +22,25 @@ public class PromptTemplate {
         builder.append("\n4. type 只能是 0 或 1。0 表示支出，1 表示收入。");
         builder.append("\n5. amount 必须是正数纯数字，不要带负号、货币符号、单位或逗号。");
         builder.append("\n6. 不要返回 null。无法判断的字符串字段使用空字符串。");
+        builder.append("\n7. 如果是转账操作，必须额外包含：isTransfer、fromAsset、toAsset、discount 字段。");
+
+        builder.append("\n\n【转账识别规则】");
+        builder.append("\n1. 如果用户描述包含\"转账\"\"转\"\"还款\"\"还\"\"转入\"\"转出\"\"互转\"等关键词，且明确提到两个资产账户，应识别为转账。");
+        builder.append("\n2. 转账示例：");
+        builder.append("\n   - \"微信零钱转20到中国银行\" → isTransfer=true, fromAsset=\"微信零钱\", toAsset=\"中国银行\", amount=20");
+        builder.append("\n   - \"中国银行还花呗20\" → isTransfer=true, fromAsset=\"中国银行\", toAsset=\"花呗\", amount=20");
+        builder.append("\n   - \"支付宝转100到微信\" → isTransfer=true, fromAsset=\"支付宝\", toAsset=\"微信\", amount=100");
+        builder.append("\n   - \"花呗还信用卡500\" → isTransfer=true, fromAsset=\"花呗\", toAsset=\"信用卡\", amount=500");
+        builder.append("\n3. 转账的 JSON 格式：");
+        builder.append("\n   {\\\"type\\\":2,\\\"amount\\\":20.00,\\\"category\\\":\\\"资产互转\\\",\\\"subCategory\\\":\\\"\\\",\\\"note\\\":\\\"微信零钱 -> 中国银行\\\",");
+        builder.append("\n    \\\"asset\\\":\\\"\\\",\\\"time\\\":\\\"2026-05-24 10:30\\\",\\\"isTransfer\\\":true,\\\"fromAsset\\\":\\\"微信零钱\\\",\\\"toAsset\\\":\\\"中国银行\\\",\\\"discount\\\":0}");
+        builder.append("\n4. 转账时 type 必须为 2，category 必须为\\\"资产互转\\\"。");
+        builder.append("\n5. 转账的 note 格式为：\\\"转出资产 -> 转入资产\\\"。");
+        builder.append("\n6. fromAsset 和 toAsset 应尽量匹配给定的资产账户名称。");
+        builder.append("\n7. 如果提到优惠、减免、折扣，将优惠金额填入 discount 字段，amount 仍为转账目标金额。");
+        builder.append("\n8. 还款场景：从资产账户还负债账户，fromAsset 是资产，toAsset 是负债（如花呗、信用卡）。");
+        builder.append("\n9. 如果只提到一个账户和金额，没有明确转入/转出对象，不应识别为转账。");
+        builder.append("\n10. 转账不是普通收支，不要识别为购物、餐饮等分类。");
 
         builder.append("\n\n【多账单识别规则，必须严格遵守】");
         builder.append("\n1. 如果截图中出现多条交易记录、账单列表、订单列表、收支明细列表，每一行或每一个卡片都必须识别为一条独立账单。");

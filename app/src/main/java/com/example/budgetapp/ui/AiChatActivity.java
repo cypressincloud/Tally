@@ -953,6 +953,35 @@ public class AiChatActivity extends AppCompatActivity {
         }
 
         private void fillForm(TransactionDraft draft) {
+            // 转账类型特殊处理
+            if (draft.isTransfer) {
+                // 隐藏普通记账的UI元素
+                rgType.setVisibility(View.GONE);
+                rvCategory.setVisibility(View.GONE);
+                spAsset.setVisibility(View.GONE);
+                cbExcludeBudget.setVisibility(View.GONE);
+                
+                // 显示金额和备注
+                etAmount.setText(String.format(Locale.getDefault(), "%.2f", draft.amount));
+                etNote.setText(draft.note == null ? "" : draft.note);
+                etNote.setHint("转账备注（可选）");
+                
+                // TODO: 添加转出/转入资产选择器
+                // 暂时在备注中显示提示
+                if (draft.note == null || draft.note.isEmpty()) {
+                    etNote.setText(draft.fromAsset + " -> " + draft.toAsset);
+                }
+                
+                return;
+            }
+            
+            // 普通记账逻辑
+            rgType.setVisibility(View.VISIBLE);
+            rvCategory.setVisibility(View.VISIBLE);
+            spAsset.setVisibility(View.VISIBLE);
+            cbExcludeBudget.setVisibility(View.VISIBLE);
+            etNote.setHint("添加备注");
+            
             if (draft.type == 1) rgType.check(R.id.rb_income);
             else rgType.check(R.id.rb_expense);
 
@@ -1067,21 +1096,39 @@ public class AiChatActivity extends AppCompatActivity {
 
         private void bindSummary() {
             TransactionDraft draft = model.draft;
-            tvTitle.setText(getTypeLabel(draft.type) + " " + draft.currencySymbol + String.format(Locale.getDefault(), "%.2f", draft.amount));
+            
+            // 转账类型特殊显示
+            if (draft.isTransfer) {
+                tvTitle.setText("转账 " + draft.currencySymbol + String.format(Locale.getDefault(), "%.2f", draft.amount));
+                
+                StringBuilder detailBuilder = new StringBuilder();
+                detailBuilder.append("转出: ").append(getAssetName(assets, draft.fromAssetId));
+                detailBuilder.append("\n转入: ").append(getAssetName(assets, draft.toAssetId));
+                if (draft.discount > 0) {
+                    detailBuilder.append("\n优惠: ").append(draft.currencySymbol).append(String.format(Locale.getDefault(), "%.2f", draft.discount));
+                }
+                if (draft.note != null && !draft.note.trim().isEmpty()) {
+                    detailBuilder.append("\n备注: ").append(draft.note.trim());
+                }
+                tvDetail.setText(detailBuilder.toString());
+            } else {
+                // 普通记账显示
+                tvTitle.setText(getTypeLabel(draft.type) + " " + draft.currencySymbol + String.format(Locale.getDefault(), "%.2f", draft.amount));
 
-            String categoryLine = draft.category;
-            if (draft.subCategory != null && !draft.subCategory.trim().isEmpty()) {
-                categoryLine += " / " + draft.subCategory.trim();
-            }
+                String categoryLine = draft.category;
+                if (draft.subCategory != null && !draft.subCategory.trim().isEmpty()) {
+                    categoryLine += " / " + draft.subCategory.trim();
+                }
 
-            StringBuilder detailBuilder = new StringBuilder();
-            detailBuilder.append("分类: ").append(categoryLine);
-            detailBuilder.append("\n资产: ").append(getAssetName(assets, draft.assetId));
-            if (draft.note != null && !draft.note.trim().isEmpty()) {
-                detailBuilder.append("\n备注: ").append(draft.note.trim());
+                StringBuilder detailBuilder = new StringBuilder();
+                detailBuilder.append("分类: ").append(categoryLine);
+                detailBuilder.append("\n资产: ").append(getAssetName(assets, draft.assetId));
+                if (draft.note != null && !draft.note.trim().isEmpty()) {
+                    detailBuilder.append("\n备注: ").append(draft.note.trim());
+                }
+                detailBuilder.append("\n预算: ").append(draft.excludeFromBudget ? "不计入" : "计入");
+                tvDetail.setText(detailBuilder.toString());
             }
-            detailBuilder.append("\n预算: ").append(draft.excludeFromBudget ? "不计入" : "计入");
-            tvDetail.setText(detailBuilder.toString());
 
             tvStatus.setText(model.saved ? "已入账" : "待确认");
             tvStatus.setTextColor(getColor(model.saved ? R.color.expense_green : R.color.app_blue));
@@ -1118,12 +1165,44 @@ public class AiChatActivity extends AppCompatActivity {
             model.saved = true;
             model.editing = false;
 
-            // 【修改这里】：调用带有资产同步逻辑的方法
-            financeViewModel.addTransactionWithAssetSync(updatedDraft.toTransaction());
+            // 判断是否为转账
+            if (updatedDraft.isTransfer) {
+                // 转账逻辑：调用 transferAsset
+                if (updatedDraft.fromAssetId <= 0 || updatedDraft.toAssetId <= 0) {
+                    Toast.makeText(AiChatActivity.this, "转账需要指定转出和转入资产。", Toast.LENGTH_SHORT).show();
+                    model.saved = false;
+                    return;
+                }
+                
+                // 查找转出和转入资产对象
+                AssetAccount fromAccount = null;
+                AssetAccount toAccount = null;
+                for (AssetAccount asset : assets) {
+                    if (asset.id == updatedDraft.fromAssetId) {
+                        fromAccount = asset;
+                    }
+                    if (asset.id == updatedDraft.toAssetId) {
+                        toAccount = asset;
+                    }
+                }
+                
+                if (fromAccount == null || toAccount == null) {
+                    Toast.makeText(AiChatActivity.this, "找不到对应的资产账户。", Toast.LENGTH_SHORT).show();
+                    model.saved = false;
+                    return;
+                }
+                
+                // 执行转账
+                financeViewModel.transferAsset(fromAccount, toAccount, updatedDraft.amount, updatedDraft.discount, updatedDraft.note);
+                Toast.makeText(AiChatActivity.this, "转账已完成。", Toast.LENGTH_SHORT).show();
+            } else {
+                // 普通记账逻辑：调用带有资产同步逻辑的方法
+                financeViewModel.addTransactionWithAssetSync(updatedDraft.toTransaction());
+                Toast.makeText(AiChatActivity.this, "已保存这笔账单。", Toast.LENGTH_SHORT).show();
+            }
 
             bindSummary();
             updateEditorState();
-            Toast.makeText(AiChatActivity.this, "已保存这笔账单。", Toast.LENGTH_SHORT).show();
             // 【优化】：保存后不自动滚动到AI回复，让用户停留在当前卡片位置
             addMessage(ChatMessage.aiText("这笔我已经帮你入账了。"), false);
         }
@@ -1142,7 +1221,16 @@ public class AiChatActivity extends AppCompatActivity {
             }
 
             TransactionDraft draft = model.draft;
+            
+            // 转账类型：保持原有的转账信息
+            if (draft.isTransfer) {
+                draft.amount = amount;
+                draft.note = etNote.getText().toString().trim();
+                // 保持 fromAssetId, toAssetId, discount 等字段不变
+                return draft;
+            }
 
+            // 普通记账逻辑
             if (rgType != null) {
                 int checkedId = rgType.getCheckedRadioButtonId();
                 if (checkedId == R.id.rb_income) draft.type = 1;
