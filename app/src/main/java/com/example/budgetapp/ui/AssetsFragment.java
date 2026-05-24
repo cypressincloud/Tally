@@ -3,6 +3,7 @@ package com.example.budgetapp.ui;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -11,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
@@ -19,6 +21,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -27,9 +30,12 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.util.AssistantConfig;
+import com.example.budgetapp.util.AssetCategoryManager;
 import com.example.budgetapp.util.AssetIconHelper;
 import com.example.budgetapp.util.CurrencyUtils;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,9 +48,12 @@ public class AssetsFragment extends Fragment {
     private AssistantConfig config;
     private TextView tvTotalAssets, tvTotalLiability, tvTotalLent, tvListTitle;
     private LinearLayout layoutAssets, layoutLiability, layoutLent;
+    private HorizontalScrollView hsvAssetCategoryFilter;
+    private ChipGroup cgAssetCategoryFilter;
     private RecyclerView rvAssets;
     private AssetAdapter adapter;
     private List<AssetAccount> allAccounts = new ArrayList<>();
+    private String selectedAssetCategoryFilter = "全部";
 
     // 0: 资产, 1: 负债, 2: 借出
     private int currentType = 0;
@@ -83,6 +92,8 @@ public class AssetsFragment extends Fragment {
         layoutAssets = view.findViewById(R.id.layout_assets);
         layoutLiability = view.findViewById(R.id.layout_liability);
         layoutLent = view.findViewById(R.id.layout_lent);
+        hsvAssetCategoryFilter = view.findViewById(R.id.hsv_asset_category_filter);
+        cgAssetCategoryFilter = view.findViewById(R.id.cg_asset_category_filter);
 
         rvAssets = view.findViewById(R.id.rv_assets_list);
         rvAssets.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -303,6 +314,61 @@ public class AssetsFragment extends Fragment {
         return adapter;
     }
 
+    private void updateAssetCategoryFilterBar() {
+        if (getContext() == null || hsvAssetCategoryFilter == null || cgAssetCategoryFilter == null) {
+            return;
+        }
+
+        boolean enabled = AssetCategoryManager.isEnabled(requireContext());
+        boolean shouldShow = enabled && currentType == 0;
+        if (!shouldShow) {
+            selectedAssetCategoryFilter = "全部";
+            hsvAssetCategoryFilter.setVisibility(View.GONE);
+            cgAssetCategoryFilter.removeAllViews();
+            return;
+        }
+
+        hsvAssetCategoryFilter.setVisibility(View.VISIBLE);
+        cgAssetCategoryFilter.removeAllViews();
+
+        List<String> categories = AssetCategoryManager.getCategories(requireContext());
+        if (!"全部".equals(selectedAssetCategoryFilter) && !categories.contains(selectedAssetCategoryFilter)) {
+            selectedAssetCategoryFilter = "全部";
+        }
+
+        addAssetCategoryChip("全部");
+        for (String category : categories) {
+            addAssetCategoryChip(category);
+        }
+    }
+
+    private void addAssetCategoryChip(String label) {
+        if (getContext() == null || cgAssetCategoryFilter == null) {
+            return;
+        }
+
+        int bgDefault = ContextCompat.getColor(requireContext(), R.color.cat_unselected_bg);
+        int bgChecked = ContextCompat.getColor(requireContext(), R.color.app_blue);
+        int textDefault = ContextCompat.getColor(requireContext(), R.color.text_primary);
+        int textChecked = ContextCompat.getColor(requireContext(), R.color.cat_selected_text);
+        int[][] states = new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}};
+
+        Chip chip = new Chip(requireContext());
+        chip.setText(label);
+        chip.setCheckable(true);
+        chip.setClickable(true);
+        chip.setChipBackgroundColor(new ColorStateList(states, new int[]{bgChecked, bgDefault}));
+        chip.setTextColor(new ColorStateList(states, new int[]{textChecked, textDefault}));
+        chip.setChipStrokeWidth(0);
+        chip.setCheckedIconVisible(false);
+        chip.setChecked(label.equals(selectedAssetCategoryFilter));
+        chip.setOnClickListener(v -> {
+            selectedAssetCategoryFilter = label;
+            refreshList();
+        });
+        cgAssetCategoryFilter.addView(chip);
+    }
+
     private void switchType(int type) {
         if (currentType != type) {
             currentType = type;
@@ -404,6 +470,8 @@ public class AssetsFragment extends Fragment {
     }
 
     private void refreshList() {
+        updateAssetCategoryFilterBar();
+
         // 读取"总资产显示所有资产"开关状态
         SharedPreferences assetPrefs = requireContext().getSharedPreferences("asset_display_prefs", Context.MODE_PRIVATE);
         boolean showAllAssets = assetPrefs.getBoolean("show_all_assets_in_total", false);
@@ -412,13 +480,21 @@ public class AssetsFragment extends Fragment {
         
         if (currentType == 0 && showAllAssets) {
             // 开关开启时，在"我的资产"页面显示所有类型的资产
-            filteredList.addAll(allAccounts);
+            for (AssetAccount acc : allAccounts) {
+                if ("全部".equals(selectedAssetCategoryFilter)
+                        || selectedAssetCategoryFilter.equals(acc.assetCategory)) {
+                    filteredList.add(acc);
+                }
+            }
         } else {
             // 开关关闭时，按原有逻辑筛选
             for (AssetAccount acc : allAccounts) {
                 // 当选中资产(0)时，同时显示普通资产(0)和理财(3)
                 if (currentType == 0 && (acc.type == 0 || acc.type == 3)) {
-                    filteredList.add(acc);
+                    if ("全部".equals(selectedAssetCategoryFilter)
+                            || selectedAssetCategoryFilter.equals(acc.assetCategory)) {
+                        filteredList.add(acc);
+                    }
                 } 
                 // 【新增】当选中负债(1)时，同时显示普通负债(1)和分期(4)
                 else if (currentType == 1 && (acc.type == 1 || acc.type == 4)) {
@@ -562,6 +638,20 @@ public class AssetsFragment extends Fragment {
         colorAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spinnerColor.setAdapter(colorAdapter);
 
+        android.widget.Spinner spinnerAssetCategory = view.findViewById(R.id.spinner_asset_category);
+        boolean isAssetCategoryEnabled = AssetCategoryManager.isEnabled(requireContext());
+        List<String> assetCategories = new ArrayList<>();
+        assetCategories.add("资产分类：未分类");
+        assetCategories.addAll(AssetCategoryManager.getCategories(requireContext()));
+        android.widget.ArrayAdapter<String> assetCategoryAdapter = new android.widget.ArrayAdapter<>(
+                getContext(),
+                R.layout.item_spinner_dropdown,
+                assetCategories
+        );
+        assetCategoryAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        spinnerAssetCategory.setAdapter(assetCategoryAdapter);
+        spinnerAssetCategory.setVisibility(isAssetCategoryEnabled ? View.VISIBLE : View.GONE);
+
         // 用来临时保存用户在弹窗中输入的颜色
         final String[] tempCustomColor = {existing != null && existing.customColorHex != null ? existing.customColorHex : ""};
         final String[] tempSvgIcon = {existing != null ? AssetIconHelper.normalizeSvg(existing.svgIcon) : ""};
@@ -658,6 +748,13 @@ public class AssetsFragment extends Fragment {
             // ========== 新增代码：回显颜色选择 ==========
             spinnerColor.setSelection(existing.colorType);
             // ===========================================
+
+            if (isAssetCategoryEnabled && existing.assetCategory != null && !existing.assetCategory.isEmpty()) {
+                int selectedIndex = assetCategories.indexOf(existing.assetCategory);
+                if (selectedIndex >= 0) {
+                    spinnerAssetCategory.setSelection(selectedIndex);
+                }
+            }
 
             // 回显理财数据
             if (existing.type == 3) {
@@ -905,6 +1002,9 @@ public class AssetsFragment extends Fragment {
             // 【新增 4】保存是否计入总资产的选项
             accountToSave.isIncludedInTotal = (spinnerInclude.getSelectedItemPosition() == 0);
             accountToSave.svgIcon = tempSvgIcon[0];
+            accountToSave.assetCategory = (isAssetCategoryEnabled && spinnerAssetCategory.getSelectedItemPosition() > 0)
+                    ? assetCategories.get(spinnerAssetCategory.getSelectedItemPosition())
+                    : "";
 
             // ========== 新增代码：保存颜色选择 ==========
             accountToSave.colorType = spinnerColor.getSelectedItemPosition();
@@ -1047,7 +1147,14 @@ public class AssetsFragment extends Fragment {
                     String amountStr = String.format("%.2f", item.amount);
                     normalHolder.tvAmount.setText(displaySymbol + amountStr);
                     normalHolder.tvAmount.setTextSize(18);
-                    normalHolder.tvNote.setVisibility(View.GONE);
+                    if (item.assetCategory != null && !item.assetCategory.isEmpty()) {
+                        normalHolder.tvNote.setText(item.assetCategory);
+                        normalHolder.tvNote.setVisibility(View.VISIBLE);
+                        normalHolder.tvNote.setTextSize(12);
+                        normalHolder.tvNote.setPadding(0, 4, 0, 0);
+                    } else {
+                        normalHolder.tvNote.setVisibility(View.GONE);
+                    }
                 }
                 // ================= UI 布局优化结束 =================
 
@@ -1231,6 +1338,7 @@ public class AssetsFragment extends Fragment {
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
         updateFragmentTransparency(isCustomBg);
+        refreshList();
         
         // 重置 FAB 按钮状态
         if (fabContainer != null) {

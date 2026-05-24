@@ -1,5 +1,6 @@
 package com.example.budgetapp.ui;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -111,6 +112,9 @@ public class AutoAssetActivity extends AppCompatActivity {
         rvRules.setLayoutManager(new LinearLayoutManager(this));
         adapter = new RuleAdapter();
         rvRules.setAdapter(adapter);
+
+        findViewById(R.id.card_asset_category_settings)
+                .setOnClickListener(v -> startActivity(new Intent(this, AssetCategorySettingsActivity.class)));
 
         // 点击新增规则
         findViewById(R.id.btnAddRule).setOnClickListener(v -> showRuleDialog(null));

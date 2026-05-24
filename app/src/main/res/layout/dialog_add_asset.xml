@@ -209,6 +209,16 @@
             android:popupBackground="@drawable/bg_input_field"
             android:popupElevation="4dp" />
 
+        <Spinner
+            android:id="@+id/spinner_asset_category"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_input_field"
+            android:popupBackground="@drawable/bg_input_field"
+            android:popupElevation="4dp"
+            android:visibility="gone" />
+
         <LinearLayout
             android:id="@+id/layout_investment_details"
             android:layout_width="match_parent"

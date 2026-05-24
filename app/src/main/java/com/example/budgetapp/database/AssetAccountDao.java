@@ -38,4 +38,10 @@ public interface AssetAccountDao {
 
     @Query("SELECT * FROM asset_accounts WHERE name = :name AND type = :type LIMIT 1")
     AssetAccount getAssetByNameAndType(String name, int type);
+
+    @Query("UPDATE asset_accounts SET assetCategory = :newCategory WHERE assetCategory = :oldCategory")
+    void updateAssetCategoryName(String oldCategory, String newCategory);
+
+    @Query("UPDATE asset_accounts SET assetCategory = '' WHERE assetCategory = :category")
+    void clearAssetCategory(String category);
 }

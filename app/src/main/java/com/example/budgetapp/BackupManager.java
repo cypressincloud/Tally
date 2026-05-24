@@ -1115,7 +1115,7 @@ public class BackupManager {
         // -------------------------
         csvBuilder.append("=== 资产账户列表 ===\n");
         // 【修改】加入 "计入总资产" 和 "图标"
-        csvBuilder.append("ID,账户名称,余额,类型,币种,计入总资产,图标\n");
+        csvBuilder.append("ID,账户名称,余额,类型,币种,计入总资产,图标,资产分类\n");
         for (AssetAccount asset : assets) {
             csvBuilder.append(asset.id).append(",");
             csvBuilder.append(escapeCsv(asset.name)).append(",");
@@ -1130,7 +1130,8 @@ public class BackupManager {
             String symbol = (asset.currencySymbol == null) ? "¥" : asset.currencySymbol;
             csvBuilder.append(escapeCsv(symbol)).append(",");
             csvBuilder.append(asset.isIncludedInTotal).append(",");
-            csvBuilder.append(escapeCsv(asset.svgIcon == null ? "" : asset.svgIcon)).append("\n");
+            csvBuilder.append(escapeCsv(asset.svgIcon == null ? "" : asset.svgIcon)).append(",");
+            csvBuilder.append(escapeCsv(asset.assetCategory == null ? "" : asset.assetCategory)).append("\n");
         }
         csvBuilder.append("\n\n");
 
@@ -1351,6 +1352,7 @@ public class BackupManager {
                 asset.id = id;
                 asset.currencySymbol = symbol;
                 asset.svgIcon = row.size() > 6 ? row.get(6) : "";
+                asset.assetCategory = row.size() > 7 ? row.get(7) : "";
                 asset.isIncludedInTotal = included; // 【新增】计入总资产
                 assets.add(asset);
                 assetNameToIdMap.put(name, id);

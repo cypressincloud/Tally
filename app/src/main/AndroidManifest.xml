@@ -159,6 +159,12 @@
             android:exported="false"
             android:theme="@style/Theme.BudgetApp" />
 
+        <activity
+            android:name=".ui.AssetCategorySettingsActivity"
+            android:label="资产分类设置"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
         <activity android:name=".ui.DefaultPageActivity"
             android:label="应用默认页面设置"
             android:exported="false"
