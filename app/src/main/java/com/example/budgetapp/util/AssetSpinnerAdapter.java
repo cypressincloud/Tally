@@ -1,6 +1,7 @@
 package com.example.budgetapp.util;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,8 +19,10 @@ import androidx.core.content.ContextCompat;
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 
+import java.text.DecimalFormat;
+
 /**
- * 通用资产 Spinner 适配器，支持显示 SVG 图标和自定义颜色。
+ * 通用资产 Spinner 适配器，支持显示 SVG 图标、自定义颜色和余额。
  * 用于手动记账、自动记账、磁贴记账、AI记账等所有资产选择场景。
  */
 public class AssetSpinnerAdapter extends ArrayAdapter<AssetAccount> {
@@ -27,10 +30,17 @@ public class AssetSpinnerAdapter extends ArrayAdapter<AssetAccount> {
     private static final int MAX_DROPDOWN_HEIGHT_DP = 260;
 
     private final LayoutInflater inflater;
+    private final DecimalFormat decimalFormat;
+    private final boolean isCurrencyEnabled;
 
     public AssetSpinnerAdapter(@NonNull Context context) {
         super(context, R.layout.item_spinner_asset);
         this.inflater = LayoutInflater.from(context);
+        this.decimalFormat = new DecimalFormat("#,##0.00");
+        
+        // 读取多币种设置
+        SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        this.isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
     }
 
     /**
@@ -105,7 +115,9 @@ public class AssetSpinnerAdapter extends ArrayAdapter<AssetAccount> {
 
         AssetAccount asset = getItem(position);
         if (asset != null) {
-            holder.tvName.setText(asset.name);
+            // 构建显示文本：资产名称 + 余额
+            String displayText = buildDisplayText(asset);
+            holder.tvName.setText(displayText);
 
             // 绑定 SVG 图标
             if (holder.ivIcon != null) {
@@ -117,6 +129,27 @@ public class AssetSpinnerAdapter extends ArrayAdapter<AssetAccount> {
         }
 
         return view;
+    }
+
+    /**
+     * 构建显示文本：资产名称 (余额)
+     * 格式：中国银行 (5043.54) 或 中国银行 ($5043.54)
+     */
+    private String buildDisplayText(AssetAccount asset) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(asset.name);
+        sb.append(" (");
+        
+        // 如果开启了多币种，显示货币符号
+        if (isCurrencyEnabled && asset.currencySymbol != null && !asset.currencySymbol.isEmpty()) {
+            sb.append(asset.currencySymbol);
+        }
+        
+        // 显示余额
+        sb.append(decimalFormat.format(asset.amount));
+        sb.append(")");
+        
+        return sb.toString();
     }
 
     private void applyTextColor(TextView tv, AssetAccount asset) {
