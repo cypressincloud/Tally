@@ -140,30 +140,23 @@ com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(context);
 4. 成功后保存备份时间戳
 5. 失败时静默记录日志
 
-## 当前任务
+## 开发流程
 
-查看当前任务状态：
+1. **需求分析**: 明确功能需求和验收标准
+2. **设计方案**: 确定技术方案和实现路径
+3. **编码实现**: 按照规范编写代码
+4. **测试验证**: 功能测试和问题修复
+5. **代码提交**: 提交代码并更新文档
+
+## 构建和运行
+
 ```bash
-python "./.trellis/scripts/task.py" list
+# 构建项目
+gradlew build
+
+# 安装到设备
+gradlew installDebug
+
+# 清理构建
+gradlew clean
 ```
-
-查看项目上下文：
-```bash
-python "./.trellis/scripts/get_context.py" --mode record
-```
-
-## 工作流程
-
-1. **开始工作**: 先读取 AGENTS.md，确认当前任务，查看最新 journal
-2. **规划阶段**: 明确需求、拆分任务、确定验收标准
-3. **开发阶段**: 按规范实现功能
-4. **验收阶段**: 测试功能、修复问题
-5. **记录阶段**: 提交代码、更新 journal
-
-## 相关文档
-
-- 详细规范: `.trellis/spec/`
-- 任务管理: `.trellis/tasks/`
-- 工作日志: `.trellis/workspace/`
-- Kiro 技能: `.agents/skills/`
-- Kiro 配置: `.codex/`

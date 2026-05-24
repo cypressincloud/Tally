@@ -18,3 +18,7 @@ local.properties
 *.keystore
 *.jks
 keystore.properties
+
+# AI 工作流文件（已清理）
+.trellis/
+.kiro/
