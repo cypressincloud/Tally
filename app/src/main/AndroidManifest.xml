@@ -126,6 +126,12 @@
             android:exported="false"/>
 
         <activity
+            android:name=".ui.AiModelManagerActivity"
+            android:label="模型配置管理"
+            android:theme="@style/Theme.BudgetApp"
+            android:exported="false"/>
+
+        <activity
             android:name=".ui.SecuritySettingsActivity"
             android:exported="false"
             android:screenOrientation="portrait"/>

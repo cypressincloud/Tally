@@ -24,6 +24,9 @@ import com.example.budgetapp.ai.AiAccountingClient;
 import com.example.budgetapp.ai.AiConfig;
 import com.example.budgetapp.util.ScreenshotAutoSaveManager;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class AiSettingActivity extends AppCompatActivity {
 
     private EditText etBaseUrl;
@@ -133,6 +136,11 @@ public class AiSettingActivity extends AppCompatActivity {
         
         // 初始化静默记账开关
         initAiSilentRecordingSwitch();
+
+        // 添加模型切换按钮点击事件
+        findViewById(R.id.btn_switch_text_model).setOnClickListener(v -> showModelSwitchDialog("text"));
+        findViewById(R.id.btn_switch_vision_model).setOnClickListener(v -> showModelSwitchDialog("vision"));
+        findViewById(R.id.btn_switch_audio_model).setOnClickListener(v -> showModelSwitchDialog("audio"));
 
         // 添加AI分类关键字规则入口点击事件
         findViewById(R.id.card_ai_category_rules).setOnClickListener(v -> {
@@ -347,5 +355,125 @@ public class AiSettingActivity extends AppCompatActivity {
                 isChecked ? "已开启AI静默记账" : "已关闭AI静默记账", 
                 Toast.LENGTH_SHORT).show();
         });
+    }
+    
+    private void showModelSwitchDialog(String modelType) {
+        List<com.example.budgetapp.ai.AiModelProfile> profiles = 
+            com.example.budgetapp.ai.AiModelProfile.loadProfilesByType(this, modelType);
+        
+        // 创建自定义对话框
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_model_switch, null);
+        builder.setView(dialogView);
+        AlertDialog dialog = builder.create();
+        
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+        
+        // 设置标题
+        TextView tvTitle = dialogView.findViewById(R.id.tv_dialog_title);
+        TextView tvSubtitle = dialogView.findViewById(R.id.tv_dialog_subtitle);
+        String title = "文本模型配置";
+        if ("vision".equals(modelType)) {
+            title = "视觉模型配置";
+        } else if ("audio".equals(modelType)) {
+            title = "音频模型配置";
+        }
+        tvTitle.setText(title);
+        
+        // 设置RecyclerView
+        androidx.recyclerview.widget.RecyclerView rvProfiles = dialogView.findViewById(R.id.rv_profiles);
+        rvProfiles.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
+        
+        // 创建适配器
+        ModelSwitchAdapter adapter = new ModelSwitchAdapter(profiles, profile -> {
+            applyModelProfile(profile, modelType);
+            dialog.dismiss();
+        });
+        rvProfiles.setAdapter(adapter);
+        
+        // 如果没有配置，隐藏RecyclerView和分隔线
+        if (profiles.isEmpty()) {
+            rvProfiles.setVisibility(View.GONE);
+            dialogView.findViewById(R.id.rv_profiles).setVisibility(View.GONE);
+            tvSubtitle.setText("暂无已保存的配置");
+        }
+        
+        // 新增配置按钮
+        dialogView.findViewById(R.id.btn_add_new).setOnClickListener(v -> {
+            Intent intent = new Intent(this, AiModelManagerActivity.class);
+            intent.putExtra("model_type", modelType);
+            startActivity(intent);
+            dialog.dismiss();
+        });
+        
+        dialog.show();
+    }
+    
+    // 内部适配器类
+    private static class ModelSwitchAdapter extends androidx.recyclerview.widget.RecyclerView.Adapter<ModelSwitchAdapter.ViewHolder> {
+        private final List<com.example.budgetapp.ai.AiModelProfile> profiles;
+        private final OnProfileClickListener listener;
+        
+        interface OnProfileClickListener {
+            void onProfileClick(com.example.budgetapp.ai.AiModelProfile profile);
+        }
+        
+        ModelSwitchAdapter(List<com.example.budgetapp.ai.AiModelProfile> profiles, OnProfileClickListener listener) {
+            this.profiles = profiles;
+            this.listener = listener;
+        }
+        
+        @androidx.annotation.NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@androidx.annotation.NonNull android.view.ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_model_switch_profile, parent, false);
+            return new ViewHolder(view);
+        }
+        
+        @Override
+        public void onBindViewHolder(@androidx.annotation.NonNull ViewHolder holder, int position) {
+            com.example.budgetapp.ai.AiModelProfile profile = profiles.get(position);
+            holder.tvProfileName.setText(profile.name);
+            holder.tvModelInfo.setText(profile.modelName);
+            holder.itemView.setOnClickListener(v -> listener.onProfileClick(profile));
+        }
+        
+        @Override
+        public int getItemCount() {
+            return profiles.size();
+        }
+        
+        static class ViewHolder extends androidx.recyclerview.widget.RecyclerView.ViewHolder {
+            TextView tvProfileName;
+            TextView tvModelInfo;
+            
+            ViewHolder(View itemView) {
+                super(itemView);
+                tvProfileName = itemView.findViewById(R.id.tv_profile_name);
+                tvModelInfo = itemView.findViewById(R.id.tv_model_info);
+            }
+        }
+    }
+    
+    private void applyModelProfile(com.example.budgetapp.ai.AiModelProfile profile, String modelType) {
+        if ("text".equals(modelType)) {
+            etTextModel.setText(profile.modelName);
+            etTextBaseUrl.setText(profile.baseUrl);
+            etTextApiKey.setText(profile.apiKey);
+            Toast.makeText(this, "已应用配置：" + profile.name, Toast.LENGTH_SHORT).show();
+        } else if ("vision".equals(modelType)) {
+            etVisionModel.setText(profile.modelName);
+            etVisionBaseUrl.setText(profile.baseUrl);
+            etVisionApiKey.setText(profile.apiKey);
+            Toast.makeText(this, "已应用配置：" + profile.name, Toast.LENGTH_SHORT).show();
+        } else if ("audio".equals(modelType)) {
+            etAudioModel.setText(profile.modelName);
+            etAudioBaseUrl.setText(profile.baseUrl);
+            etAudioApiKey.setText(profile.apiKey);
+            Toast.makeText(this, "已应用配置：" + profile.name, Toast.LENGTH_SHORT).show();
+        }
     }
 }
