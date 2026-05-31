@@ -211,4 +211,17 @@ public class AiConfig {
     private static String trim(String value) {
         return value == null ? "" : value.trim();
     }
+
+    // --- 静默记账开关（AI记账） ---
+    public static boolean isSilentAiRecordingEnabled(Context context) {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean("ai_silent_recording_enabled", false);
+    }
+
+    public static void setSilentAiRecordingEnabled(Context context, boolean enabled) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("ai_silent_recording_enabled", enabled)
+                .apply();
+    }
 }

@@ -580,6 +580,65 @@ public class AiChatActivity extends AppCompatActivity {
     }
 
     private void addDraftCardsReply(List<TransactionDraft> drafts, List<AssetAccount> assets, String intro) {
+        // 【新增】：检查是否开启了AI静默记账
+        boolean isSilentAiRecordingEnabled = AiConfig.isSilentAiRecordingEnabled(this);
+        
+        if (isSilentAiRecordingEnabled) {
+            // 静默记账模式：直接保存所有账单，然后显示已保存的卡片
+            List<DraftCardModel> savedModels = new ArrayList<>();
+            int savedCount = 0;
+            
+            for (TransactionDraft draft : drafts) {
+                // 为所有 draft 设置相同的 photoPath（如果有截图）
+                if (currentScreenshotPath != null && !currentScreenshotPath.isEmpty()) {
+                    draft.photoPath = currentScreenshotPath;
+                }
+                
+                // 直接保存
+                boolean saved = false;
+                if (draft.isTransfer) {
+                    // 转账逻辑
+                    if (draft.fromAssetId > 0 && draft.toAssetId > 0) {
+                        AssetAccount fromAccount = null;
+                        AssetAccount toAccount = null;
+                        for (AssetAccount asset : assets) {
+                            if (asset.id == draft.fromAssetId) fromAccount = asset;
+                            if (asset.id == draft.toAssetId) toAccount = asset;
+                        }
+                        if (fromAccount != null && toAccount != null) {
+                            financeViewModel.transferAsset(fromAccount, toAccount, draft.amount, draft.discount, draft.note);
+                            saved = true;
+                            savedCount++;
+                        }
+                    }
+                } else {
+                    // 普通记账
+                    financeViewModel.addTransactionWithAssetSync(draft.toTransaction());
+                    saved = true;
+                    savedCount++;
+                }
+                
+                // 创建已保存状态的卡片模型
+                if (saved) {
+                    DraftCardModel model = new DraftCardModel(draft);
+                    model.saved = true;  // 标记为已保存
+                    model.editing = false;  // 不处于编辑状态
+                    savedModels.add(model);
+                }
+            }
+            
+            // 清空缓存的截图路径
+            currentScreenshotPath = null;
+            
+            // 显示保存结果和已保存的卡片
+            String message = savedCount > 0 ? 
+                String.format("已自动保存 %d 笔账单", savedCount) : 
+                "没有可保存的账单";
+            addMessage(ChatMessage.aiDrafts(message, savedModels, new ArrayList<>(assets)));
+            return;
+        }
+        
+        // 原有逻辑：显示卡片让用户确认
         List<DraftCardModel> models = new ArrayList<>();
         for (TransactionDraft draft : drafts) {
             // 为所有 draft 设置相同的 photoPath（如果有截图）

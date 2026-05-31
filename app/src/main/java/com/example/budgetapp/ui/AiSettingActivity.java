@@ -52,6 +52,9 @@ public class AiSettingActivity extends AppCompatActivity {
     private SwitchCompat switchScreenshotAutoSave;
     private TextView tvScreenshotAutoSaveHint;
     private ScreenshotAutoSaveManager screenshotAutoSaveManager;
+    
+    // 静默记账开关
+    private SwitchCompat switchAiSilentRecording;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -127,6 +130,9 @@ public class AiSettingActivity extends AppCompatActivity {
         
         // 初始化截图自动保存开关
         initScreenshotAutoSaveSwitch();
+        
+        // 初始化静默记账开关
+        initAiSilentRecordingSwitch();
 
         // 添加AI分类关键字规则入口点击事件
         findViewById(R.id.card_ai_category_rules).setOnClickListener(v -> {
@@ -329,5 +335,17 @@ public class AiSettingActivity extends AppCompatActivity {
             tvScreenshotAutoSaveHint.setText(result.errorMessage);
             tvScreenshotAutoSaveHint.setTextColor(0xFFFF9800); // Orange
         }
+    }
+    
+    private void initAiSilentRecordingSwitch() {
+        switchAiSilentRecording = findViewById(R.id.switchAiSilentRecording);
+        switchAiSilentRecording.setChecked(AiConfig.isSilentAiRecordingEnabled(this));
+        
+        switchAiSilentRecording.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            AiConfig.setSilentAiRecordingEnabled(this, isChecked);
+            Toast.makeText(this, 
+                isChecked ? "已开启AI静默记账" : "已关闭AI静默记账", 
+                Toast.LENGTH_SHORT).show();
+        });
     }
 }
