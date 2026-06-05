@@ -1050,7 +1050,13 @@ public class AssetsFragment extends Fragment {
             if (existing == null) viewModel.addAsset(accountToSave);
             else viewModel.updateAsset(accountToSave);
 
-            dialog.dismiss();
+            
+            // 如果是活期理财，自动安排每日计息
+            if (finalType == 3 && !accountToSave.isFixedTerm && accountToSave.interestRate > 0) {
+                com.example.budgetapp.service.DailyInterestService.scheduleAlarm(getContext());
+            }
+
+dialog.dismiss();
         });
 
         dialog.show();

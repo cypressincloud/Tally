@@ -64,5 +64,22 @@ public class MyApplication extends Application {
             @Override
             public void onActivityDestroyed(Activity activity) {}
         });
-    }
+    
+        // 检查是否有活期理财资产，自动安排每日计息闹钟
+        com.example.budgetapp.database.AppDatabase.databaseWriteExecutor.execute(() -> {
+            try {
+                java.util.List<com.example.budgetapp.database.AssetAccount> deposits =
+                        com.example.budgetapp.database.AppDatabase.getDatabase(this).assetAccountDao().getCurrentDepositAssetsSync();
+                if (deposits != null && !deposits.isEmpty()) {
+                    for (com.example.budgetapp.database.AssetAccount a : deposits) {
+                        if (a.interestRate > 0) {
+                            com.example.budgetapp.service.DailyInterestService.scheduleAlarm(this);
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        });
+}
 }

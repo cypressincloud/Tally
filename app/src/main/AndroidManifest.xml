@@ -287,6 +287,14 @@
                 android:resource="@xml/today_budget_widget_info" />
         </receiver>
 
+
+        <receiver
+            android:name=".service.DailyInterestService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.budgetapp.action.DAILY_INTEREST" />
+            </intent-filter>
+        </receiver>
 <!--        <service android:name=".service.NotificationMonitorService"-->
 <!--            android:label="退款通知监听"-->
 <!--            android:exported="true"-->

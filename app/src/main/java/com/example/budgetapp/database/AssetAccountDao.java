@@ -42,6 +42,10 @@ public interface AssetAccountDao {
     @Query("UPDATE asset_accounts SET assetCategory = :newCategory WHERE assetCategory = :oldCategory")
     void updateAssetCategoryName(String oldCategory, String newCategory);
 
+
+    // 查询所有活期理财 (type=3, isFixedTerm=false)
+    @Query("SELECT * FROM asset_accounts WHERE type = 3 AND isFixedTerm = 0")
+    List<AssetAccount> getCurrentDepositAssetsSync();
     @Query("UPDATE asset_accounts SET assetCategory = '' WHERE assetCategory = :category")
     void clearAssetCategory(String category);
 }
