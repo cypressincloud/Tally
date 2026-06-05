@@ -31,6 +31,7 @@ import java.util.List;
 public class CurrencySettingsActivity extends AppCompatActivity {
 
     private SwitchCompat switchCurrency;
+    private SwitchCompat switchSingleCurrency;
     private CardView cardDefaultCurrency;
     private TextView tvCurrentCurrency;
     private SharedPreferences prefs;
@@ -100,6 +101,7 @@ public class CurrencySettingsActivity extends AppCompatActivity {
         prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
 
         switchCurrency = findViewById(R.id.switch_currency);
+        switchSingleCurrency = findViewById(R.id.switch_single_currency);
         cardDefaultCurrency = findViewById(R.id.card_default_currency);
         tvCurrentCurrency = findViewById(R.id.tv_current_currency);
         View btnSetDefault = findViewById(R.id.btn_set_default_currency);
@@ -108,9 +110,19 @@ public class CurrencySettingsActivity extends AppCompatActivity {
         switchCurrency.setChecked(isEnabled);
         updateDefaultSettingsVisibility(isEnabled);
 
+        boolean singleCurrencyMode = prefs.getBoolean("single_currency_mode", false);
+        switchSingleCurrency.setChecked(singleCurrencyMode);
+
         switchCurrency.setOnCheckedChangeListener((buttonView, isChecked) -> {
             prefs.edit().putBoolean("enable_currency", isChecked).apply();
             updateDefaultSettingsVisibility(isChecked);
+        });
+
+        switchSingleCurrency.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean("single_currency_mode", isChecked).apply();
+            if (isChecked) {
+                Toast.makeText(this, "已开启统一货币模式，总资产将按汇率转换", Toast.LENGTH_SHORT).show();
+            }
         });
 
         updateCurrentCurrencyText();

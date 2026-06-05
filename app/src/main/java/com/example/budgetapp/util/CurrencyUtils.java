@@ -19,6 +19,69 @@ import java.util.List;
 
 public class CurrencyUtils {
 
+    // 货币符号 → ISO 代码映射（与 CurrencySettingsActivity 的 currencyCodes / currencySymbols 保持一致）
+    private static final java.util.Map<String, String> SYMBOL_TO_CODE = buildSymbolToCodeMap();
+
+    private static java.util.Map<String, String> buildSymbolToCodeMap() {
+        java.util.Map<String, String> map = new java.util.HashMap<>();
+        map.put("¥", "CNY");
+        map.put("$", "USD");
+        map.put("€", "EUR");
+        map.put("£", "GBP");
+        map.put("HK$", "HKD");
+        map.put("NT$", "TWD");
+        map.put("JP¥", "JPY");
+        map.put("₩", "KRW");
+        map.put("C$", "CAD");
+        map.put("A$", "AUD");
+        map.put("S$", "SGD");
+        map.put("NZ$", "NZD");
+        map.put("₹", "INR");
+        map.put("₽", "RUB");
+        map.put("฿", "THB");
+        map.put("₫", "VND");
+        map.put("₱", "PHP");
+        map.put("R$", "BRL");
+        map.put("Rp", "IDR");
+        map.put("RM", "MYR");
+        map.put("CHF", "CHF");
+        map.put("₺", "TRY");
+        map.put("₪", "ILS");
+        map.put("kr", "SEK");  // kr 在多国使用，这里用 SEK 作为兜底
+        map.put("zł", "PLN");
+        map.put("Kč", "CZK");
+        map.put("Ft", "HUF");
+        map.put("lei", "RON");
+        map.put("лв", "BGN");
+        map.put("RSD", "RSD");
+        map.put("BYN", "BYN");
+        map.put("₴", "UAH");
+        map.put("L", "MDL");
+        map.put("Lek", "ALL");
+        map.put("KM", "BAM");
+        map.put("den", "MKD");
+        map.put("₾", "GEL");
+        map.put("֏", "AMD");
+        map.put("₼", "AZN");
+        map.put("KD", "KWD");
+        map.put("SR", "SAR");
+        map.put("DH", "AED");
+        map.put("R", "ZAR");
+        map.put("₦", "NGN");
+        map.put("E£", "EGP");
+        return java.util.Collections.unmodifiableMap(map);
+    }
+
+    /**
+     * 将货币符号转换为 ISO 货币代码
+     */
+    public static String symbolToCode(String symbol) {
+        if (symbol == null || symbol.isEmpty()) return "CNY";
+        String code = SYMBOL_TO_CODE.get(symbol);
+        return code != null ? code : "CNY";
+    }
+
+
     public static final String[] CURRENCY_DISPLAY = {
             "¥ 人民币", "$ 美元", "€ 欧元", "£ 英镑", "HK$ 港币", "NT$ 新台币",
             "JP¥ 日元", "₩ 韩元", "C$ 加元", "A$ 澳元", "S$ 新加坡元", "NZ$ 新西兰元",

@@ -28,6 +28,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.budgetapp.R;
+import android.util.Log;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.util.AssetCategoryManager;
@@ -38,6 +39,7 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -415,7 +417,117 @@ public class AssetsFragment extends Fragment {
             tvTotalLent.setText(String.format("%.2f", totalLent));
 
         } else {
-            // ================== 多币种逻辑 ==================
+                        // ================== 多币种逻辑 ==================
+            boolean singleCurrencyMode = prefs.getBoolean("single_currency_mode", false);
+            String defaultCode = prefs.getString("default_currency_code", "CNY");
+            String defaultSymbol = prefs.getString("default_currency_symbol", "¥");
+
+            if (singleCurrencyMode) {
+                // ===== 统一货币模式：将所有币种按汇率转换为默认币种 =====
+                // 显示加载状态
+                tvTotalAssets.setText(defaultSymbol + " 计算中...");
+                tvTotalLiability.setText(defaultSymbol + " 计算中...");
+                tvTotalLent.setText(defaultSymbol + " 计算中...");
+                
+                // 使用汇率管理器异步获取汇率并计算
+                com.example.budgetapp.util.ExchangeRateManager rateManager = 
+                    new com.example.budgetapp.util.ExchangeRateManager(getContext());
+                
+                // 收集所有需要转换的货币
+                Map<String, Double> assetAmounts = new HashMap<>();
+                Map<String, Double> liabilityAmounts = new HashMap<>();
+                Map<String, Double> lentAmounts = new HashMap<>();
+                
+                for (AssetAccount acc : allAccounts) {
+                    String currencyCode = getCurrencyCode(acc.currencySymbol);
+                    
+                    // 分类统计
+                    if (acc.type == 1 || acc.type == 4) {
+                        liabilityAmounts.put(currencyCode, 
+                            liabilityAmounts.getOrDefault(currencyCode, 0.0) + acc.amount);
+                    } else if (acc.type == 2) {
+                        lentAmounts.put(currencyCode, 
+                            lentAmounts.getOrDefault(currencyCode, 0.0) + acc.amount);
+                    }
+                    
+                    // 总资产统计
+                    if (acc.isIncludedInTotal) {
+                        double currentAmount = assetAmounts.getOrDefault(currencyCode, 0.0);
+                        if (acc.type == 0 || acc.type == 3 || acc.type == 2) {
+                            assetAmounts.put(currencyCode, currentAmount + acc.amount);
+                        } else if (acc.type == 1 || acc.type == 4) {
+                            assetAmounts.put(currencyCode, currentAmount - acc.amount);
+                        }
+                    }
+                }
+                
+                // 异步转换总资产
+                rateManager.convertAmounts(assetAmounts, defaultCode, new com.example.budgetapp.util.ExchangeRateManager.ConvertCallback() {
+                    @Override
+                    public void onSuccess(double convertedAmount) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                tvTotalAssets.setTextSize(32);
+                                tvTotalAssets.setText(defaultSymbol + String.format("%.2f", convertedAmount));
+                            });
+                        }
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                tvTotalAssets.setText(defaultSymbol + " 网络错误");
+                                Toast.makeText(getContext(), "汇率获取失败: " + error, Toast.LENGTH_SHORT).show();
+                            });
+                        }
+                    }
+                });
+                
+                // 异步转换负债
+                rateManager.convertAmounts(liabilityAmounts, defaultCode, new com.example.budgetapp.util.ExchangeRateManager.ConvertCallback() {
+                    @Override
+                    public void onSuccess(double convertedAmount) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                tvTotalLiability.setText(defaultSymbol + String.format("%.2f", convertedAmount));
+                            });
+                        }
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                tvTotalLiability.setText(defaultSymbol + " -");
+                            });
+                        }
+                    }
+                });
+                
+                // 异步转换借出
+                rateManager.convertAmounts(lentAmounts, defaultCode, new com.example.budgetapp.util.ExchangeRateManager.ConvertCallback() {
+                    @Override
+                    public void onSuccess(double convertedAmount) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                tvTotalLent.setText(defaultSymbol + String.format("%.2f", convertedAmount));
+                            });
+                        }
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                tvTotalLent.setText(defaultSymbol + " -");
+                            });
+                        }
+                    }
+                });
+
+            } else {
+                // ===== 原有分币种显示逻辑 =====
             Map<String, Double> assetMap = new TreeMap<>();
             Map<String, Double> liabilityMap = new TreeMap<>();
             Map<String, Double> lentMap = new TreeMap<>();
@@ -430,7 +542,7 @@ public class AssetsFragment extends Fragment {
                     lentMap.put(symbol, lentMap.getOrDefault(symbol, 0.0) + acc.amount);
                 }
 
-                // 2. 统计顶部的大字“总资产”
+                // 2. 统计顶部的大学"总资产"
                 if (acc.isIncludedInTotal) {
                 double currentTotal = assetMap.getOrDefault(symbol, 0.0);
                 if (acc.type == 0 || acc.type == 3) {
@@ -454,12 +566,13 @@ public class AssetsFragment extends Fragment {
             tvTotalAssets.setText(formatMultiCurrency(assetMap));
             tvTotalLiability.setText(formatMultiCurrency(liabilityMap));
             tvTotalLent.setText(formatMultiCurrency(lentMap));
-                }
+            }
+        }
 
         refreshList();
     }
 
-    private String formatMultiCurrency(Map<String, Double> map) {
+private String formatMultiCurrency(Map<String, Double> map) {
         if (map.isEmpty()) return "0.00";
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, Double> entry : map.entrySet()) {
@@ -1645,6 +1758,67 @@ dialog.dismiss();
         } else {
             statusView.setText(AssetIconHelper.hasSvgIcon(svgCode) ? "SVG 无法解析" : "未设置图标");
         }
+    }
+
+    /**
+     * 将货币符号转换为货币代码
+     * @param symbol 货币符号（如 "¥", "$", "€"）
+     * @return 货币代码（如 "CNY", "USD", "EUR"）
+     */
+    private String getCurrencyCode(String symbol) {
+        if (symbol == null || symbol.isEmpty()) {
+            return "CNY"; // 默认人民币
+        }
+        
+        // 符号到代码的映射
+        Map<String, String> symbolToCode = new HashMap<>();
+        symbolToCode.put("¥", "CNY");
+        symbolToCode.put("$", "USD");
+        symbolToCode.put("€", "EUR");
+        symbolToCode.put("£", "GBP");
+        symbolToCode.put("HK$", "HKD");
+        symbolToCode.put("NT$", "TWD");
+        symbolToCode.put("JP¥", "JPY");
+        symbolToCode.put("₩", "KRW");
+        symbolToCode.put("C$", "CAD");
+        symbolToCode.put("A$", "AUD");
+        symbolToCode.put("S$", "SGD");
+        symbolToCode.put("NZ$", "NZD");
+        symbolToCode.put("₹", "INR");
+        symbolToCode.put("₽", "RUB");
+        symbolToCode.put("฿", "THB");
+        symbolToCode.put("₫", "VND");
+        symbolToCode.put("₱", "PHP");
+        symbolToCode.put("R$", "BRL");
+        symbolToCode.put("Rp", "IDR");
+        symbolToCode.put("RM", "MYR");
+        symbolToCode.put("CHF", "CHF");
+        symbolToCode.put("₺", "TRY");
+        symbolToCode.put("₪", "ILS");
+        symbolToCode.put("kr", "SEK"); // 瑞典克朗（默认）
+        symbolToCode.put("zł", "PLN");
+        symbolToCode.put("Kč", "CZK");
+        symbolToCode.put("Ft", "HUF");
+        symbolToCode.put("lei", "RON");
+        symbolToCode.put("лв", "BGN");
+        symbolToCode.put("RSD", "RSD");
+        symbolToCode.put("BYN", "BYN");
+        symbolToCode.put("₴", "UAH");
+        symbolToCode.put("L", "MDL");
+        symbolToCode.put("Lek", "ALL");
+        symbolToCode.put("KM", "BAM");
+        symbolToCode.put("den", "MKD");
+        symbolToCode.put("₾", "GEL");
+        symbolToCode.put("֏", "AMD");
+        symbolToCode.put("₼", "AZN");
+        symbolToCode.put("KD", "KWD");
+        symbolToCode.put("SR", "SAR");
+        symbolToCode.put("DH", "AED");
+        symbolToCode.put("R", "ZAR");
+        symbolToCode.put("₦", "NGN");
+        symbolToCode.put("E£", "EGP");
+        
+        return symbolToCode.getOrDefault(symbol, "CNY");
     }
 
 }
