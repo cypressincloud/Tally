@@ -940,7 +940,7 @@ public class DetailsFragment extends Fragment {
                 localAssetList.add(noAsset);
                 if (assets != null) {
                     for (AssetAccount a : assets) {
-                        if (a.type == 0 || a.type == 1) localAssetList.add(a);
+                        if (a.type == 0 || a.type == 1 || a.type == 2) localAssetList.add(a);
                     }
                 }
                 assetAdapter.clear();
@@ -954,6 +954,17 @@ public class DetailsFragment extends Fragment {
                             break;
                         }
                     }
+                } else if (existingTransaction == null) {
+                    // 【新增】新建记录时，自动选择默认资产
+                    int defaultAssetId = config.getDefaultAssetId();
+                    if (defaultAssetId != -1) {
+                        for (int i = 0; i < localAssetList.size(); i++) {
+                            if (localAssetList.get(i).id == defaultAssetId) {
+                                spAsset.setSelection(i);
+                                break;
+                            }
+                        }
+                    }
                 }
             });
         } else {
@@ -963,6 +974,12 @@ public class DetailsFragment extends Fragment {
         final java.util.Calendar calendar = java.util.Calendar.getInstance();
         if (existingTransaction != null) {
             calendar.setTimeInMillis(existingTransaction.date);
+        } else {
+            // 【新增】新建记录时，使用当前时间，但日期设置为传入的date参数
+            calendar.setTimeInMillis(System.currentTimeMillis());
+            calendar.set(java.util.Calendar.YEAR, date.getYear());
+            calendar.set(java.util.Calendar.MONTH, date.getMonthValue() - 1);
+            calendar.set(java.util.Calendar.DAY_OF_MONTH, date.getDayOfMonth());
         }
         Runnable updateDateDisplay = () -> {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy年MM月dd日 HH:mm", Locale.CHINA);
@@ -1065,6 +1082,13 @@ public class DetailsFragment extends Fragment {
 
                 showRevokeDialog(tempTx, dialog);
             });
+        } else {
+            // 【新增】新建记录时，自动在备注字段填充默认时间标识
+            btnSave.setText("保 存");
+            btnDelete.setVisibility(View.GONE);
+            tvRevoke.setVisibility(View.GONE);
+            SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA);
+            etNote.setText(noteSdf.format(calendar.getTime()));
         }
 
         btnSave.setOnClickListener(v -> {
