@@ -491,61 +491,69 @@ public class AiChatActivity extends AppCompatActivity {
     }
 
     private void processImageAccounting(Bitmap bitmap, byte[] imageBytes, String mimeType) {
-        int statusIndex = addMessage(ChatMessage.aiText("正在做 OCR 识别..."));
+        int statusIndex = addMessage(ChatMessage.aiText("正在识别截图..."));
         new Thread(() -> {
-            String fallbackReason = "";
-            try {
-                OcrExtractResult ocrResult = ocrHelper.extract(bitmap);
-                if (!ocrResult.hasText()) {
-                    fallbackReason = "OCR 没提取到有效文字";
-                } else {
-                    runOnUiThread(() -> updateMessage(statusIndex, "OCR 已提取文字，正在用文本模型生成账单..."));
-                    try {
-                        List<TransactionDraft> drafts = aiClient.parseText(this, ocrResult.buildPrompt());
-                        List<AssetAccount> assets = loadAccountingAssets();
-                        if (ocrResult.isSufficientForAccounting() || !aiConfig.isVisionReady()) {
+            // Step 1: 优先使用视觉模型
+            if (aiConfig.isVisionReady()) {
+                runOnUiThread(() -> updateMessage(statusIndex, "正在用视觉模型识别截图..."));
+                try {
+                    List<TransactionDraft> drafts = aiClient.parseVisionImage(this, "请提取截图里的记账信息。", imageBytes, mimeType);
+                    List<AssetAccount> assets = loadAccountingAssets();
+                    runOnUiThread(() -> {
+                        removeMessage(statusIndex);
+                        addDraftCardsReply(drafts, assets, "截图我已经整理好了。下面这些卡片可以直接保存，也可以继续修改。");
+                    });
+                    return;
+                } catch (Exception e) {
+                    // 视觉模型识别失败，回退到 OCR + 文本模型
+                }
+            }
+
+            // Step 2: 回退到 OCR + 文本模型
+            if (aiConfig.isTextReady()) {
+                runOnUiThread(() -> updateMessage(statusIndex, "正在用 OCR 识别截图..."));
+                try {
+                    OcrExtractResult ocrResult = ocrHelper.extract(bitmap);
+                    if (ocrResult.hasText()) {
+                        runOnUiThread(() -> updateMessage(statusIndex, "OCR 已提取文字，正在用文本模型生成账单..."));
+                        try {
+                            List<TransactionDraft> drafts = aiClient.parseText(this, ocrResult.buildPrompt());
+                            List<AssetAccount> assets = loadAccountingAssets();
                             runOnUiThread(() -> {
                                 removeMessage(statusIndex);
-                                if (!ocrResult.isSufficientForAccounting() && !aiConfig.isVisionReady()) {
-                                    addMessage(ChatMessage.aiText("这张图 OCR 信息不算完整，但你没配视觉模型，所以我先按 OCR 结果给你出卡片，建议重点看看金额和资产。"));
-                                }
                                 addDraftCardsReply(drafts, assets, "截图我已经整理好了。下面这些卡片可以直接保存，也可以继续修改。");
                             });
                             return;
+                        } catch (Exception e) {
+                            runOnUiThread(() -> updateMessage(statusIndex, "OCR 文字提取到了，但文本模型解析失败：" + e.getMessage()));
+                            return;
                         }
-                        fallbackReason = ocrResult.confidenceHint + "，正在改用视觉模型补识别";
-                    } catch (Exception e) {
-                        fallbackReason = "OCR 文字提取到了，但文本模型解析失败：" + e.getMessage();
+                    } else {
+                        if (aiConfig.isVisionReady()) {
+                            runOnUiThread(() -> updateMessage(statusIndex, "视觉模型识别失败，OCR 也没提取到有效文字，无法识别这张截图。"));
+                        } else {
+                            runOnUiThread(() -> updateMessage(statusIndex, "没有配置视觉模型，OCR 也没提取到有效文字，无法识别这张截图。"));
+                        }
+                    }
+                } catch (Exception e) {
+                    if (aiConfig.isVisionReady()) {
+                        runOnUiThread(() -> updateMessage(statusIndex, "视觉模型识别失败，OCR 也识别失败：" + e.getMessage()));
+                    } else {
+                        runOnUiThread(() -> updateMessage(statusIndex, "OCR 识别失败：" + e.getMessage()));
                     }
                 }
-            } catch (Exception e) {
-                fallbackReason = "OCR 识别失败：" + e.getMessage();
+            } else {
+                if (aiConfig.isVisionReady()) {
+                    runOnUiThread(() -> updateMessage(statusIndex, "视觉模型识别失败，文本模型也未配置，无法识别截图。"));
+                } else {
+                    runOnUiThread(() -> updateMessage(statusIndex, "没有配置视觉模型和文本模型，无法识别截图。请先在设置中配置 AI 模型。"));
+                }
             }
-
-            fallbackToVisionOrFail(statusIndex, imageBytes, mimeType, fallbackReason);
         }).start();
     }
 
     private void fallbackToVisionOrFail(int statusIndex, byte[] imageBytes, String mimeType, String fallbackReason) {
-        if (!aiConfig.isVisionReady()) {
-            runOnUiThread(() -> updateMessage(statusIndex, fallbackReason + "\n未配置视觉模型，无法继续补识别。"));
-            return;
-        }
-
-        runOnUiThread(() -> updateMessage(statusIndex, fallbackReason + "\n正在调用视觉模型继续识别..."));
-        try {
-            List<TransactionDraft> drafts = aiClient.parseVisionImage(this, "请提取截图里的记账信息。", imageBytes, mimeType);
-            List<AssetAccount> assets = loadAccountingAssets();
-            runOnUiThread(() -> {
-                removeMessage(statusIndex);
-                addMessage(ChatMessage.aiText("这张图我已经切到视觉模型补识别了。"));
-                addDraftCardsReply(drafts, assets, "下面是我整理出的账单卡片。");
-            });
-        } catch (Exception e) {
-            runOnUiThread(() -> updateMessage(statusIndex, fallbackReason + "\n视觉模型兜底失败：" + e.getMessage()));
-        }
     }
-
     private boolean ensureTextReady() {
         aiConfig = AiConfig.load(this);
         aiClient.setConfig(aiConfig);
