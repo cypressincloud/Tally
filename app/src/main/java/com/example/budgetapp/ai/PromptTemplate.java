@@ -112,10 +112,14 @@ public class PromptTemplate {
 
         builder.append("\n\n【分类规则】");
         builder.append("\n1. 分类必须优先使用给定的项目分类。");
-        builder.append("\n2. 如果命中了二级分类，category 必须写对应一级分类，subCategory 必须写对应二级分类。");
-        builder.append("\n3. 如果没有适合的分类，category 使用\"其他\"，subCategory 留空。");
-        builder.append("\n4. 外卖、餐厅、饭、奶茶、咖啡、早餐、午餐、晚餐优先归为餐饮相关分类。");
-        builder.append("\n5. 便利店、超市、商场、淘宝、京东、拼多多、天猫优先归为购物相关分类，除非商品明显属于餐饮、交通、医疗等更具体分类。");
+        builder.append("\n2. 如果某一级分类有二级分类列表，强烈建议根据消费场景选择合适的二级分类填入 subCategory 字段。");
+        builder.append("\n3. 例如：餐饮 -> [早餐, 午餐, 晚餐, 夜宵, 快餐, 正餐, 奶茶饮品, 咖啡]，如果是奶茶店消费，category=\"餐饮\", subCategory=\"奶茶饮品\"。");
+        builder.append("\n4. 例如：购物 -> [便利店, 超市, 百货, 电商]，如果是美宜佳、7-11等便利店，category=\"购物\", subCategory=\"便利店\"。");
+        builder.append("\n5. 二级分类能让账单更精准，强烈建议优先使用二级分类。");
+        builder.append("\n6. 如果确实找不到合适的二级分类，subCategory 可以留空。");
+        builder.append("\n7. 如果没有适合的一级分类，category 使用\"其他\"，subCategory 留空。");
+        builder.append("\n8. 外卖、餐厅、饭、奶茶、咖啡、早餐、午餐、晚餐优先归为餐饮相关分类及对应二级分类。");
+        builder.append("\n9. 便利店、超市、商场、淘宝、京东、拼多多、天猫优先归为购物相关分类及对应二级分类，除非商品明显属于餐饮、交通、医疗等更具体分类。");
 
         builder.append("\n\n【备注规则】");
         builder.append("\n1. note 应简洁描述这笔账，例如商家名、商品名或用途。");

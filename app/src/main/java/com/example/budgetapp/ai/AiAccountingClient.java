@@ -426,10 +426,10 @@ public class AiAccountingClient {
         // 添加 JSON 示例
         builder.append("\n\n只返回 JSON 数组。示例：");
         builder.append("[");
-        builder.append("{\"type\":0,\"amount\":5.00,\"category\":\"购物\",\"subCategory\":\"\",\"note\":\"美宜佳\",\"asset\":\"\",\"time\":\"")
+        builder.append("{\"type\":0,\"amount\":5.00,\"category\":\"购物\",\"subCategory\":\"便利店\",\"note\":\"美宜佳\",\"asset\":\"\",\"time\":\"")
                 .append(currentTime)
                 .append("\"},");
-        builder.append("{\"type\":0,\"amount\":19.90,\"category\":\"购物\",\"subCategory\":\"\",\"note\":\"美宜佳\",\"asset\":\"\",\"time\":\"")
+        builder.append("{\"type\":0,\"amount\":19.90,\"category\":\"餐饮\",\"subCategory\":\"快餐\",\"note\":\"麦当劳\",\"asset\":\"\",\"time\":\"")
                 .append(currentTime)
                 .append("\"}");
         builder.append("]");
