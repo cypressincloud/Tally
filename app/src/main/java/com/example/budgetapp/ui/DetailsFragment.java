@@ -1272,8 +1272,8 @@ public class DetailsFragment extends Fragment {
         EditText etMax = v.findViewById(R.id.et_max_amount);
         EditText etCategory = v.findViewById(R.id.et_category);
         EditText etAsset = v.findViewById(R.id.et_asset);
-        com.google.android.material.button.MaterialButton btnStartDate = v.findViewById(R.id.btn_start_date);
-        com.google.android.material.button.MaterialButton btnEndDate = v.findViewById(R.id.btn_end_date);
+        TextView btnStartDate = v.findViewById(R.id.btn_start_date);
+        TextView btnEndDate = v.findViewById(R.id.btn_end_date);
 
         Spinner spType = v.findViewById(R.id.sp_filter_type);
         String[] types = {"全部", "支出", "收入", "加班"};
