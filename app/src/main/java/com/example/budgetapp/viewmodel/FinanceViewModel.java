@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
@@ -478,13 +479,83 @@ public class FinanceViewModel extends AndroidViewModel {
     // (在 ViewModel 中新增转移方法)
 
     /**
-     * 资产转移：处理余额增减（包含优惠逻辑），并生成一条转账记录
+     * 资产转移：处理余额增减（包含优惠逻辑和货币转换），并生成一条转账记录
      */
     public void transferAsset(AssetAccount fromAccount, AssetAccount toAccount, double amount, double discount, String note) {
         AppDatabase.databaseWriteExecutor.execute(() -> {
             // 实际扣款金额 = 设定转账金额 - 优惠金额
             double actualDeduct = amount - discount;
 
+            // 【新增】货币转换逻辑
+            SharedPreferences prefs = getApplication().getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE);
+            boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+            boolean singleCurrencyMode = prefs.getBoolean("single_currency_mode", false);
+            
+            // 如果启用了货币功能且开启了统一货币模式，需要进行汇率转换
+            if (isCurrencyEnabled && singleCurrencyMode) {
+                String fromCurrencySymbol = (fromAccount.currencySymbol != null && !fromAccount.currencySymbol.isEmpty()) 
+                    ? fromAccount.currencySymbol : "¥";
+                String toCurrencySymbol = (toAccount.currencySymbol != null && !toAccount.currencySymbol.isEmpty()) 
+                    ? toAccount.currencySymbol : "¥";
+                
+                String fromCurrencyCode = getCurrencyCode(fromCurrencySymbol);
+                String toCurrencyCode = getCurrencyCode(toCurrencySymbol);
+                
+                // 如果转出和转入账户的货币不同，需要进行汇率转换
+                if (!fromCurrencyCode.equals(toCurrencyCode)) {
+                    // 使用汇率管理器进行同步转换
+                    // 注意：这里使用简化处理，实际应该异步处理并在UI层显示转换结果
+                    // 但考虑到 ViewModel 已经在后台线程执行，我们直接同步获取缓存汇率
+                    com.example.budgetapp.util.ExchangeRateManager rateManager = 
+                        new com.example.budgetapp.util.ExchangeRateManager(getApplication());
+                    
+                    // 从缓存获取汇率（这里使用简化逻辑，假设缓存已存在）
+                    // 实际转账金额按汇率转换
+                    double convertedAmount = convertAmountSync(rateManager, amount, fromCurrencyCode, toCurrencyCode);
+                    double convertedDiscount = convertAmountSync(rateManager, discount, fromCurrencyCode, toCurrencyCode);
+                    double convertedActualDeduct = convertedAmount - convertedDiscount;
+                    
+                    // 1. 处理转出账户余额 (以转出币种的实际扣款金额计算)
+                    if (fromAccount.type == 1) {
+                        fromAccount.amount += actualDeduct;
+                    } else {
+                        fromAccount.amount -= actualDeduct;
+                    }
+
+                    // 2. 处理转入账户余额 (以转入币种的转换后金额计算)
+                    if (toAccount.type == 1) {
+                        toAccount.amount -= convertedAmount;
+                    } else {
+                        toAccount.amount += convertedAmount;
+                    }
+
+                    // 更新数据库中的资产信息
+                    assetDao.update(fromAccount);
+                    assetDao.update(toAccount);
+
+                    // 3. 生成对应的账单明细
+                    Transaction transaction = new Transaction();
+                    transaction.amount = actualDeduct; // 账单记录实际支出的金额（转出币种）
+                    transaction.type = 2; // 转账
+                    transaction.category = "资产互转";
+
+                    String noteContent = fromAccount.name + "(" + fromCurrencySymbol + String.format("%.2f", amount) + ") -> " 
+                                       + toAccount.name + "(" + toCurrencySymbol + String.format("%.2f", convertedAmount) + ")";
+                    if (discount > 0) {
+                        noteContent += " (优惠:" + discount + ")";
+                    }
+                    transaction.note = noteContent + (note.isEmpty() ? "" : " | 备注: " + note);
+                    transaction.date = System.currentTimeMillis();
+                    transaction.assetId = fromAccount.id;
+
+                    transactionDao.insert(transaction);
+                    com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
+                    notifyWidgetUpdate();
+                    return;
+                }
+            }
+            
+            // 【原有逻辑】：相同货币或未启用货币转换
             // 1. 处理转出账户余额 (以实际扣款金额计算)
             if (fromAccount.type == 1) {
                 // 从负债账户转出（例如用信用卡取现借出），意味着负债增加
@@ -526,6 +597,80 @@ public class FinanceViewModel extends AndroidViewModel {
             com.example.budgetapp.BackupManager.triggerAutoUploadIfEnabled(getApplication());
             notifyWidgetUpdate();
         });
+    }
+    
+    /**
+     * 同步获取汇率并转换金额（从缓存）
+     */
+    private double convertAmountSync(com.example.budgetapp.util.ExchangeRateManager rateManager, 
+                                     double amount, String fromCurrency, String toCurrency) {
+        if (fromCurrency.equals(toCurrency)) {
+            return amount;
+        }
+        
+        // 尝试从缓存获取汇率
+        SharedPreferences ratePrefs = getApplication().getSharedPreferences("exchange_rate_prefs", android.content.Context.MODE_PRIVATE);
+        try {
+            String ratesJson = ratePrefs.getString("rates_json", "{}");
+            String baseCurrency = ratePrefs.getString("base_currency", "");
+            
+            org.json.JSONObject rates = new org.json.JSONObject(ratesJson);
+            
+            // 如果基础货币是转出货币，直接获取转入货币汇率
+            if (baseCurrency.equals(fromCurrency) && rates.has(toCurrency)) {
+                double rate = rates.getDouble(toCurrency);
+                return amount * rate;
+            }
+            // 如果基础货币是转入货币，需要取倒数
+            else if (baseCurrency.equals(toCurrency) && rates.has(fromCurrency)) {
+                double rate = rates.getDouble(fromCurrency);
+                return amount / rate;
+            }
+            // 如果基础货币都不是，需要交叉计算
+            else if (rates.has(fromCurrency) && rates.has(toCurrency)) {
+                double fromRate = rates.getDouble(fromCurrency);
+                double toRate = rates.getDouble(toCurrency);
+                return amount * (toRate / fromRate);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("FinanceViewModel", "Error converting currency", e);
+        }
+        
+        // 如果无法转换，返回原金额
+        return amount;
+    }
+    
+    /**
+     * 将货币符号转换为货币代码
+     */
+    private String getCurrencyCode(String symbol) {
+        switch (symbol) {
+            case "¥": return "CNY";
+            case "$": return "USD";
+            case "€": return "EUR";
+            case "£": return "GBP";
+            case "₹": return "INR";
+            case "¢": return "JPY";
+            case "₩": return "KRW";
+            case "A$": return "AUD";
+            case "C$": return "CAD";
+            case "HK$": return "HKD";
+            case "S$": return "SGD";
+            case "₽": return "RUB";
+            case "R$": return "BRL";
+            case "R": return "ZAR";
+            case "₺": return "TRY";
+            case "฿": return "THB";
+            case "₱": return "PHP";
+            case "Rp": return "IDR";
+            case "RM": return "MYR";
+            case "₫": return "VND";
+            case "NT$": return "TWD";
+            case "Fr": return "CHF";
+            case "kr": return "SEK";
+            case "zł": return "PLN";
+            default: return "CNY";
+        }
     }
 // ================= 新增：动态按需加载 API =================
 

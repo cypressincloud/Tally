@@ -182,6 +182,19 @@ public class AssetsFragment extends Fragment {
         EditText etNote = view.findViewById(R.id.et_transfer_note);
         Button btnCancel = view.findViewById(R.id.btn_cancel);
         Button btnConfirm = view.findViewById(R.id.btn_confirm);
+        
+        // 【新增】货币转换提示标签（动态创建）
+        TextView tvConversionHint = new TextView(getContext());
+        tvConversionHint.setTextSize(12);
+        tvConversionHint.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary));
+        tvConversionHint.setPadding(16, 8, 16, 8);
+        tvConversionHint.setVisibility(View.GONE);
+        
+        // 将其添加到金额输入框下方
+        ViewGroup parent = (ViewGroup) etAmount.getParent();
+        int index = parent.indexOfChild(etAmount);
+        parent.addView(tvConversionHint, index + 1);
+        final TextView finalTvConversionHint = tvConversionHint;
 
         // 🌟 1. 分别为“转出”和“转入”创建数据列表，并插入专属提示词
         List<String> fromAccountNames = new ArrayList<>();
@@ -206,6 +219,35 @@ public class AssetsFragment extends Fragment {
         // 默认显示为第0项（即提示词）
         spinnerFrom.setSelection(0);
         spinnerTo.setSelection(0);
+        
+        // 【新增】监听账户选择和金额输入，实时显示货币转换提示
+        android.widget.AdapterView.OnItemSelectedListener accountChangeListener = new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                updateCurrencyConversionHint(spinnerFrom, spinnerTo, etAmount, finalTvConversionHint);
+            }
+            
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {
+                finalTvConversionHint.setVisibility(View.GONE);
+            }
+        };
+        
+        spinnerFrom.setOnItemSelectedListener(accountChangeListener);
+        spinnerTo.setOnItemSelectedListener(accountChangeListener);
+        
+        etAmount.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateCurrencyConversionHint(spinnerFrom, spinnerTo, etAmount, finalTvConversionHint);
+            }
+            
+            @Override
+            public void afterTextChanged(android.text.Editable s) {}
+        });
 
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
@@ -314,6 +356,96 @@ public class AssetsFragment extends Fragment {
         };
         adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         return adapter;
+    }
+    
+    /**
+     * 【新增】更新货币转换提示
+     */
+    private void updateCurrencyConversionHint(android.widget.Spinner spinnerFrom, 
+                                              android.widget.Spinner spinnerTo, 
+                                              EditText etAmount, 
+                                              TextView tvHint) {
+        // 检查是否启用了货币功能和统一货币模式
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+        boolean singleCurrencyMode = prefs.getBoolean("single_currency_mode", false);
+        
+        if (!isCurrencyEnabled || !singleCurrencyMode) {
+            tvHint.setVisibility(View.GONE);
+            return;
+        }
+        
+        int fromIndex = spinnerFrom.getSelectedItemPosition();
+        int toIndex = spinnerTo.getSelectedItemPosition();
+        
+        // 如果任一账户未选择，隐藏提示
+        if (fromIndex == 0 || toIndex == 0) {
+            tvHint.setVisibility(View.GONE);
+            return;
+        }
+        
+        AssetAccount fromAccount = allAccounts.get(fromIndex - 1);
+        AssetAccount toAccount = allAccounts.get(toIndex - 1);
+        
+        String fromSymbol = (fromAccount.currencySymbol != null && !fromAccount.currencySymbol.isEmpty()) 
+            ? fromAccount.currencySymbol : "¥";
+        String toSymbol = (toAccount.currencySymbol != null && !toAccount.currencySymbol.isEmpty()) 
+            ? toAccount.currencySymbol : "¥";
+        
+        String fromCode = getCurrencyCode(fromSymbol);
+        String toCode = getCurrencyCode(toSymbol);
+        
+        // 如果是相同货币，隐藏提示
+        if (fromCode.equals(toCode)) {
+            tvHint.setVisibility(View.GONE);
+            return;
+        }
+        
+        // 获取输入金额
+        String amountStr = etAmount.getText().toString().trim();
+        if (amountStr.isEmpty()) {
+            tvHint.setVisibility(View.GONE);
+            return;
+        }
+        
+        try {
+            double amount = Double.parseDouble(amountStr);
+            if (amount <= 0) {
+                tvHint.setVisibility(View.GONE);
+                return;
+            }
+            
+            // 异步获取汇率并显示转换后金额
+            com.example.budgetapp.util.ExchangeRateManager rateManager = 
+                new com.example.budgetapp.util.ExchangeRateManager(getContext());
+            
+            rateManager.getExchangeRate(fromCode, toCode, new com.example.budgetapp.util.ExchangeRateManager.ExchangeRateCallback() {
+                @Override
+                public void onSuccess(double rate) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            double convertedAmount = amount * rate;
+                            String hint = String.format("💱 汇率转换: %s%.2f ≈ %s%.2f (汇率: 1:%s)", 
+                                fromSymbol, amount, toSymbol, convertedAmount, String.format("%.4f", rate));
+                            tvHint.setText(hint);
+                            tvHint.setVisibility(View.VISIBLE);
+                        });
+                    }
+                }
+                
+                @Override
+                public void onError(String error) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            tvHint.setText("⚠️ 汇率获取失败，将使用缓存汇率");
+                            tvHint.setVisibility(View.VISIBLE);
+                        });
+                    }
+                }
+            });
+        } catch (NumberFormatException e) {
+            tvHint.setVisibility(View.GONE);
+        }
     }
 
     private void updateAssetCategoryFilterBar() {

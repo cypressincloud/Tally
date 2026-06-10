@@ -86,7 +86,6 @@ import java.util.regex.Pattern;
 
 public class StatsFragment extends Fragment {
 
-    // ... (成员变量部分保持不变) ...
     private FinanceViewModel viewModel;
     private LineChart lineChart;
     private PieChart expensePieChart;
@@ -177,10 +176,6 @@ public class StatsFragment extends Fragment {
 
         cardSummary = view.findViewById(R.id.card_summary);
     }
-
-    // ... (中间的 setupGestures, setupListeners, changeDate, updateDateRangeDisplay 等未修改方法省略，保持原样) ...
-    // 为了篇幅，这里假设 setupGestures, setupListeners, changeDate, updateDateRangeDisplay, showCustomDatePicker, updatePreviewText, refreshData, processYearlyData, processMonthlyData, processWeeklyData, aggregateData, updateCharts, updateSinglePieChart, updateSummarySection, checkHasOvertime, calculateAndShowOvertime, generateThemeColors, createLineDataSet, setupLineChart, setupPieCharts, initPieChartStyle 均保持原样。
-    // 请确保您的代码中包含这些方法。
 
     // 【修改】showCategoryDetailDialog 方法
     private void showCategoryDetailDialog(String category, int type) {
@@ -404,33 +399,131 @@ public class StatsFragment extends Fragment {
 
         currentCategoryDetailAdapter.setTransactions(filteredList);
 
-        // ================= 新增：动态计算并更新汇总金额 =================
+        // ================= 新增：动态计算并更新汇总金额（支持多币种） =================
         if (currentDetailSummaryTextView != null) {
-            double totalAmount = 0;
-            for (Transaction t : filteredList) {
-                totalAmount += t.amount;
-            }
-
-            if (filteredList.isEmpty() && totalAmount == 0) {
+            if (filteredList.isEmpty()) {
                 currentDetailSummaryTextView.setVisibility(View.GONE);
             } else {
                 currentDetailSummaryTextView.setVisibility(View.VISIBLE);
+                
+                // 检查是否启用多币种
+                SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+                boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
+                
                 SpannableStringBuilder ssb = new SpannableStringBuilder();
-
-                if (currentDetailType == 0) { // 支出
-                    int colorExpense = ContextCompat.getColor(requireContext(), R.color.expense_green);
-                    String expStr = String.format(Locale.CHINA, "支出: %.2f", totalAmount);
+                int colorMain = (currentDetailType == 0) 
+                    ? ContextCompat.getColor(requireContext(), R.color.expense_green)
+                    : ContextCompat.getColor(requireContext(), R.color.income_red);
+                int colorSecondary = ContextCompat.getColor(requireContext(), R.color.text_secondary);
+                
+                if (!isCurrencyEnabled) {
+                    // ===== 单一币种模式 =====
+                    double totalAmount = 0;
+                    for (Transaction t : filteredList) {
+                        totalAmount += t.amount;
+                    }
+                    
+                    int count = filteredList.size();
+                    double average = totalAmount / count;
+                    
+                    String typeStr = (currentDetailType == 0) ? "支出" : "收入";
+                    String mainStr = String.format(Locale.CHINA, "%s %.2f", typeStr, totalAmount);
                     int start = ssb.length();
-                    ssb.append(expStr);
-                    ssb.setSpan(new ForegroundColorSpan(colorExpense), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                } else { // 收入
-                    int colorIncome = ContextCompat.getColor(requireContext(), R.color.income_red);
-                    String incStr = String.format(Locale.CHINA, "收入: %.2f", totalAmount);
+                    ssb.append(mainStr);
+                    ssb.setSpan(new ForegroundColorSpan(colorMain), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    ssb.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    
+                    String countStr = String.format(Locale.CHINA, "  共 %d 条", count);
+                    start = ssb.length();
+                    ssb.append(countStr);
+                    ssb.setSpan(new ForegroundColorSpan(colorSecondary), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    
+                    String avgStr = String.format(Locale.CHINA, "  平均 %.2f", average);
+                    start = ssb.length();
+                    ssb.append(avgStr);
+                    ssb.setSpan(new ForegroundColorSpan(colorSecondary), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    
+                } else {
+                    // ===== 多币种模式 =====
+                    // 按货币符号分组统计
+                    Map<String, Double> currencyTotals = new java.util.TreeMap<>();
+                    for (Transaction t : filteredList) {
+                        // 获取交易关联的资产账户货币
+                        String symbol = "¥"; // 默认人民币
+                        if (t.assetId != 0 && assetList != null) {
+                            for (AssetAccount asset : assetList) {
+                                if (asset.id == t.assetId) {
+                                    if (asset.currencySymbol != null && !asset.currencySymbol.isEmpty()) {
+                                        symbol = asset.currencySymbol;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        currencyTotals.put(symbol, currencyTotals.getOrDefault(symbol, 0.0) + t.amount);
+                    }
+                    
+                    int count = filteredList.size();
+                    String typeStr = (currentDetailType == 0) ? "支出" : "收入";
+                    
+                    // 显示各币种总额
+                    boolean first = true;
+                    for (Map.Entry<String, Double> entry : currencyTotals.entrySet()) {
+                        if (!first) {
+                            ssb.append("  ");
+                        }
+                        String amountStr = String.format(Locale.CHINA, "%s %s%.2f", 
+                            first ? typeStr : "", entry.getKey(), entry.getValue());
+                        int start = ssb.length();
+                        ssb.append(amountStr);
+                        ssb.setSpan(new ForegroundColorSpan(colorMain), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        if (first) {
+                            ssb.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        }
+                        first = false;
+                    }
+                    
+                    // 显示总条数
+                    String countStr = String.format(Locale.CHINA, "  共 %d 条", count);
                     int start = ssb.length();
-                    ssb.append(incStr);
-                    ssb.setSpan(new ForegroundColorSpan(colorIncome), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    ssb.append(countStr);
+                    ssb.setSpan(new ForegroundColorSpan(colorSecondary), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    
+                    // 显示各币种平均值
+                    ssb.append("  平均 ");
+                    first = true;
+                    for (Map.Entry<String, Double> entry : currencyTotals.entrySet()) {
+                        // 计算该币种的交易数量
+                        int currencyCount = 0;
+                        for (Transaction t : filteredList) {
+                            String symbol = "¥";
+                            if (t.assetId != 0 && assetList != null) {
+                                for (AssetAccount asset : assetList) {
+                                    if (asset.id == t.assetId) {
+                                        if (asset.currencySymbol != null && !asset.currencySymbol.isEmpty()) {
+                                            symbol = asset.currencySymbol;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                            if (symbol.equals(entry.getKey())) {
+                                currencyCount++;
+                            }
+                        }
+                        
+                        double average = entry.getValue() / currencyCount;
+                        if (!first) {
+                            ssb.append("/");
+                        }
+                        String avgStr = String.format(Locale.CHINA, "%s%.2f", entry.getKey(), average);
+                        start = ssb.length();
+                        ssb.append(avgStr);
+                        ssb.setSpan(new ForegroundColorSpan(colorSecondary), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        first = false;
+                    }
                 }
-
+                
                 currentDetailSummaryTextView.setText(ssb);
             }
         }
