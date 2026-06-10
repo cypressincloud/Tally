@@ -87,6 +87,56 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="时间范围"
+            android:textSize="14sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/btn_start_date"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:hint="起始日期"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_input_field"
+                android:paddingHorizontal="16dp"
+                android:textSize="14sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textColorHint="?android:attr/textColorSecondary"
+                android:clickable="true"
+                android:focusable="true"/>
+
+            <View android:layout_width="12dp" android:layout_height="1dp"
+                android:background="@color/divider_color"
+                android:layout_gravity="center"
+                android:layout_marginHorizontal="8dp"/>
+
+            <TextView
+                android:id="@+id/btn_end_date"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:hint="结束日期"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_input_field"
+                android:paddingHorizontal="16dp"
+                android:textSize="14sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textColorHint="?android:attr/textColorSecondary"
+                android:clickable="true"
+                android:focusable="true"/>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="分类关键字"
             android:textSize="14sp"
             android:textColor="?android:attr/textColorSecondary"
@@ -118,47 +168,7 @@
             android:background="@drawable/bg_input_field"
             android:paddingHorizontal="16dp"
             android:textSize="14sp"
-            android:layout_marginBottom="16dp"/>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="时间范围"
-            android:textSize="14sp"
-            android:textColor="?android:attr/textColorSecondary"
-            android:layout_marginBottom="8dp"/>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="24dp">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_start_date"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_weight="1"
-                android:text="起始时间"
-                android:textColor="@color/text_primary"
-                android:backgroundTint="@color/input_bg"
-                app:cornerRadius="12dp"
-                android:layout_marginEnd="8dp"
-                android:textSize="13sp"
-                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_end_date"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_weight="1"
-                android:text="结束时间"
-                android:textColor="@color/text_primary"
-                android:backgroundTint="@color/input_bg"
-                app:cornerRadius="12dp"
-                android:textSize="13sp"
-                style="@style/Widget.MaterialComponents.Button.UnelevatedButton"/>
-        </LinearLayout>
+            android:layout_marginBottom="24dp"/>
 
         <LinearLayout
             android:layout_width="match_parent"
