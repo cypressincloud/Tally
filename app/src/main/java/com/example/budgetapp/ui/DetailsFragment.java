@@ -206,12 +206,15 @@ public class DetailsFragment extends Fragment {
         Float minAmount, maxAmount;
         String category, assetName;
         Integer type;
+        Long startTime, endTime; // 添加时间筛选字段
         void clear() {
             minAmount = null;
             maxAmount = null;
             category = null;
             assetName = null;
             type = null;
+            startTime = null;
+            endTime = null;
         }
     }
     private final FilterCriteria currentFilter = new FilterCriteria();
@@ -656,6 +659,20 @@ public class DetailsFragment extends Fragment {
     }
 
     private long[] getTimeRange() {
+        // 如果筛选器中设置了自定义时间范围，优先使用
+        if (currentFilter.startTime != null && currentFilter.endTime != null) {
+            return new long[]{currentFilter.startTime, currentFilter.endTime + 86400000L - 1}; // 结束时间加一天减1毫秒（到23:59:59.999）
+        }
+        if (currentFilter.startTime != null) {
+            // 只设置了起始时间，结束时间使用当前时间
+            return new long[]{currentFilter.startTime, System.currentTimeMillis()};
+        }
+        if (currentFilter.endTime != null) {
+            // 只设置了结束时间，起始时间使用2000年1月1日
+            return new long[]{946656000000L, currentFilter.endTime + 86400000L - 1}; // 2000-01-01 00:00:00
+        }
+        
+        // 没有设置自定义时间，使用原有的年/月/周逻辑
         ZoneId zone = ZoneId.systemDefault();
         if (currentMode == 0) return new long[]{selectedDate.with(TemporalAdjusters.firstDayOfYear()).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.lastDayOfYear()).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
         if (currentMode == 2) return new long[]{selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
@@ -1255,6 +1272,8 @@ public class DetailsFragment extends Fragment {
         EditText etMax = v.findViewById(R.id.et_max_amount);
         EditText etCategory = v.findViewById(R.id.et_category);
         EditText etAsset = v.findViewById(R.id.et_asset);
+        com.google.android.material.button.MaterialButton btnStartDate = v.findViewById(R.id.btn_start_date);
+        com.google.android.material.button.MaterialButton btnEndDate = v.findViewById(R.id.btn_end_date);
 
         Spinner spType = v.findViewById(R.id.sp_filter_type);
         String[] types = {"全部", "支出", "收入", "加班"};
@@ -1262,6 +1281,7 @@ public class DetailsFragment extends Fragment {
         typeAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         spType.setAdapter(typeAdapter);
 
+        // 数据回显
         if (currentFilter.minAmount != null) {
             etMin.setText(String.valueOf(currentFilter.minAmount).replaceAll("\\.0$", ""));
         }
@@ -1285,6 +1305,31 @@ public class DetailsFragment extends Fragment {
         } else if (currentFilter.type == 2) {
             spType.setSelection(3);
         }
+
+        // 时间回显
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        if (currentFilter.startTime != null) {
+            btnStartDate.setText(dateFormat.format(new java.util.Date(currentFilter.startTime)));
+        }
+        if (currentFilter.endTime != null) {
+            btnEndDate.setText(dateFormat.format(new java.util.Date(currentFilter.endTime)));
+        }
+
+        // 起始时间选择
+        btnStartDate.setOnClickListener(view -> {
+            showDateTimePicker(currentFilter.startTime, selectedMillis -> {
+                currentFilter.startTime = selectedMillis;
+                btnStartDate.setText(dateFormat.format(new java.util.Date(selectedMillis)));
+            });
+        });
+
+        // 结束时间选择
+        btnEndDate.setOnClickListener(view -> {
+            showDateTimePicker(currentFilter.endTime, selectedMillis -> {
+                currentFilter.endTime = selectedMillis;
+                btnEndDate.setText(dateFormat.format(new java.util.Date(selectedMillis)));
+            });
+        });
 
         v.findViewById(R.id.btn_apply).setOnClickListener(view -> {
             String minStr = etMin.getText().toString();
@@ -1317,6 +1362,82 @@ public class DetailsFragment extends Fragment {
         });
 
         dialog.show();
+    }
+
+    /**
+     * 显示日期时间选择器
+     */
+    private void showDateTimePicker(Long currentMillis, java.util.function.Consumer<Long> onDateSelected) {
+        java.util.Calendar calendar = java.util.Calendar.getInstance();
+        if (currentMillis != null) {
+            calendar.setTimeInMillis(currentMillis);
+        }
+
+        com.google.android.material.bottomsheet.BottomSheetDialog dialog = new com.google.android.material.bottomsheet.BottomSheetDialog(requireContext());
+        dialog.setContentView(R.layout.dialog_bottom_date_picker);
+
+        dialog.setOnShowListener(d -> {
+            View bottomSheet = ((com.google.android.material.bottomsheet.BottomSheetDialog) d).findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) bottomSheet.setBackgroundResource(android.R.color.transparent);
+        });
+
+        NumberPicker npYear = dialog.findViewById(R.id.np_year);
+        NumberPicker npMonth = dialog.findViewById(R.id.np_month);
+        NumberPicker npDay = dialog.findViewById(R.id.np_day);
+        TextView tvPreview = dialog.findViewById(R.id.tv_date_preview);
+        Button btnCancel = dialog.findViewById(R.id.btn_cancel);
+        Button btnConfirm = dialog.findViewById(R.id.btn_confirm);
+
+        npYear.setMinValue(2000);
+        npYear.setMaxValue(2050);
+        npYear.setValue(calendar.get(java.util.Calendar.YEAR));
+
+        npMonth.setMinValue(1);
+        npMonth.setMaxValue(12);
+        npMonth.setValue(calendar.get(java.util.Calendar.MONTH) + 1);
+
+        npDay.setMinValue(1);
+        int maxDay = calendar.getActualMaximum(java.util.Calendar.DAY_OF_MONTH);
+        npDay.setMaxValue(maxDay);
+        npDay.setValue(calendar.get(java.util.Calendar.DAY_OF_MONTH));
+
+        java.util.function.BiConsumer<Integer, Integer> updateDayRange = (year, month) -> {
+            java.util.Calendar temp = java.util.Calendar.getInstance();
+            temp.set(year, month - 1, 1);
+            int maxDays = temp.getActualMaximum(java.util.Calendar.DAY_OF_MONTH);
+            if (npDay.getMaxValue() != maxDays) {
+                npDay.setMaxValue(maxDays);
+                if (npDay.getValue() > maxDays) npDay.setValue(maxDays);
+            }
+        };
+
+        NumberPicker.OnValueChangeListener listener = (picker, oldVal, newVal) -> {
+            updateDayRange.accept(npYear.getValue(), npMonth.getValue());
+            updatePreview(tvPreview, npYear.getValue(), npMonth.getValue(), npDay.getValue());
+        };
+
+        npYear.setOnValueChangedListener(listener);
+        npMonth.setOnValueChangedListener(listener);
+        npDay.setOnValueChangedListener(listener);
+
+        updatePreview(tvPreview, npYear.getValue(), npMonth.getValue(), npDay.getValue());
+
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        btnConfirm.setOnClickListener(v -> {
+            java.util.Calendar selected = java.util.Calendar.getInstance();
+            selected.set(npYear.getValue(), npMonth.getValue() - 1, npDay.getValue(), 0, 0, 0);
+            selected.set(java.util.Calendar.MILLISECOND, 0);
+            onDateSelected.accept(selected.getTimeInMillis());
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    private void updatePreview(TextView tvPreview, int year, int month, int day) {
+        if (tvPreview != null) {
+            tvPreview.setText(String.format(Locale.getDefault(), "%d年%02d月%02d日", year, month, day));
+        }
     }
 
     class DecimalDigitsInputFilter implements InputFilter {
