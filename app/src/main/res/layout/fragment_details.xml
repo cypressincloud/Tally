@@ -118,6 +118,18 @@
                     android:background="@null"
                     app:tint="@color/text_primary" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_statistics_summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:gravity="center"
+                android:text="账单 0 条  支出 0.00  收入 0.00  结余 0.00"/>
         </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView

@@ -78,6 +78,7 @@ public class DetailsFragment extends Fragment {
 
     private FinanceViewModel viewModel;
     private RecyclerView recyclerView;
+    private TextView tvStatisticsSummary;
     private DetailsAdapter adapter;
     private List<Transaction> allTransactions = new ArrayList<>();
     private List<AssetAccount> assetList = new ArrayList<>();
@@ -258,6 +259,8 @@ public class DetailsFragment extends Fragment {
         recyclerView = view.findViewById(R.id.recycler_details);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         recyclerView.setItemAnimator(null);
+        
+        tvStatisticsSummary = view.findViewById(R.id.tv_statistics_summary);
 
         adapter = new DetailsAdapter();
         adapter.setOnTransactionClickListener(t -> {
@@ -649,6 +652,9 @@ public class DetailsFragment extends Fragment {
             if (list != null) {
                 // 🌟 修改点：将分页流替换为常规的 List 更新
                 adapter.setTransactions(list);
+                
+                // 更新统计信息
+                updateStatisticsSummary(list);
             }
 
             if (getContext() != null && recyclerView != null && direction != 0) {
@@ -677,6 +683,71 @@ public class DetailsFragment extends Fragment {
         if (currentMode == 0) return new long[]{selectedDate.with(TemporalAdjusters.firstDayOfYear()).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.lastDayOfYear()).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
         if (currentMode == 2) return new long[]{selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
         return new long[]{selectedDate.with(TemporalAdjusters.firstDayOfMonth()).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.lastDayOfMonth()).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
+    }
+
+    /**
+     * 更新统计信息摘要
+     */
+    private void updateStatisticsSummary(List<Transaction> transactions) {
+        if (tvStatisticsSummary == null || transactions == null) {
+            return;
+        }
+
+        int count = 0;
+        double totalExpense = 0;
+        double totalIncome = 0;
+
+        for (Transaction t : transactions) {
+            // 排除转账类型（type=2）
+            if (t.type == 2 || "资产互转".equals(t.category)) {
+                continue;
+            }
+            
+            count++; // 只计算非转账账单
+            
+            if (t.type == 0) { // 支出
+                totalExpense += t.amount;
+            } else if (t.type == 1) { // 收入
+                totalIncome += t.amount;
+            }
+        }
+
+        double balance = totalIncome - totalExpense;
+
+        // 使用 SpannableStringBuilder 实现不同颜色
+        SpannableStringBuilder ssb = new SpannableStringBuilder();
+        int colorSecondary = ContextCompat.getColor(requireContext(), R.color.text_secondary);
+        int colorExpense = ContextCompat.getColor(requireContext(), R.color.expense_green);
+        int colorIncome = ContextCompat.getColor(requireContext(), R.color.income_red);
+        int colorBalance = balance >= 0 
+            ? ContextCompat.getColor(requireContext(), R.color.income_red) 
+            : ContextCompat.getColor(requireContext(), R.color.expense_green);
+
+        // 账单条数
+        String countStr = String.format(Locale.CHINA, "账单 %d 条  ", count);
+        int start = ssb.length();
+        ssb.append(countStr);
+        ssb.setSpan(new ForegroundColorSpan(colorSecondary), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        // 支出
+        String expenseStr = String.format(Locale.CHINA, "支出 %.2f  ", totalExpense);
+        start = ssb.length();
+        ssb.append(expenseStr);
+        ssb.setSpan(new ForegroundColorSpan(colorExpense), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        // 收入
+        String incomeStr = String.format(Locale.CHINA, "收入 %.2f  ", totalIncome);
+        start = ssb.length();
+        ssb.append(incomeStr);
+        ssb.setSpan(new ForegroundColorSpan(colorIncome), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        // 结余
+        String balanceStr = String.format(Locale.CHINA, "结余 %.2f", balance);
+        start = ssb.length();
+        ssb.append(balanceStr);
+        ssb.setSpan(new ForegroundColorSpan(colorBalance), start, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        tvStatisticsSummary.setText(ssb);
     }
 
     private void showAddOrEditDialog(Transaction existingTransaction, LocalDate date) {
