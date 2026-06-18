@@ -90,14 +90,18 @@ public class DetailsFragment extends Fragment {
     private GestureDetector gestureDetector;
     private LocalDate selectedDate = LocalDate.now();
     private int currentMode = 1; // 0:年, 1:月, 2:周
+    
+    // 手势处理相关变量（参考统计模块）
+    private float touchStartX, touchStartY;
+    private boolean isDirectionLocked = false;
+    private boolean isHorizontalSwipe = false;
+    private int touchSlop;
 
     private static final String PREFS_NAME = "details_prefs";
     private static final String KEY_TIME_MODE = "time_mode";
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     private final SimpleDateFormat displayDateFormat = new SimpleDateFormat("MM月dd日 EEEE", Locale.getDefault());
-
-    private int touchSlop;
 
     // FAB 滚动隐藏相关
     private FloatingActionButton btnQuickRecord;
@@ -113,94 +117,131 @@ public class DetailsFragment extends Fragment {
     private List<AssetAccount> cachedAssets = new ArrayList<>();
     private AssistantConfig assistantConfig;
 
-    private void setupFollowHandSwipe(RecyclerView recyclerView) {
+    // 参考统计模块的手势处理实现（优化灵敏度）
+    private void setupFollowHandSwipe(androidx.core.widget.NestedScrollView scrollView) {
         touchSlop = android.view.ViewConfiguration.get(requireContext()).getScaledTouchSlop();
+        gestureDetector = new GestureDetector(requireContext(), new SwipeGestureListener());
 
-        recyclerView.addOnItemTouchListener(new RecyclerView.OnItemTouchListener() {
-            private float initialX = 0f;
-            private float initialY = 0f;
-            private boolean isHorizontalSwipe = false;
-
-            @Override
-            public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
-                switch (e.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        initialX = e.getRawX();
-                        initialY = e.getRawY();
-                        isHorizontalSwipe = false;
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        float dx = e.getRawX() - initialX;
-                        float dy = e.getRawY() - initialY;
-                        if (!isHorizontalSwipe && Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
-                            isHorizontalSwipe = true;
-                            if (rv.getParent() != null) {
-                                rv.getParent().requestDisallowInterceptTouchEvent(true);
-                            }
-                            return true;
+        scrollView.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    touchStartX = event.getX();
+                    touchStartY = event.getY();
+                    isDirectionLocked = false;
+                    isHorizontalSwipe = false;
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (!isDirectionLocked) {
+                        float dx = Math.abs(event.getX() - touchStartX);
+                        float dy = Math.abs(event.getY() - touchStartY);
+                        // 降低触发阈值，更快锁定方向
+                        if (dx > touchSlop * 0.8f || dy > touchSlop * 0.8f) {
+                            isDirectionLocked = true;
+                            // 横向滑动距离只需大于纵向1.2倍即可识别为横向
+                            if (dx > dy * 1.2f) isHorizontalSwipe = true;
+                            else isHorizontalSwipe = false;
                         }
-                        break;
-                }
-                return false;
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    isDirectionLocked = false;
+                    isHorizontalSwipe = false;
+                    break;
             }
-
-            @Override
-            public void onTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
-                if (!isHorizontalSwipe) return;
-
-                float dx = e.getRawX() - initialX;
-                float screenWidth = rv.getWidth();
-                if (screenWidth == 0) screenWidth = 1080;
-
-                switch (e.getAction()) {
-                    case MotionEvent.ACTION_MOVE:
-                        rv.setTranslationX(dx * 0.6f);
-                        rv.setAlpha(1f - (Math.abs(dx) / screenWidth) * 0.5f);
-                        break;
-
-                    case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
-                        if (dx > screenWidth * 0.2f) {
-                            finishSwipeAnimation(rv, screenWidth, -1);
-                        } else if (dx < -screenWidth * 0.2f) {
-                            finishSwipeAnimation(rv, -screenWidth, 1);
-                        } else {
-                            rv.animate().translationX(0f).alpha(1f).setDuration(250)
-                                    .setInterpolator(new android.view.animation.OvershootInterpolator()).start();
-                        }
-                        isHorizontalSwipe = false;
-                        break;
-                }
-            }
-
-            @Override
-            public void onRequestDisallowInterceptTouchEvent(boolean disallowIntercept) {}
+            return isDirectionLocked && isHorizontalSwipe; // 横向滑动时拦截事件
         });
+
+        // 给 RecyclerView 添加触摸监听器，让它也能响应横向滑动
+        View.OnTouchListener recyclerTouchListener = (v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            return false; // 返回 false 让事件继续传递
+        };
+
+        if (recyclerView != null) {
+            recyclerView.setOnTouchListener(recyclerTouchListener);
+        }
     }
 
-    private void finishSwipeAnimation(RecyclerView rv, float targetTranslationX, int offset) {
-        rv.animate()
-                .translationX(targetTranslationX)
-                .alpha(0f)
-                .setDuration(150)
-                .withEndAction(() -> {
-                    if (currentMode == 0) selectedDate = selectedDate.plusYears(offset);
-                    else if (currentMode == 1) selectedDate = selectedDate.plusMonths(offset);
-                    else selectedDate = selectedDate.plusWeeks(offset);
-                    updateDateRangeDisplay();
+    // 参考统计模块的滑动手势监听器（降低阈值提高灵敏度）
+    private class SwipeGestureListener extends GestureDetector.SimpleOnGestureListener {
+        private static final int SWIPE_THRESHOLD = 80;  // 降低距离阈值（原140）
+        private static final int SWIPE_VELOCITY_THRESHOLD = 100;  // 降低速度阈值（原200）
 
-                    rv.setTranslationX(-targetTranslationX * 0.5f);
+        @Override
+        public boolean onDown(@NonNull MotionEvent e) { 
+            return true; 
+        }
+        
+        @Override
+        public boolean onFling(@Nullable MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
+            if (e1 == null || e2 == null) return false;
+            float diffX = e2.getX() - e1.getX();
+            float diffY = e2.getY() - e1.getY();
 
-                    processAndDisplayData(0);
+            // 只要横向滑动距离大于纵向，就可能触发翻页
+            if (Math.abs(diffX) > Math.abs(diffY) * 1.2f) {
+                if (Math.abs(diffX) > SWIPE_THRESHOLD && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+                    if (diffX > 0) changeDate(-1, -1);
+                    else changeDate(1, 1);
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
 
-                    rv.animate()
+    // 参考统计模块的日期切换动画（只对账单列表做动画）
+    private void finishSwipeAnimation(int offset) {
+        // 只对账单列表做动画，统计信息卡片和顶部控制栏都保持固定
+        View[] animateViews = {recyclerView};
+
+        androidx.core.widget.NestedScrollView scrollView = getView() != null ? 
+            getView().findViewById(R.id.scroll_view_details) : null;
+        if (scrollView == null) return;
+        
+        float screenWidth = scrollView.getWidth();
+        if (screenWidth == 0) screenWidth = 1080;
+
+        // 计算滑出目标位移
+        float targetX = (offset > 0) ? -screenWidth : screenWidth;
+
+        // 第一阶段：旧数据整体滑出并淡出
+        for (View v : animateViews) {
+            if (v != null && v.getVisibility() == View.VISIBLE) {
+                v.animate()
+                        .translationX(targetX)
+                        .alpha(0f)
+                        .setDuration(150)
+                        .start();
+            }
+        }
+
+        // 第二阶段：更新内容后滑入
+        scrollView.postDelayed(() -> {
+            // 更新日期
+            if (currentMode == 0) selectedDate = selectedDate.plusYears(offset);
+            else if (currentMode == 1) selectedDate = selectedDate.plusMonths(offset);
+            else selectedDate = selectedDate.plusWeeks(offset);
+            
+            updateDateRangeDisplay();
+            processAndDisplayData(0);
+
+            // 从相反方向滑入
+            for (View v : animateViews) {
+                if (v != null && v.getVisibility() == View.VISIBLE) {
+                    v.setTranslationX(-targetX * 0.5f);
+                    v.setAlpha(0f);
+                    v.animate()
                             .translationX(0f)
                             .alpha(1f)
                             .setDuration(300)
                             .setInterpolator(new android.view.animation.DecelerateInterpolator())
                             .start();
-                })
-                .start();
+                }
+            }
+        }, 150);
     }
 
     private static class FilterCriteria {
@@ -275,7 +316,12 @@ public class DetailsFragment extends Fragment {
         });
 
         recyclerView.setAdapter(adapter);
-        setupFollowHandSwipe(recyclerView);
+        
+        // 获取 ScrollView 并设置手势监听
+        androidx.core.widget.NestedScrollView scrollView = view.findViewById(R.id.scroll_view_details);
+        if (scrollView != null) {
+            setupFollowHandSwipe(scrollView);
+        }
 
         // 初始化 AssistantConfig
         assistantConfig = new AssistantConfig(requireContext());
@@ -368,11 +414,8 @@ public class DetailsFragment extends Fragment {
     }
 
     private void changeDate(int offset, int direction) {
-        if (recyclerView != null) {
-            float screenWidth = recyclerView.getWidth();
-            if (screenWidth == 0) screenWidth = 1080;
-            finishSwipeAnimation(recyclerView, direction == 1 ? -screenWidth : screenWidth, offset);
-        }
+        // 调用新的动画方法
+        finishSwipeAnimation(offset);
     }
 
     private void updateDateRangeDisplay() {
@@ -678,7 +721,19 @@ public class DetailsFragment extends Fragment {
             return new long[]{946656000000L, currentFilter.endTime + 86400000L - 1}; // 2000-01-01 00:00:00
         }
         
-        // 没有设置自定义时间，使用原有的年/月/周逻辑
+        // 如果有其他筛选条件（类型、金额、分类、资产），则默认显示全部时间范围
+        boolean hasOtherFilters = currentFilter.type != null || 
+                                  currentFilter.minAmount != null || 
+                                  currentFilter.maxAmount != null || 
+                                  !TextUtils.isEmpty(currentFilter.category) || 
+                                  !TextUtils.isEmpty(currentFilter.assetName);
+        
+        if (hasOtherFilters) {
+            // 有其他筛选条件时，返回全部时间范围（2000年至今）
+            return new long[]{946656000000L, System.currentTimeMillis()}; // 2000-01-01 00:00:00 到现在
+        }
+        
+        // 没有任何筛选条件，使用原有的年/月/周逻辑
         ZoneId zone = ZoneId.systemDefault();
         if (currentMode == 0) return new long[]{selectedDate.with(TemporalAdjusters.firstDayOfYear()).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.lastDayOfYear()).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
         if (currentMode == 2) return new long[]{selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
@@ -1567,16 +1622,29 @@ public class DetailsFragment extends Fragment {
         View view = getView();
         if (view == null) return;
 
+        // 获取外层 FrameLayout (getView() 返回的就是根视图)
+        View frameLayout = view;
         View rootLayout = view.findViewById(R.id.root_layout_details);
         TextView tvTopTitle = view.findViewById(R.id.tv_top_title);
         RadioGroup rgTimeMode = view.findViewById(R.id.rg_time_mode);
+        androidx.core.widget.NestedScrollView scrollView = view.findViewById(R.id.scroll_view_details);
         RecyclerView recyclerDetails = view.findViewById(R.id.recycler_details);
+        com.google.android.material.floatingactionbutton.FloatingActionButton btnQuickRecord = view.findViewById(R.id.btn_quick_record_details);
+        TextView tvStatisticsSummary = view.findViewById(R.id.tv_statistics_summary);
+        View btnPrev = view.findViewById(R.id.btn_prev);
+        android.widget.LinearLayout llTimeControls = btnPrev != null ? (android.widget.LinearLayout) btnPrev.getParent() : null;
 
         if (isCustomBg) {
+            // ================= 自定义背景模式 =================
+            // 1. 基础大背景全透明，完全透出底层自定义图片
+            if (frameLayout != null) frameLayout.setBackgroundColor(Color.TRANSPARENT);
             if (rootLayout != null) rootLayout.setBackgroundColor(Color.TRANSPARENT);
             if (tvTopTitle != null) tvTopTitle.setBackgroundColor(Color.TRANSPARENT);
+            if (scrollView != null) scrollView.setBackgroundColor(Color.TRANSPARENT);
             if (recyclerDetails != null) recyclerDetails.setBackgroundColor(Color.TRANSPARENT);
+            if (llTimeControls != null) llTimeControls.setBackgroundColor(Color.TRANSPARENT);
 
+            // 2. 年月周切换栏：外框 90% 透明度，选中块 95% 透明度
             if (rgTimeMode != null) {
                 if (rgTimeMode.getBackground() != null) {
                     rgTimeMode.getBackground().mutate().setAlpha(230);
@@ -1588,10 +1656,41 @@ public class DetailsFragment extends Fragment {
                     }
                 }
             }
+
+            // 3. 统计信息文本：添加半透明圆角背景
+            if (tvStatisticsSummary != null && tvStatisticsSummary.getVisibility() == View.VISIBLE) {
+                android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+                shape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+                float radius = android.util.TypedValue.applyDimension(
+                        android.util.TypedValue.COMPLEX_UNIT_DIP, 12, getResources().getDisplayMetrics());
+                shape.setCornerRadius(radius);
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
+                shape.setColor(translucentSurface);
+                
+                // 添加内边距
+                int padding8dp = (int) android.util.TypedValue.applyDimension(
+                        android.util.TypedValue.COMPLEX_UNIT_DIP, 8, getResources().getDisplayMetrics());
+                tvStatisticsSummary.setBackground(shape);
+                tvStatisticsSummary.setPadding(padding8dp, padding8dp, padding8dp, padding8dp);
+            }
+
+            // 4. 快捷记账按钮：90% 透明度 (230) + 去除阴影
+            if (btnQuickRecord != null) {
+                int fabColor = ContextCompat.getColor(requireContext(), R.color.app_blue);
+                int translucentFab = androidx.core.graphics.ColorUtils.setAlphaComponent(fabColor, 230);
+                btnQuickRecord.setBackgroundTintList(ColorStateList.valueOf(translucentFab));
+                btnQuickRecord.setCompatElevation(0f);
+            }
+
         } else {
+            // ================= 恢复普通系统/日间/夜间模式 =================
+            if (frameLayout != null) frameLayout.setBackgroundResource(R.color.bar_background);
             if (rootLayout != null) rootLayout.setBackgroundResource(R.color.bar_background);
             if (tvTopTitle != null) tvTopTitle.setBackgroundResource(R.color.bar_background);
+            if (scrollView != null) scrollView.setBackgroundColor(Color.TRANSPARENT);
             if (recyclerDetails != null) recyclerDetails.setBackgroundResource(R.color.bar_background);
+            if (llTimeControls != null) llTimeControls.setBackgroundColor(Color.TRANSPARENT);
 
             if (rgTimeMode != null) {
                 if (rgTimeMode.getBackground() != null) {
@@ -1604,8 +1703,36 @@ public class DetailsFragment extends Fragment {
                     }
                 }
             }
+
+            // 恢复统计信息文本：移除背景，恢复原有边距
+            if (tvStatisticsSummary != null) {
+                tvStatisticsSummary.setBackground(null);
+                // 恢复原有的 margin，而不是 padding
+                int margin16dp = (int) android.util.TypedValue.applyDimension(
+                        android.util.TypedValue.COMPLEX_UNIT_DIP, 16, getResources().getDisplayMetrics());
+                int margin4dp = (int) android.util.TypedValue.applyDimension(
+                        android.util.TypedValue.COMPLEX_UNIT_DIP, 4, getResources().getDisplayMetrics());
+                int margin8dp = (int) android.util.TypedValue.applyDimension(
+                        android.util.TypedValue.COMPLEX_UNIT_DIP, 8, getResources().getDisplayMetrics());
+                
+                ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) tvStatisticsSummary.getLayoutParams();
+                params.leftMargin = margin16dp;
+                params.rightMargin = margin16dp;
+                params.topMargin = margin4dp;
+                params.bottomMargin = margin8dp;
+                tvStatisticsSummary.setLayoutParams(params);
+                tvStatisticsSummary.setPadding(0, 0, 0, 0);
+            }
+
+            // 恢复快捷记账按钮：100% 不透明 + 去除阴影（统一去阴影风格）
+            if (btnQuickRecord != null) {
+                int fabColor = ContextCompat.getColor(requireContext(), R.color.app_blue);
+                btnQuickRecord.setBackgroundTintList(ColorStateList.valueOf(fabColor));
+                btnQuickRecord.setCompatElevation(0f);
+            }
         }
 
+        // 刷新 RecyclerView 以应用列表项的背景变化
         if (adapter != null) adapter.notifyDataSetChanged();
     }
 
