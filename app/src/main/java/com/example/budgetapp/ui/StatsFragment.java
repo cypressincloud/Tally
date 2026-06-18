@@ -975,6 +975,7 @@ public class StatsFragment extends Fragment {
     // ... 其他辅助方法保持不变 (setupGestures, setupListeners, changeDate 等)
     private void setupGestures() {
         if (scrollView == null) return;
+        touchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
         gestureDetector = new GestureDetector(requireContext(), new SwipeGestureListener());
 
         scrollView.setOnTouchListener((v, event) -> {
@@ -990,10 +991,17 @@ public class StatsFragment extends Fragment {
                     if (!isDirectionLocked) {
                         float dx = Math.abs(event.getX() - touchStartX);
                         float dy = Math.abs(event.getY() - touchStartY);
-                        if (dx > touchSlop || dy > touchSlop) {
+                        // 更早锁定方向（降低阈值到50%）
+                        if (dx > touchSlop * 0.5f || dy > touchSlop * 0.5f) {
                             isDirectionLocked = true;
-                            if (dx > dy) isHorizontalSwipe = true;
-                            else isHorizontalSwipe = false;
+                            // 横向滑动距离只需大于纵向1.2倍即可识别为横向
+                            if (dx > dy * 1.2f) {
+                                isHorizontalSwipe = true;
+                                // 通知父视图不要拦截触摸事件
+                                scrollView.requestDisallowInterceptTouchEvent(true);
+                            } else {
+                                isHorizontalSwipe = false;
+                            }
                         }
                     }
                     break;
@@ -1001,11 +1009,13 @@ public class StatsFragment extends Fragment {
                 case MotionEvent.ACTION_CANCEL:
                     isDirectionLocked = false;
                     isHorizontalSwipe = false;
+                    scrollView.requestDisallowInterceptTouchEvent(false);
                     break;
             }
             return isDirectionLocked && isHorizontalSwipe;
         });
 
+        // 给图表添加触摸监听器，让它们也能响应横向滑动
         View.OnTouchListener chartTouchListener = (v, event) -> {
             gestureDetector.onTouchEvent(event);
             return false;
@@ -1017,18 +1027,22 @@ public class StatsFragment extends Fragment {
     }
 
     private class SwipeGestureListener extends GestureDetector.SimpleOnGestureListener {
-        private static final int SWIPE_THRESHOLD = 140;
-        private static final int SWIPE_VELOCITY_THRESHOLD = 200;
+        private static final int SWIPE_THRESHOLD = 80;  // 降低距离阈值
+        private static final int SWIPE_VELOCITY_THRESHOLD = 100;  // 降低速度阈值
 
         @Override
-        public boolean onDown(@NonNull MotionEvent e) { return true; }
+        public boolean onDown(@NonNull MotionEvent e) { 
+            return true; 
+        }
+        
         @Override
         public boolean onFling(@Nullable MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
             if (e1 == null || e2 == null) return false;
             float diffX = e2.getX() - e1.getX();
             float diffY = e2.getY() - e1.getY();
 
-            if (Math.abs(diffX) > Math.abs(diffY)) {
+            // 只要横向滑动距离大于纵向，就可能触发翻页
+            if (Math.abs(diffX) > Math.abs(diffY) * 1.2f) {
                 if (Math.abs(diffX) > SWIPE_THRESHOLD && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
                     if (diffX > 0) changeDate(-1);
                     else changeDate(1);
