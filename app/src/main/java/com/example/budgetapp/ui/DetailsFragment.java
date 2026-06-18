@@ -96,6 +96,7 @@ public class DetailsFragment extends Fragment {
     private boolean isDirectionLocked = false;
     private boolean isHorizontalSwipe = false;
     private int touchSlop;
+    private boolean hasHorizontalSwipeOccurred = false; // 标记是否发生了横向滑动
 
     private static final String PREFS_NAME = "details_prefs";
     private static final String KEY_TIME_MODE = "time_mode";
@@ -117,7 +118,7 @@ public class DetailsFragment extends Fragment {
     private List<AssetAccount> cachedAssets = new ArrayList<>();
     private AssistantConfig assistantConfig;
 
-    // 参考统计模块的手势处理实现（优化灵敏度）
+    // 参考统计模块的手势处理实现（优化方向锁定，防止冲突）
     private void setupFollowHandSwipe(androidx.core.widget.NestedScrollView scrollView) {
         touchSlop = android.view.ViewConfiguration.get(requireContext()).getScaledTouchSlop();
         gestureDetector = new GestureDetector(requireContext(), new SwipeGestureListener());
@@ -130,17 +131,24 @@ public class DetailsFragment extends Fragment {
                     touchStartY = event.getY();
                     isDirectionLocked = false;
                     isHorizontalSwipe = false;
+                    hasHorizontalSwipeOccurred = false; // 重置标志
                     break;
                 case MotionEvent.ACTION_MOVE:
                     if (!isDirectionLocked) {
                         float dx = Math.abs(event.getX() - touchStartX);
                         float dy = Math.abs(event.getY() - touchStartY);
-                        // 降低触发阈值，更快锁定方向
-                        if (dx > touchSlop * 0.8f || dy > touchSlop * 0.8f) {
+                        // 更早锁定方向（降低阈值到50%）
+                        if (dx > touchSlop * 0.5f || dy > touchSlop * 0.5f) {
                             isDirectionLocked = true;
                             // 横向滑动距离只需大于纵向1.2倍即可识别为横向
-                            if (dx > dy * 1.2f) isHorizontalSwipe = true;
-                            else isHorizontalSwipe = false;
+                            if (dx > dy * 1.2f) {
+                                isHorizontalSwipe = true;
+                                hasHorizontalSwipeOccurred = true; // 标记发生了横向滑动
+                                // 通知父视图不要拦截触摸事件
+                                scrollView.requestDisallowInterceptTouchEvent(true);
+                            } else {
+                                isHorizontalSwipe = false;
+                            }
                         }
                     }
                     break;
@@ -148,19 +156,76 @@ public class DetailsFragment extends Fragment {
                 case MotionEvent.ACTION_CANCEL:
                     isDirectionLocked = false;
                     isHorizontalSwipe = false;
+                    scrollView.requestDisallowInterceptTouchEvent(false);
+                    // 延迟重置标志，确保点击事件能检查到
+                    scrollView.postDelayed(() -> hasHorizontalSwipeOccurred = false, 100);
                     break;
             }
             return isDirectionLocked && isHorizontalSwipe; // 横向滑动时拦截事件
         });
 
-        // 给 RecyclerView 添加触摸监听器，让它也能响应横向滑动
-        View.OnTouchListener recyclerTouchListener = (v, event) -> {
-            gestureDetector.onTouchEvent(event);
-            return false; // 返回 false 让事件继续传递
-        };
-
+        // 给 RecyclerView 添加触摸拦截器（使用 addOnItemTouchListener）
         if (recyclerView != null) {
-            recyclerView.setOnTouchListener(recyclerTouchListener);
+            recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+                private float startX = 0f;
+                private float startY = 0f;
+                private boolean horizontalSwipeDetected = false;
+
+                @Override
+                public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
+                    // 总是将触摸事件传递给 GestureDetector
+                    boolean consumed = gestureDetector.onTouchEvent(e);
+                    
+                    switch (e.getAction()) {
+                        case MotionEvent.ACTION_DOWN:
+                            startX = e.getX();
+                            startY = e.getY();
+                            horizontalSwipeDetected = false;
+                            hasHorizontalSwipeOccurred = false; // 重置标志
+                            break;
+                        case MotionEvent.ACTION_MOVE:
+                            if (!horizontalSwipeDetected) {
+                                float dx = Math.abs(e.getX() - startX);
+                                float dy = Math.abs(e.getY() - startY);
+                                // 更早检测横向滑动
+                                if (dx > touchSlop * 0.5f || dy > touchSlop * 0.5f) {
+                                    if (dx > dy * 1.2f) {
+                                        horizontalSwipeDetected = true;
+                                        hasHorizontalSwipeOccurred = true; // 标记发生了横向滑动
+                                        // 阻止 RecyclerView 拦截触摸事件
+                                        rv.requestDisallowInterceptTouchEvent(true);
+                                        // 拦截事件，防止账单项的点击
+                                        return true;
+                                    }
+                                }
+                            } else {
+                                // 已经检测到横向滑动，继续拦截后续的 MOVE 事件
+                                return true;
+                            }
+                            break;
+                        case MotionEvent.ACTION_UP:
+                        case MotionEvent.ACTION_CANCEL:
+                            boolean wasHorizontal = horizontalSwipeDetected;
+                            horizontalSwipeDetected = false;
+                            rv.requestDisallowInterceptTouchEvent(false);
+                            // 延迟重置标志，确保点击事件能检查到
+                            rv.postDelayed(() -> hasHorizontalSwipeOccurred = false, 100);
+                            // 如果是横向滑动结束，拦截 UP 事件
+                            if (wasHorizontal) {
+                                return true;
+                            }
+                            break;
+                    }
+                    
+                    return false;
+                }
+                
+                @Override
+                public void onTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
+                    // 横向滑动时，继续传递给 GestureDetector
+                    gestureDetector.onTouchEvent(e);
+                }
+            });
         }
     }
 
@@ -305,6 +370,11 @@ public class DetailsFragment extends Fragment {
 
         adapter = new DetailsAdapter();
         adapter.setOnTransactionClickListener(t -> {
+            // 如果刚刚发生了横向滑动，忽略点击事件
+            if (hasHorizontalSwipeOccurred) {
+                return;
+            }
+            
             boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
             if (isTransfer) {
                 showDeleteTransferDialog(t);

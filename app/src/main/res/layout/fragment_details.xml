@@ -150,7 +150,7 @@
                     android:layout_height="wrap_content"
                     android:nestedScrollingEnabled="false"
                     android:clipToPadding="false"
-                    android:paddingBottom="80dp"
+                    android:paddingBottom="16dp"
                     android:background="@color/bar_background"/>
 
             </LinearLayout>
