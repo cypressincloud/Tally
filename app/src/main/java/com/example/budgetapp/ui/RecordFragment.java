@@ -114,6 +114,7 @@ public class RecordFragment extends Fragment {
 
     // 账单滑动卡片相关
     private View layoutBillSlider;
+    private androidx.cardview.widget.CardView cardNoBill;
     private androidx.cardview.widget.CardView cardBillSlider;
     private ViewPager2 vpBillCard;
     private LinearLayout layoutIndicator;
@@ -320,6 +321,7 @@ public class RecordFragment extends Fragment {
         // 初始化账单滑动卡片
         cardBillSlider = view.findViewById(R.id.card_bill_slider);
         layoutBillSlider = view.findViewById(R.id.layout_bill_slider);
+        cardNoBill = view.findViewById(R.id.card_no_bill);
         vpBillCard = view.findViewById(R.id.vp_bill_card);
         layoutIndicator = view.findViewById(R.id.layout_indicator);
         setupBillSlider();
@@ -640,12 +642,16 @@ public class RecordFragment extends Fragment {
 
         // 如果有账单，显示账单卡片
         if (!dayTransactions.isEmpty()) {
-            cardBillSlider.setVisibility(View.VISIBLE);
-            cardBudgetStatus.setVisibility(View.GONE); // 隐藏预算卡片
+            if (cardBillSlider != null) cardBillSlider.setVisibility(View.VISIBLE);
+            if (cardBudgetStatus != null) cardBudgetStatus.setVisibility(View.GONE);
+            if (cardNoBill != null) cardNoBill.setVisibility(View.GONE);
             billSliderAdapter.setTransactions(dayTransactions);
             setupIndicators(dayTransactions.size());
         } else {
-            cardBillSlider.setVisibility(View.GONE);
+            // 没有账单数据时，显示"暂无账单"提示
+            if (cardBillSlider != null) cardBillSlider.setVisibility(View.GONE);
+            if (cardBudgetStatus != null) cardBudgetStatus.setVisibility(View.GONE);
+            if (cardNoBill != null) cardNoBill.setVisibility(View.VISIBLE);
         }
     }
 
@@ -767,7 +773,15 @@ public class RecordFragment extends Fragment {
                 cardBillSlider.setCardElevation(0f);
             }
 
-            // 5. 快捷记账按钮：85%透明度 (216) + 去除阴影
+            // 5. 【新增】暂无账单卡片：80%透明度
+            if (cardNoBill != null) {
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
+                cardNoBill.setCardBackgroundColor(translucentSurface);
+                cardNoBill.setCardElevation(0f);
+            }
+
+            // 6. 快捷记账按钮：85%透明度 (216) + 去除阴影
             if (btnQuickRecord != null) {
                 int fabColor = ContextCompat.getColor(requireContext(), R.color.app_blue);
                 int translucentFab = androidx.core.graphics.ColorUtils.setAlphaComponent(fabColor, 230);
@@ -800,6 +814,13 @@ public class RecordFragment extends Fragment {
                 int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
                 cardBillSlider.setCardBackgroundColor(surfaceColor);
                 cardBillSlider.setCardElevation(0f);
+            }
+
+            // 5. 【新增】暂无账单卡片：恢复普通背景
+            if (cardNoBill != null) {
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                cardNoBill.setCardBackgroundColor(surfaceColor);
+                cardNoBill.setCardElevation(0f);
             }
 
             if (btnQuickRecord != null) {

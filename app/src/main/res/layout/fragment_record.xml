@@ -341,6 +341,11 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
+    <!-- 暂无账单提示卡片 -->
+    <include
+        layout="@layout/card_no_bill"
+        android:id="@+id/layout_no_bill"/>
+
     <!-- 账单滑动卡片（替换预算卡片） -->
     <androidx.cardview.widget.CardView
         android:id="@+id/card_bill_slider"
