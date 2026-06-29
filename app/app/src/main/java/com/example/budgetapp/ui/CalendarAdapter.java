@@ -297,7 +297,8 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             if (bg != null) bg.setTint(themeColor);
 
             holder.tvDay.setTextColor(Color.WHITE);
-            holder.tvDay.setAlpha(1.0f);
+            holder.tvDay.setAlpha(1.0f); // 确保今天始终不透明，无论是否属于当月
+            holder.tvNet.setAlpha(1.0f); // 确保今天下方金额文字也不透明
             holder.itemView.setSelected(false);
 
         } else if (isRenewalDay) {

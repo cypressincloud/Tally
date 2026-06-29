@@ -297,10 +297,16 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             // [今天状态]：黄色实心背景 + 白色文字
             holder.itemView.setBackgroundResource(R.drawable.bg_calendar_today);
             Drawable bg = holder.itemView.getBackground();
-            if (bg != null) bg.setTint(themeColor);
+            if (bg != null) {
+                bg.setTint(themeColor);
+                // 如果今天不属于当月（如在下个月查看时），背景透明度应与上月日期一致
+                int bgAlpha = isCustomBg ? (isCurrentMonth ? 230 : 153) : 255;
+                bg.setAlpha(bgAlpha);
+            }
 
             holder.tvDay.setTextColor(Color.WHITE);
-            holder.tvDay.setAlpha(1.0f);
+            holder.tvDay.setAlpha(isCurrentMonth ? 1.0f : 0.3f);
+            holder.tvNet.setAlpha(isCurrentMonth ? 1.0f : 0.3f);
             holder.itemView.setSelected(false);
 
         } else if (isRenewalDay) {
