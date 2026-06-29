@@ -20,11 +20,13 @@ public class DefaultPageActivity extends AppCompatActivity {
 
     private RadioGroup radioGroupDefaultPage;
     private SwitchCompat switchDetailsQuickButton;
+    private SwitchCompat switchBillCard;
     private SharedPreferences prefs;
-    
+
     public static final String PREF_NAME = "app_prefs";
     public static final String KEY_DEFAULT_PAGE = "default_page";
     public static final String KEY_DETAILS_QUICK_BUTTON = "details_quick_button";
+    public static final String KEY_BILL_CARD = "bill_card";
     public static final int PAGE_RECORD = 0;
     public static final int PAGE_DETAILS = 1;
     public static final int PAGE_BUDGET = 2;
@@ -67,19 +69,28 @@ public class DefaultPageActivity extends AppCompatActivity {
         prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
         radioGroupDefaultPage = findViewById(R.id.radioGroupDefaultPage);
         switchDetailsQuickButton = findViewById(R.id.switchDetailsQuickButton);
+        switchBillCard = findViewById(R.id.switchBillCard);
 
         // 读取当前设置
         int currentPage = prefs.getInt(KEY_DEFAULT_PAGE, PAGE_RECORD);
         boolean showQuickButton = prefs.getBoolean(KEY_DETAILS_QUICK_BUTTON, true);
-        
+        boolean showBillCard = prefs.getBoolean(KEY_BILL_CARD, false);
+
         // 设置开关状态
         switchDetailsQuickButton.setChecked(showQuickButton);
-        
+        switchBillCard.setChecked(showBillCard);
+
         // 监听开关变化
         switchDetailsQuickButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
             prefs.edit().putBoolean(KEY_DETAILS_QUICK_BUTTON, isChecked).apply();
             String status = isChecked ? "显示" : "隐藏";
             Toast.makeText(this, "明细模块快捷按钮已设置为：" + status, Toast.LENGTH_SHORT).show();
+        });
+
+        switchBillCard.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean(KEY_BILL_CARD, isChecked).apply();
+            String status = isChecked ? "开启" : "关闭";
+            Toast.makeText(this, "账单卡片已设置为：" + status, Toast.LENGTH_SHORT).show();
         });
         
         // 设置选中状态

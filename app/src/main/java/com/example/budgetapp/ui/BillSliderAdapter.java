@@ -2,6 +2,9 @@ package com.example.budgetapp.ui;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -134,12 +137,24 @@ public class BillSliderAdapter extends RecyclerView.Adapter<BillSliderAdapter.Bi
             }
         });
 
-        // 透明度设置
+        // 自定义主题背景设置
         SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
-        int surfaceColor = ContextCompat.getColor(context, R.color.white);
-        holder.itemView.setBackgroundColor(isCustomBg ?
-                androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230) : surfaceColor);
+
+        if (isCustomBg) {
+            // 创建圆角矩形 Shape，使用 white 颜色（自动适配日间/夜间模式，与日历卡片一致）
+            GradientDrawable shape = new GradientDrawable();
+            shape.setShape(GradientDrawable.RECTANGLE);
+            shape.setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(
+                    ContextCompat.getColor(context, R.color.white), 230));
+            float radius = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, 16, context.getResources().getDisplayMetrics());
+            shape.setCornerRadius(radius);
+            holder.itemView.setBackground(shape);
+        } else {
+            // 普通模式：白色背景
+            holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.white));
+        }
     }
 
     private AssetAccount findAssetById(int assetId) {
