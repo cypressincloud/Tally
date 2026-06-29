@@ -17,6 +17,7 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Transaction;
+import com.example.budgetapp.util.AssetIconHelper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -117,12 +118,8 @@ public class BillSliderAdapter extends RecyclerView.Adapter<BillSliderAdapter.Bi
             if (asset != null) {
                 holder.llAssetInfo.setVisibility(View.VISIBLE);
                 holder.tvAssetName.setText(asset.name);
-                // 如果有资产图标 SVG，显示图标
-                if (asset.svgIcon != null && !asset.svgIcon.isEmpty()) {
-                    holder.ivAssetIcon.setVisibility(View.VISIBLE);
-                } else {
-                    holder.ivAssetIcon.setVisibility(View.GONE);
-                }
+                // 使用 AssetIconHelper 加载 SVG 图标
+                AssetIconHelper.bindSvgIcon(holder.ivAssetIcon, asset.svgIcon);
             } else {
                 holder.llAssetInfo.setVisibility(View.GONE);
             }
