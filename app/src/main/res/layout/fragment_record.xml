@@ -340,6 +340,31 @@
                 android:progressDrawable="@drawable/layer_budget_progress" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
+
+    <!-- 账单滑动卡片（替换预算卡片） -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/card_bill_slider"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignTop="@id/btn_quick_record"
+        android:layout_alignBottom="@id/btn_quick_record"
+        android:layout_toStartOf="@id/btn_quick_record"
+        android:layout_alignParentStart="true"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="@android:color/transparent"
+        android:visibility="gone">
+
+        <include
+            layout="@layout/card_bill_slider"
+            android:id="@+id/layout_bill_slider"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+
+    </androidx.cardview.widget.CardView>
+
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/btn_quick_record"
         android:layout_width="wrap_content"

@@ -50,6 +50,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
@@ -110,6 +111,14 @@ public class RecordFragment extends Fragment {
     private androidx.cardview.widget.CardView cardBudgetStatus;
     private TextView tvBudgetText;
     private android.widget.ProgressBar pbBudget;
+
+    // 账单滑动卡片相关
+    private View layoutBillSlider;
+    private androidx.cardview.widget.CardView cardBillSlider;
+    private ViewPager2 vpBillCard;
+    private LinearLayout layoutIndicator;
+    private BillSliderAdapter billSliderAdapter;
+    private List<View> indicatorDots = new ArrayList<>();
 
     // 新增：用于记录当前请求的时间范围，防止无限循环查询
     private long currentStartMillis = 0;
@@ -308,6 +317,13 @@ public class RecordFragment extends Fragment {
         tvBudgetText = view.findViewById(R.id.tv_budget_text);
         pbBudget = view.findViewById(R.id.pb_budget);
 
+        // 初始化账单滑动卡片
+        cardBillSlider = view.findViewById(R.id.card_bill_slider);
+        layoutBillSlider = view.findViewById(R.id.layout_bill_slider);
+        vpBillCard = view.findViewById(R.id.vp_bill_card);
+        layoutIndicator = view.findViewById(R.id.layout_indicator);
+        setupBillSlider();
+
         FloatingActionButton btnQuickRecord = view.findViewById(R.id.btn_quick_record);
         if (btnQuickRecord != null) {
             btnQuickRecord.setOnClickListener(v -> {
@@ -452,6 +468,9 @@ public class RecordFragment extends Fragment {
                 if (currentDetailAdapter != null) {
                     currentDetailAdapter.setAssets(assets);
                 }
+                if (billSliderAdapter != null) {
+                    billSliderAdapter.setAssets(assets);
+                }
             }
         });
 
@@ -555,6 +574,128 @@ public class RecordFragment extends Fragment {
         // 核心：把过滤后的状态传给日历适配器。
         // 如果 finalBudgetEnabled 为 false（比如查看去年的账单），日历背景色就不会变
         adapter.setBudgetConfig(finalBudgetEnabled, monthlyBudget);
+
+        // 更新账单卡片（如果开启了账单卡片替换功能）
+        updateBillSlider(transactions);
+    }
+
+    /**
+     * 初始化账单滑动卡片
+     */
+    private void setupBillSlider() {
+        billSliderAdapter = new BillSliderAdapter(transaction -> {
+            // 点击账单卡片，跳转到编辑页面
+            showAddOrEditDialog(transaction, LocalDate.now());
+        });
+        vpBillCard.setAdapter(billSliderAdapter);
+        // 设置卡片切换动画
+        vpBillCard.setPageTransformer(new BillSliderAdapter.BillCardTransformer());
+        // 关闭 clip，防止重影
+        vpBillCard.setClipToPadding(false);
+        // 获取内部 RecyclerView 并禁用动画
+        if (vpBillCard.getChildAt(0) instanceof RecyclerView) {
+            RecyclerView innerRv = (RecyclerView) vpBillCard.getChildAt(0);
+            innerRv.setItemAnimator(null);
+            innerRv.setClipToPadding(false);
+        }
+
+        // 页面切换监听，更新指示器
+        vpBillCard.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                super.onPageSelected(position);
+                updateIndicator(position);
+            }
+        });
+    }
+
+    /**
+     * 更新账单滑动卡片
+     */
+    private void updateBillSlider(List<Transaction> transactions) {
+        if (transactions == null || getContext() == null) return;
+
+        SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+        boolean isBillCardReplace = prefs.getBoolean("bill_card_replace_budget", false);
+
+        // 如果没有开启账单卡片替换功能，隐藏账单卡片
+        if (!isBillCardReplace) {
+            cardBillSlider.setVisibility(View.GONE);
+            return;
+        }
+
+        // 获取需要计算的日期（如果没有选定日期，默认用今天）
+        LocalDate targetDate = selectedDate != null ? selectedDate : LocalDate.now();
+
+        // 过滤出当日账单
+        long startOfDay = targetDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        long endOfDay = targetDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+
+        List<Transaction> dayTransactions = new ArrayList<>();
+        for (Transaction t : transactions) {
+            if (t.date >= startOfDay && t.date < endOfDay) {
+                dayTransactions.add(t);
+            }
+        }
+
+        // 如果有账单，显示账单卡片
+        if (!dayTransactions.isEmpty()) {
+            cardBillSlider.setVisibility(View.VISIBLE);
+            cardBudgetStatus.setVisibility(View.GONE); // 隐藏预算卡片
+            billSliderAdapter.setTransactions(dayTransactions);
+            setupIndicators(dayTransactions.size());
+        } else {
+            cardBillSlider.setVisibility(View.GONE);
+        }
+    }
+
+    /**
+     * 设置页面指示器
+     */
+    private void setupIndicators(int count) {
+        layoutIndicator.removeAllViews();
+        indicatorDots.clear();
+
+        if (count <= 1) {
+            layoutIndicator.setVisibility(View.GONE);
+            return;
+        }
+
+        layoutIndicator.setVisibility(View.VISIBLE);
+
+        for (int i = 0; i < count; i++) {
+            View dot = new View(getContext());
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    dpToPx(6), dpToPx(6));
+            params.setMargins(dpToPx(4), 0, dpToPx(4), 0);
+            dot.setLayoutParams(params);
+            dot.setBackgroundResource(R.drawable.indicator_dot_inactive);
+            indicatorDots.add(dot);
+            layoutIndicator.addView(dot);
+        }
+
+        // 默认选中第一个
+        updateIndicator(0);
+    }
+
+    /**
+     * 更新指示器状态
+     */
+    private void updateIndicator(int position) {
+        for (int i = 0; i < indicatorDots.size(); i++) {
+            if (i == position) {
+                indicatorDots.get(i).setBackgroundResource(R.drawable.indicator_dot_active);
+            } else {
+                indicatorDots.get(i).setBackgroundResource(R.drawable.indicator_dot_inactive);
+            }
+        }
+    }
+
+    /**
+     * dp 转 px
+     */
+    private int dpToPx(int dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density);
     }
 
     @Override
@@ -618,7 +759,15 @@ public class RecordFragment extends Fragment {
                 cardStats.setCardElevation(0f);
             }
 
-            // 4. 快捷记账按钮：85%透明度 (216) + 去除阴影
+            // 4. 【新增】账单滑动卡片：80%透明度
+            if (cardBillSlider != null) {
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                int translucentSurface = androidx.core.graphics.ColorUtils.setAlphaComponent(surfaceColor, 230);
+                cardBillSlider.setCardBackgroundColor(translucentSurface);
+                cardBillSlider.setCardElevation(0f);
+            }
+
+            // 5. 快捷记账按钮：85%透明度 (216) + 去除阴影
             if (btnQuickRecord != null) {
                 int fabColor = ContextCompat.getColor(requireContext(), R.color.app_blue);
                 int translucentFab = androidx.core.graphics.ColorUtils.setAlphaComponent(fabColor, 230);
@@ -645,6 +794,12 @@ public class RecordFragment extends Fragment {
                 cardStats.setCardBackgroundColor(surfaceColor);
                 // 【修改】：恢复为 0f，去掉普通模式下的卡片阴影
                 cardStats.setCardElevation(0f);
+            }
+
+            if (cardBillSlider != null) {
+                int surfaceColor = ContextCompat.getColor(requireContext(), R.color.white);
+                cardBillSlider.setCardBackgroundColor(surfaceColor);
+                cardBillSlider.setCardElevation(0f);
             }
 
             if (btnQuickRecord != null) {

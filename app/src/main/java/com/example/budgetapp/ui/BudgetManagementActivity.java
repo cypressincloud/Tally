@@ -30,7 +30,7 @@ import java.util.List;
 
 public class BudgetManagementActivity extends AppCompatActivity {
 
-    private SwitchCompat switchBudget, switchDetailedBudget;
+    private SwitchCompat switchBudget, switchDetailedBudget, switchBillCardReplace;
     private View cardBudgetInput;
     private LinearLayout llNormalBudgetInput, llDetailedBudgetContainer;
     private EditText etMonthlyBudget;
@@ -65,6 +65,7 @@ public class BudgetManagementActivity extends AppCompatActivity {
 
         switchBudget = findViewById(R.id.switch_budget);
         switchDetailedBudget = findViewById(R.id.switch_detailed_budget);
+        switchBillCardReplace = findViewById(R.id.switch_bill_card_replace);
         cardBudgetInput = findViewById(R.id.card_budget_input);
         llNormalBudgetInput = findViewById(R.id.ll_normal_budget_input);
         llDetailedBudgetContainer = findViewById(R.id.ll_detailed_budget_container);
@@ -75,10 +76,12 @@ public class BudgetManagementActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isBudgetEnabled = prefs.getBoolean("is_budget_enabled", false);
         boolean isDetailedEnabled = prefs.getBoolean("is_detailed_budget_enabled", false);
+        boolean isBillCardReplace = prefs.getBoolean("bill_card_replace_budget", false);
         float monthlyBudget = prefs.getFloat("monthly_budget", 0f);
 
         switchBudget.setChecked(isBudgetEnabled);
         switchDetailedBudget.setChecked(isDetailedEnabled);
+        switchBillCardReplace.setChecked(isBillCardReplace);
 
         // 构建动态视图
         buildDetailedInputs(prefs);
@@ -98,6 +101,10 @@ public class BudgetManagementActivity extends AppCompatActivity {
             prefs.edit().putBoolean("is_detailed_budget_enabled", isChecked).apply();
             updateUI(switchBudget.isChecked(), isChecked);
             calculateDynamicTotal(); // 切换时立刻重算提示金额
+        });
+
+        switchBillCardReplace.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean("bill_card_replace_budget", isChecked).apply();
         });
 
         etMonthlyBudget.addTextChangedListener(new TextWatcher() {
