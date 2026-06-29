@@ -40,6 +40,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.example.budgetapp.R;
 import com.example.budgetapp.ai.AiAccountingClient;
@@ -93,6 +94,8 @@ public class AiChatActivity extends AppCompatActivity {
     private ScreenshotOcrHelper ocrHelper;
     private ScreenshotAutoSaveManager screenshotAutoSaveManager;
     private String currentScreenshotPath;
+    // 刷新按钮状态：true 表示正在识别中，按钮应被禁用
+    private volatile boolean isRefreshing = false;
 
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private ActivityResultLauncher<Intent> speechRecognizerLauncher;
@@ -286,18 +289,18 @@ public class AiChatActivity extends AppCompatActivity {
                 }
                 byte[] audioBytes = bos.toByteArray();
                 fis.close();
-                
+
                 // 添加日志：打印音频文件大小
                 android.util.Log.d("AiChatActivity", "Audio file size: " + audioBytes.length + " bytes");
-                
+
                 file.delete(); // 内存读取完毕，清理磁盘临时文件
 
                 // 提交给 AI 接口，使用 audio/m4a (M4A 格式，AAC 编码)
                 String transcript = aiClient.transcribeAudio(audioBytes, "voice-input.m4a", "audio/m4a");
                 runOnUiThread(() -> {
                     updateMessage(statusIndex, "正在为您生成账单...");
-                    addMessage(ChatMessage.mine(transcript, null));
-                    processTextAccounting(transcript, statusIndex);
+                    // 先不显示用户消息，等 AI 解析完成后再显示
+                    processTextAccounting(transcript, statusIndex, true);
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> updateMessage(statusIndex, "语音转写失败：" + e.getMessage()));
@@ -431,8 +434,8 @@ public class AiChatActivity extends AppCompatActivity {
                 String transcript = aiClient.transcribeAudio(audioBytes, "voice-input", mimeType);
                 runOnUiThread(() -> {
                     updateMessage(statusIndex, "音频模型已转成文字，正在解析账单...");
-                    addMessage(ChatMessage.mine(transcript, null));
-                    processTextAccounting(transcript, statusIndex);
+                    // 先不显示用户消息，等 AI 解析完成后再显示
+                    processTextAccounting(transcript, statusIndex, true);
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> updateMessage(statusIndex, "语音转写失败：" + e.getMessage()));
@@ -468,30 +471,169 @@ public class AiChatActivity extends AppCompatActivity {
 
     private void processTextAccounting(String text) {
         int statusIndex = addMessage(ChatMessage.aiText("正在解析账单..."));
-        processTextAccounting(text, statusIndex);
+        processTextAccounting(text, statusIndex, false);
     }
 
-    private void processTextAccounting(String text, int statusIndex) {
+    private void processTextAccounting(String text, int statusIndex, boolean showUserMessage) {
         if (!ensureTextReady()) {
             updateMessage(statusIndex, "请先在设置里启用 AI，并至少配置 Base URL、API Key、文本模型。");
             return;
         }
+        isRefreshing = true;
+        notifyRefreshStateChanged();
         new Thread(() -> {
             try {
                 List<TransactionDraft> drafts = aiClient.parseText(this, text);
                 List<AssetAccount> assets = loadAccountingAssets();
                 runOnUiThread(() -> {
+                    isRefreshing = false;
+                    notifyRefreshStateChanged();
                     removeMessage(statusIndex);
+                    // 如果需要显示用户消息，先显示用户消息
+                    if (showUserMessage) {
+                        addMessage(ChatMessage.mine(text, null));
+                    }
                     addDraftCardsReply(drafts, assets, "我先帮你整理成卡片了。确认没问题就直接保存，要改也可以在卡片里改。");
                 });
             } catch (Exception e) {
-                runOnUiThread(() -> updateMessage(statusIndex, "文本记账失败：" + e.getMessage()));
+                runOnUiThread(() -> {
+                    isRefreshing = false;
+                    notifyRefreshStateChanged();
+                    // 如果出错也要显示用户消息
+                    if (showUserMessage) {
+                        addMessage(ChatMessage.mine(text, null));
+                    }
+                    updateMessage(statusIndex, "文本记账失败：" + e.getMessage());
+                });
             }
         }).start();
     }
 
+    private void processTextAccountingWithRetry(String text, ChatMessage originalMessage) {
+        isRefreshing = true;
+        notifyRefreshStateChanged();
+
+        int statusIndex = addMessage(ChatMessage.aiText("正在重新解析账单..."));
+
+        new Thread(() -> {
+            try {
+                List<TransactionDraft> drafts = aiClient.parseText(this, text);
+                List<AssetAccount> assets = loadAccountingAssets();
+                runOnUiThread(() -> {
+                    isRefreshing = false;
+                    notifyRefreshStateChanged();
+                    removeMessage(statusIndex);
+                    addDraftCardsReply(drafts, assets, "重新识别完成了，这些是新的账单卡片。确认没问题就直接保存。");
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    isRefreshing = false;
+                    notifyRefreshStateChanged();
+                    updateMessage(statusIndex, "文本记账失败：" + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void processImageAccountingWithRetry(Bitmap bitmap, ChatMessage originalMessage) {
+        isRefreshing = true;
+        notifyRefreshStateChanged();
+
+        int statusIndex = addMessage(ChatMessage.aiText("正在重新识别截图..."));
+
+        new Thread(() -> {
+            try {
+                // 重新处理图片
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                scaleBitmap(bitmap, 1200).compress(Bitmap.CompressFormat.JPEG, 85, outputStream);
+                byte[] imageBytes = outputStream.toByteArray();
+
+                OcrExtractResult ocrResult = ocrHelper.extract(bitmap);
+                if (ocrResult.hasText()) {
+                    runOnUiThread(() -> updateMessage(statusIndex, "OCR 已提取文字，正在重新生成账单..."));
+                    try {
+                        List<TransactionDraft> drafts = aiClient.parseText(this, ocrResult.buildPrompt());
+                        List<AssetAccount> assets = loadAccountingAssets();
+                        runOnUiThread(() -> {
+                            isRefreshing = false;
+                            notifyRefreshStateChanged();
+                            removeMessage(statusIndex);
+                            addDraftCardsReply(drafts, assets, "重新识别完成了，这些是新的账单卡片。确认没问题就直接保存。");
+                        });
+                    } catch (Exception e) {
+                        if (aiConfig.isVisionReady()) {
+                            runOnUiThread(() -> updateMessage(statusIndex, "文本模型解析失败，尝试用视觉模型重新识别..."));
+                            try {
+                                List<TransactionDraft> drafts = aiClient.parseVisionImage(this, "请提取截图里的记账信息。", imageBytes, "image/jpeg");
+                                List<AssetAccount> assets = loadAccountingAssets();
+                                runOnUiThread(() -> {
+                                    isRefreshing = false;
+                                    notifyRefreshStateChanged();
+                                    removeMessage(statusIndex);
+                                    addDraftCardsReply(drafts, assets, "重新识别完成了，这些是新的账单卡片。确认没问题就直接保存。");
+                                });
+                            } catch (Exception visionError) {
+                                runOnUiThread(() -> {
+                                    isRefreshing = false;
+                                    notifyRefreshStateChanged();
+                                    updateMessage(statusIndex, "识别失败：" + visionError.getMessage());
+                                });
+                            }
+                        } else {
+                            runOnUiThread(() -> {
+                                isRefreshing = false;
+                                notifyRefreshStateChanged();
+                                updateMessage(statusIndex, "识别失败：" + e.getMessage());
+                            });
+                        }
+                    }
+                } else {
+                    if (aiConfig.isVisionReady()) {
+                        runOnUiThread(() -> updateMessage(statusIndex, "OCR 未提取到文字，用视觉模型重新识别..."));
+                        try {
+                            List<TransactionDraft> drafts = aiClient.parseVisionImage(this, "请提取截图里的记账信息。", imageBytes, "image/jpeg");
+                            List<AssetAccount> assets = loadAccountingAssets();
+                            runOnUiThread(() -> {
+                                isRefreshing = false;
+                                notifyRefreshStateChanged();
+                                removeMessage(statusIndex);
+                                addDraftCardsReply(drafts, assets, "重新识别完成了，这些是新的账单卡片。确认没问题就直接保存。");
+                            });
+                        } catch (Exception visionError) {
+                            runOnUiThread(() -> {
+                                isRefreshing = false;
+                                notifyRefreshStateChanged();
+                                updateMessage(statusIndex, "识别失败：" + visionError.getMessage());
+                            });
+                        }
+                    } else {
+                        runOnUiThread(() -> {
+                            isRefreshing = false;
+                            notifyRefreshStateChanged();
+                            updateMessage(statusIndex, "无法识别此截图，OCR 和视觉模型都不可用。");
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    isRefreshing = false;
+                    notifyRefreshStateChanged();
+                    updateMessage(statusIndex, "识别失败：" + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void notifyRefreshStateChanged() {
+        if (chatAdapter != null) {
+            chatAdapter.notifyDataSetChanged();
+        }
+    }
+
     private void processImageAccounting(Bitmap bitmap, byte[] imageBytes, String mimeType) {
         int statusIndex = addMessage(ChatMessage.aiText("正在识别截图..."));
+        isRefreshing = true;
+        notifyRefreshStateChanged();
         new Thread(() -> {
             // Step 1: 优先使用 OCR + 文本模型
             if (aiConfig.isTextReady()) {
@@ -504,6 +646,8 @@ public class AiChatActivity extends AppCompatActivity {
                             List<TransactionDraft> drafts = aiClient.parseText(this, ocrResult.buildPrompt());
                             List<AssetAccount> assets = loadAccountingAssets();
                             runOnUiThread(() -> {
+                                isRefreshing = false;
+                                notifyRefreshStateChanged();
                                 removeMessage(statusIndex);
                                 addDraftCardsReply(drafts, assets, "截图我已经整理好了。下面这些卡片可以直接保存，也可以继续修改。");
                             });
@@ -516,16 +660,26 @@ public class AiChatActivity extends AppCompatActivity {
                                     List<TransactionDraft> drafts = aiClient.parseVisionImage(this, "请提取截图里的记账信息。", imageBytes, mimeType);
                                     List<AssetAccount> assets = loadAccountingAssets();
                                     runOnUiThread(() -> {
+                                        isRefreshing = false;
+                                        notifyRefreshStateChanged();
                                         removeMessage(statusIndex);
                                         addDraftCardsReply(drafts, assets, "截图我已经整理好了。下面这些卡片可以直接保存，也可以继续修改。");
                                     });
                                     return;
                                 } catch (Exception visionError) {
-                                    runOnUiThread(() -> updateMessage(statusIndex, "OCR 提取到文字，但文本模型和视觉模型都解析失败：" + e.getMessage()));
+                                    runOnUiThread(() -> {
+                                        isRefreshing = false;
+                                        notifyRefreshStateChanged();
+                                        updateMessage(statusIndex, "OCR 提取到文字，但文本模型和视觉模型都解析失败：" + e.getMessage());
+                                    });
                                     return;
                                 }
                             } else {
-                                runOnUiThread(() -> updateMessage(statusIndex, "OCR 文字提取到了，但文本模型解析失败：" + e.getMessage()));
+                                runOnUiThread(() -> {
+                                    isRefreshing = false;
+                                    notifyRefreshStateChanged();
+                                    updateMessage(statusIndex, "OCR 文字提取到了，但文本模型解析失败：" + e.getMessage());
+                                });
                                 return;
                             }
                         }
@@ -537,16 +691,26 @@ public class AiChatActivity extends AppCompatActivity {
                                 List<TransactionDraft> drafts = aiClient.parseVisionImage(this, "请提取截图里的记账信息。", imageBytes, mimeType);
                                 List<AssetAccount> assets = loadAccountingAssets();
                                 runOnUiThread(() -> {
+                                    isRefreshing = false;
+                                    notifyRefreshStateChanged();
                                     removeMessage(statusIndex);
                                     addDraftCardsReply(drafts, assets, "截图我已经整理好了。下面这些卡片可以直接保存，也可以继续修改。");
                                 });
                                 return;
                             } catch (Exception visionError) {
-                                runOnUiThread(() -> updateMessage(statusIndex, "OCR 和视觉模型都无法识别这张截图。"));
+                                runOnUiThread(() -> {
+                                    isRefreshing = false;
+                                    notifyRefreshStateChanged();
+                                    updateMessage(statusIndex, "OCR 和视觉模型都无法识别这张截图。");
+                                });
                                 return;
                             }
                         } else {
-                            runOnUiThread(() -> updateMessage(statusIndex, "没有配置视觉模型，OCR 也没提取到有效文字，无法识别这张截图。"));
+                            runOnUiThread(() -> {
+                                isRefreshing = false;
+                                notifyRefreshStateChanged();
+                                updateMessage(statusIndex, "没有配置视觉模型，OCR 也没提取到有效文字，无法识别这张截图。");
+                            });
                         }
                     }
                 } catch (Exception e) {
@@ -557,16 +721,26 @@ public class AiChatActivity extends AppCompatActivity {
                             List<TransactionDraft> drafts = aiClient.parseVisionImage(this, "请提取截图里的记账信息。", imageBytes, mimeType);
                             List<AssetAccount> assets = loadAccountingAssets();
                             runOnUiThread(() -> {
+                                isRefreshing = false;
+                                notifyRefreshStateChanged();
                                 removeMessage(statusIndex);
                                 addDraftCardsReply(drafts, assets, "截图我已经整理好了。下面这些卡片可以直接保存，也可以继续修改。");
                             });
                             return;
                         } catch (Exception visionError) {
-                            runOnUiThread(() -> updateMessage(statusIndex, "OCR 和视觉模型都识别失败：" + e.getMessage()));
+                            runOnUiThread(() -> {
+                                isRefreshing = false;
+                                notifyRefreshStateChanged();
+                                updateMessage(statusIndex, "OCR 和视觉模型都识别失败：" + e.getMessage());
+                            });
                             return;
                         }
                     } else {
-                        runOnUiThread(() -> updateMessage(statusIndex, "OCR 识别失败：" + e.getMessage()));
+                        runOnUiThread(() -> {
+                            isRefreshing = false;
+                            notifyRefreshStateChanged();
+                            updateMessage(statusIndex, "OCR 识别失败：" + e.getMessage());
+                        });
                     }
                 }
             } else {
@@ -577,16 +751,26 @@ public class AiChatActivity extends AppCompatActivity {
                         List<TransactionDraft> drafts = aiClient.parseVisionImage(this, "请提取截图里的记账信息。", imageBytes, mimeType);
                         List<AssetAccount> assets = loadAccountingAssets();
                         runOnUiThread(() -> {
+                            isRefreshing = false;
+                            notifyRefreshStateChanged();
                             removeMessage(statusIndex);
                             addDraftCardsReply(drafts, assets, "截图我已经整理好了。下面这些卡片可以直接保存，也可以继续修改。");
                         });
                         return;
                     } catch (Exception visionError) {
-                        runOnUiThread(() -> updateMessage(statusIndex, "视觉模型识别失败：" + visionError.getMessage()));
+                        runOnUiThread(() -> {
+                            isRefreshing = false;
+                            notifyRefreshStateChanged();
+                            updateMessage(statusIndex, "视觉模型识别失败：" + visionError.getMessage());
+                        });
                         return;
                     }
                 } else {
-                    runOnUiThread(() -> updateMessage(statusIndex, "没有配置视觉模型和文本模型，无法识别截图。请先在设置中配置 AI 模型。"));
+                    runOnUiThread(() -> {
+                        isRefreshing = false;
+                        notifyRefreshStateChanged();
+                        updateMessage(statusIndex, "没有配置视觉模型和文本模型，无法识别截图。请先在设置中配置 AI 模型。");
+                    });
                 }
             }
         }).start();
@@ -900,11 +1084,13 @@ public class AiChatActivity extends AppCompatActivity {
     private static class TextMessageViewHolder extends RecyclerView.ViewHolder {
         private final TextView tvContent;
         private final ImageView ivImage;
+        private final ImageButton btnRefresh;
 
         TextMessageViewHolder(@NonNull View itemView) {
             super(itemView);
             tvContent = itemView.findViewById(R.id.tv_chat_text);
             ivImage = itemView.findViewById(R.id.iv_chat_image);
+            btnRefresh = itemView.findViewById(R.id.btn_refresh);
         }
 
         void bind(ChatMessage message) {
@@ -920,6 +1106,37 @@ public class AiChatActivity extends AppCompatActivity {
             } else {
                 ivImage.setVisibility(View.GONE);
                 ivImage.setOnClickListener(null);
+            }
+
+            // 刷新按钮：仅用户消息时显示
+            if (btnRefresh != null) {
+                if (message.isMine) {
+                    btnRefresh.setVisibility(View.VISIBLE);
+                    AiChatActivity activity = (AiChatActivity) itemView.getContext();
+                    // 识别过程中禁用按钮
+                    btnRefresh.setEnabled(!activity.isRefreshing);
+                    btnRefresh.setAlpha(activity.isRefreshing ? 0.3f : 1.0f);
+                    btnRefresh.setOnClickListener(v -> {
+                        if (!v.isEnabled()) return;
+                        v.setEnabled(false);
+                        v.setAlpha(0.3f);
+                        AiChatActivity act = (AiChatActivity) v.getContext();
+                        int position = getBindingAdapterPosition();
+                        if (position != RecyclerView.NO_POSITION) {
+                            ChatMessage msg = act.chatMessages.get(position);
+                            if (msg.image != null) {
+                                act.processImageAccountingWithRetry(msg.image, msg);
+                            } else if (msg.content != null && !msg.content.trim().isEmpty()
+                                    && !msg.content.contains("正在")
+                                    && !msg.content.equals("请识别这张截图里的账单。")) {
+                                act.processTextAccountingWithRetry(msg.content, msg);
+                            }
+                        }
+                    });
+                } else {
+                    btnRefresh.setVisibility(View.GONE);
+                    btnRefresh.setOnClickListener(null);
+                }
             }
         }
     }
@@ -1398,6 +1615,7 @@ public class AiChatActivity extends AppCompatActivity {
         final Bitmap image;
         final List<DraftCardModel> draftCards;
         final List<AssetAccount> assets;
+        boolean canRetry;  // 是否可以重新识别
 
         private ChatMessage(boolean isMine, MessageKind kind, String content, Bitmap image, List<DraftCardModel> draftCards, List<AssetAccount> assets) {
             this.isMine = isMine;
@@ -1406,18 +1624,25 @@ public class AiChatActivity extends AppCompatActivity {
             this.image = image;
             this.draftCards = draftCards == null ? new ArrayList<>() : draftCards;
             this.assets = assets == null ? new ArrayList<>() : assets;
+            this.canRetry = false;
         }
 
         static ChatMessage mine(String content, Bitmap image) {
-            return new ChatMessage(true, MessageKind.TEXT, content, image, null, null);
+            ChatMessage msg = new ChatMessage(true, MessageKind.TEXT, content, image, null, null);
+            msg.canRetry = true;
+            return msg;
         }
 
         static ChatMessage aiText(String content) {
-            return new ChatMessage(false, MessageKind.TEXT, content, null, null, null);
+            ChatMessage msg = new ChatMessage(false, MessageKind.TEXT, content, null, null, null);
+            msg.canRetry = false;
+            return msg;
         }
 
         static ChatMessage aiDrafts(String content, List<DraftCardModel> draftCards, List<AssetAccount> assets) {
-            return new ChatMessage(false, MessageKind.DRAFTS, content, null, draftCards, assets);
+            ChatMessage msg = new ChatMessage(false, MessageKind.DRAFTS, content, null, draftCards, assets);
+            msg.canRetry = false;
+            return msg;
         }
     }
 
