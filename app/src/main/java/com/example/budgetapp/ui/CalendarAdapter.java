@@ -103,6 +103,16 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        // 🔧 修复 Bug：取消之前的动画，防止动画在复用的 ViewHolder 上继续执行
+        Object animatorTag = holder.itemView.getTag(R.id.tv_day); // 使用一个 ID 作为 tag key
+        if (animatorTag instanceof ValueAnimator) {
+            ((ValueAnimator) animatorTag).cancel();
+        }
+        
+        // 🔧 修复 Bug：强制重置 ViewHolder 的状态，防止复用时状态残留
+        holder.itemView.setSelected(false);
+        holder.itemView.setBackground(null); // 清除旧背景，防止 Drawable 复用
+        
         LocalDate date = days.get(position);
         if (date == null) {
             holder.tvDay.setText("");
@@ -587,7 +597,8 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             alphaAnimator.start();
         }
         
-        // 启动动画
+        // 启动动画并存储到 tag 中，以便在 ViewHolder 复用时取消
+        holder.itemView.setTag(R.id.tv_day, animator);
         animator.start();
     }
 

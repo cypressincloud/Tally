@@ -1128,6 +1128,11 @@ public class RecordFragment extends Fragment {
         List<Transaction> allList = viewModel.getRangeTransactions().getValue();
         List<Transaction> currentList = allList != null ? allList : new ArrayList<>();
 
+        // 强制清空缓存池，防止上一页末尾带有选中状态的 View 被 LIFO 倒序复用到本页开头
+        if (calendarRecycler != null) {
+            calendarRecycler.getRecycledViewPool().clear();
+        }
+
         adapter.setRenewalItems(assistantConfig.getRenewalList());
         adapter.setCurrentMonth(currentMonth);
         adapter.updateData(days, currentList);
