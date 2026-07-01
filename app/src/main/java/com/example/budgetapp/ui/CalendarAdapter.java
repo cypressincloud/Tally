@@ -287,24 +287,19 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             }
         }
 
-        // ====== 新增：提前获取是否开启了自定义背景 ======
+        // 检查是否是自定义背景模式
         SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
-        // ===============================================
 
-        // --- 样式优先级：选中 > 今天 > 续费日期 > 普通 ---
         if (isSelected) {
-            // [被选中状态]：显示蓝色边框，带有由浅入深的过渡动画
-            // 如果之前是"今天"或"预算色块"，需要带淡出动画
+            // [选中状态]：应用动画
             boolean wasToday = isToday;
-            boolean wasBudget = isBudgetEnabled && monthlyBudget > 0 && isCurrentMonth && !date.isAfter(LocalDate.now()) && dailyExpenseForBudget > 0;
-            
-            applySelectedDateAnimation(holder, themeColor, defaultDayColor, wasToday, wasBudget, dailyExpenseForBudget, dailyBudget(date), isCurrentMonth);
-            holder.tvDay.setAlpha(1.0f);
-            holder.itemView.setSelected(true);
-
+            boolean wasBudget = isBudgetEnabled && monthlyBudget > 0 && isCurrentMonth && !date.isAfter(LocalDate.now());
+            double dailyBudget = dailyBudget(date);
+            applySelectedDateAnimation(holder, themeColor, defaultDayColor, wasToday, wasBudget, dailyExpenseForBudget, dailyBudget, isCurrentMonth);
+            holder.tvNet.setTextColor(defaultNetColor);
         } else if (isToday) {
-            // [今天状态]：黄色实心背景 + 白色文字
+            // [今天状态]：蓝色圆角背景
             holder.itemView.setBackgroundResource(R.drawable.bg_calendar_today);
             Drawable bg = holder.itemView.getBackground();
             if (bg != null) {
@@ -486,6 +481,12 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                                            boolean isCurrentMonth) {
         Context context = holder.itemView.getContext();
         
+        // === 保存原始 Padding，防止动画过程中被改变 ===
+        final int savedPadLeft = holder.itemView.getPaddingLeft();
+        final int savedPadTop = holder.itemView.getPaddingTop();
+        final int savedPadRight = holder.itemView.getPaddingRight();
+        final int savedPadBottom = holder.itemView.getPaddingBottom();
+        
         // 创建圆角矩形边框 Shape
         GradientDrawable shape = new GradientDrawable();
         shape.setShape(GradientDrawable.RECTANGLE);
@@ -564,7 +565,9 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             
             InsetDrawable insetDrawable = new InsetDrawable(shape, currentInset, currentInset, currentInset, currentInset);
             holder.itemView.setBackground(insetDrawable);
-            holder.itemView.invalidate();
+            // === 每一帧都恢复 padding，防止背景改变时 padding 丢失 ===
+            holder.itemView.setPadding(savedPadLeft, savedPadTop, savedPadRight, savedPadBottom);
+            // 移除 invalidate()，setBackground 已经会触发重绘，避免和 RecyclerView 的布局动画冲突
         });
         
         // 文字颜色过渡动画（如果是今天，文字从白色过渡到默认颜色）
@@ -592,6 +595,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             alphaAnimator.setDuration(100); // 与边框动画同步
             alphaAnimator.addUpdateListener(animation -> {
                 float alpha = (float) animation.getAnimatedValue();
+                holder.tvDay.setAlpha(alpha); // 同时设置日期数字的透明度
                 holder.tvNet.setAlpha(alpha);
             });
             alphaAnimator.start();
