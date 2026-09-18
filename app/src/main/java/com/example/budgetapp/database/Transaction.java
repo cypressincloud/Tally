@@ -16,6 +16,11 @@ public class Transaction {
     @PrimaryKey(autoGenerate = true)
     public int id;
     public long date;
+    /** Optional inclusive date range for displaying and calculating an amortized bill. */
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    public long spreadStartDate;
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    public long spreadEndDate;
     public int type; // 0支出, 1收入, 2转账
     public String category;
     public double amount;
@@ -33,6 +38,8 @@ public class Transaction {
     // 【新增】是否不计入预算 (默认 false，即计入预算)
     @androidx.room.ColumnInfo(defaultValue = "0")
     public boolean excludeFromBudget;
+    @Ignore public Double displayAmount;
+    @Ignore public Transaction displaySource;
 
     public Transaction() {
     }

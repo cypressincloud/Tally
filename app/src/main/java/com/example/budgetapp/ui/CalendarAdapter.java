@@ -17,10 +17,13 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.budgetapp.R;
+import com.example.budgetapp.database.BudgetPlan;
 import com.example.budgetapp.database.RenewalItem;
 import com.example.budgetapp.database.Transaction;
+import com.example.budgetapp.util.BudgetCalculator;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -39,12 +42,53 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
 
     private boolean isBudgetEnabled = false;
     private float monthlyBudget = 0f;
+    private boolean usesPlanBudgets = false;
+    private List<BudgetPlan> budgetPlans = new ArrayList<>();
+    private List<Transaction> budgetTransactions = new ArrayList<>();
 
     // 增加一个公开方法用于接收配置
     public void setBudgetConfig(boolean enabled, float budget) {
+        boolean changed = usesPlanBudgets
+                || isBudgetEnabled != enabled
+                || Math.abs(monthlyBudget - budget) > 0.001f;
+        usesPlanBudgets = false;
         this.isBudgetEnabled = enabled;
         this.monthlyBudget = budget;
-        notifyDataSetChanged();
+        if (changed) notifyDataSetChanged();
+    }
+
+    public void setBudgetPlanConfig(List<BudgetPlan> plans, List<Transaction> transactions) {
+        List<BudgetPlan> nextPlans = plans == null ? new ArrayList<>() : new ArrayList<>(plans);
+        List<Transaction> nextTransactions = transactions == null ? new ArrayList<>() : transactions;
+        boolean nextUsesPlans = false;
+        for (BudgetPlan plan : nextPlans) {
+            if (plan.enabled && plan.totalAmount > 0) {
+                nextUsesPlans = true;
+                break;
+            }
+        }
+
+        boolean changed = nextUsesPlans != usesPlanBudgets
+                || budgetTransactions != nextTransactions
+                || !samePlanConfiguration(budgetPlans, nextPlans);
+        budgetPlans = nextPlans;
+        budgetTransactions = nextTransactions;
+        usesPlanBudgets = nextUsesPlans;
+        if (changed) notifyDataSetChanged();
+    }
+
+    private boolean samePlanConfiguration(List<BudgetPlan> first, List<BudgetPlan> second) {
+        if (first.size() != second.size()) return false;
+        for (int i = 0; i < first.size(); i++) {
+            BudgetPlan a = first.get(i);
+            BudgetPlan b = second.get(i);
+            if (a.id != b.id || a.enabled != b.enabled || a.startDate != b.startDate
+                    || a.endDate != b.endDate
+                    || Math.abs(a.totalAmount - b.totalAmount) > 0.001) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public interface OnDateClickListener {
@@ -79,8 +123,14 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
     }
 
     public void setSelectedDate(LocalDate date) {
+        LocalDate previousDate = selectedDate;
         this.selectedDate = date;
-        notifyDataSetChanged();
+        int previousPosition = previousDate == null ? -1 : days.indexOf(previousDate);
+        int newPosition = date == null ? -1 : days.indexOf(date);
+
+        if (previousPosition >= 0) notifyItemChanged(previousPosition);
+        if (newPosition >= 0 && newPosition != previousPosition) notifyItemChanged(newPosition);
+        if (previousPosition < 0 && newPosition < 0) notifyDataSetChanged();
     }
 
     private int getThemeColor(Context context, int attr) {
@@ -157,7 +207,8 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         long end = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 
         for (Transaction t : transactions) {
-            if (t.date >= start && t.date < end) {
+            double dayAmount = com.example.budgetapp.util.BudgetCalculator.amountForDay(t, date);
+            if (dayAmount > 0 || (t.date >= start && t.date < end && t.amount == 0)) {
 
                 // 🌟 核心拦截：如果是资产互转，直接跳过，不参与日历下方任何数字的计算
                 boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
@@ -167,25 +218,25 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
 
                 // <--- 2. 新增这块：只要是支出(type==0)，就累加到预算统计里 --->
                 if (t.type == 0) {
-                    dailyExpenseForBudget += t.amount;
+                    dailyExpenseForBudget += dayAmount;
                 }
 
                 switch (filterMode) {
                     case 0: // 结余
                         if (t.type == 1) {
-                            if (!"加班".equals(t.category)) dailySum += t.amount;
+                            if (!"加班".equals(t.category)) dailySum += dayAmount;
                         } else if (t.type == 0) { // 🌟 严格限制只有真正的支出才减去金额
-                            dailySum -= t.amount;
+                            dailySum -= dayAmount;
                         }
                         break;
                     case 1: // 收入
-                        if (t.type == 1 && !"加班".equals(t.category)) dailySum += t.amount;
+                        if (t.type == 1 && !"加班".equals(t.category)) dailySum += dayAmount;
                         break;
                     case 2: // 支出
-                        if (t.type == 0) dailySum += t.amount;
+                        if (t.type == 0) dailySum += dayAmount;
                         break;
                     case 3: // 加班工资
-                        if (t.type == 1 && "加班".equals(t.category)) dailySum += t.amount;
+                        if (t.type == 1 && "加班".equals(t.category)) dailySum += dayAmount;
                         break;
                     case 4: // 加班工时
                         if (t.type == 1 && "加班".equals(t.category)) {
@@ -198,7 +249,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
                                 }
                             }
                             // 赋值 dailySum 让底部判断有数据
-                            dailySum += t.amount;
+                            dailySum += dayAmount;
                         }
                         break;
                 }
@@ -294,7 +345,7 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         if (isSelected) {
             // [选中状态]：应用动画
             boolean wasToday = isToday;
-            boolean wasBudget = isBudgetEnabled && monthlyBudget > 0 && isCurrentMonth && !date.isAfter(LocalDate.now());
+            boolean wasBudget = hasBudgetForDate(date) && isCurrentMonth && !date.isAfter(LocalDate.now());
             double dailyBudget = dailyBudget(date);
             applySelectedDateAnimation(holder, themeColor, defaultDayColor, wasToday, wasBudget, dailyExpenseForBudget, dailyBudget, isCurrentMonth);
             holder.tvNet.setTextColor(defaultNetColor);
@@ -323,11 +374,12 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
             holder.tvDay.setTextColor(defaultDayColor);
             holder.itemView.setSelected(false);
 
-        } else if (isBudgetEnabled && monthlyBudget > 0 && isCurrentMonth && !date.isAfter(LocalDate.now())) {
+        } else if (hasBudgetForDate(date) && isCurrentMonth && !date.isAfter(LocalDate.now())) {
             // [预算状态]
-            int daysInMonth = date.lengthOfMonth();
-            double dailyBudget = monthlyBudget / daysInMonth;
-            if (dailyExpenseForBudget > dailyBudget) {
+            double dailyBudget = dailyBudget(date);
+            boolean exceeded = dailyBudget <= 0
+                    ? dailyExpenseForBudget > 0 : dailyExpenseForBudget > dailyBudget;
+            if (exceeded) {
                 holder.itemView.setBackgroundResource(R.drawable.bg_budget_exceed);
             } else {
                 holder.itemView.setBackgroundResource(R.drawable.bg_budget_safe);
@@ -459,9 +511,30 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
      * 计算每日预算
      */
     private double dailyBudget(LocalDate date) {
+        if (usesPlanBudgets) {
+            double total = 0;
+            for (BudgetPlan plan : budgetPlans) {
+                if (!plan.enabled || plan.totalAmount <= 0) continue;
+                total += BudgetCalculator.remainingDailyBudget(plan, date, budgetTransactions);
+            }
+            return Math.max(0, total);
+        }
         if (!isBudgetEnabled || monthlyBudget <= 0) return 0;
         int daysInMonth = date.lengthOfMonth();
         return monthlyBudget / daysInMonth;
+    }
+
+    private boolean hasBudgetForDate(LocalDate date) {
+        if (!usesPlanBudgets) return isBudgetEnabled && monthlyBudget > 0;
+        for (BudgetPlan plan : budgetPlans) {
+            if (!plan.enabled || plan.totalAmount <= 0) continue;
+            LocalDate start = Instant.ofEpochMilli(plan.startDate)
+                    .atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate end = Instant.ofEpochMilli(plan.endDate)
+                    .atZone(ZoneId.systemDefault()).toLocalDate();
+            if (!date.isBefore(start) && !date.isAfter(end)) return true;
+        }
+        return false;
     }
 
     /**

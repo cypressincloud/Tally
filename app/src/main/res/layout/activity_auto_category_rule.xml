@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bar_background"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/tv_page_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="自动分类配置"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="?android:attr/textColorPrimary"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/tv_page_description"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="按软件和记录标识匹配分类，规则按列表顺序执行"
+        android:textSize="13sp"
+        android:textColor="@color/text_secondary"
+        android:layout_marginBottom="16dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
+        <LinearLayout
+            android:id="@+id/ll_rules"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_add_rule"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="添加自动分类规则"
+        android:textColor="@color/text_white"
+        android:backgroundTint="@color/app_blue"
+        app:cornerRadius="16dp" />
+</LinearLayout>

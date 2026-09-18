@@ -24,6 +24,7 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
     private List<Transaction> list = new ArrayList<>();
     private Map<Integer, AssetAccount> assetMap = new HashMap<>();
     private OnItemClickListener listener;
+    private LocalDate displayDate;
 
     public interface OnItemClickListener {
         void onItemClick(Transaction transaction);
@@ -35,6 +36,11 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
 
     public void setTransactions(List<Transaction> list) {
         this.list = list;
+        notifyDataSetChanged();
+    }
+
+    public void setDisplayDate(LocalDate date) {
+        displayDate = date;
         notifyDataSetChanged();
     }
 
@@ -66,7 +72,10 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
                 .getBoolean("enable_currency", false);
 
         String symbol = (t.currencySymbol != null && !t.currencySymbol.isEmpty()) ? t.currencySymbol : "¥";
-        String amountStr = String.format("%.2f", t.amount);
+        double shownAmount = t.displayAmount != null ? t.displayAmount
+                : (displayDate == null ? t.amount
+                : com.example.budgetapp.util.BudgetCalculator.amountForDay(t, displayDate));
+        String amountStr = String.format("%.2f", shownAmount);
         String displayAmount = showCurrency ? (symbol + " " + amountStr) : amountStr;
 
         // --- 核心逻辑：自动续费预览账单处理 ---
@@ -125,6 +134,18 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             holder.tvNote.setText(t.note);
         } else {
             holder.tvNote.setVisibility(View.GONE);
+            holder.tvNote.setTextColor(context.getColor(R.color.text_secondary));
+        }
+        if (holder.tvAmortization != null) holder.tvAmortization.setVisibility(View.GONE);
+        if ((displayDate != null || t.displayAmount != null)
+                && t.spreadStartDate > 0 && t.spreadEndDate >= t.spreadStartDate) {
+            LocalDate start = java.time.Instant.ofEpochMilli(t.spreadStartDate).atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            LocalDate end = java.time.Instant.ofEpochMilli(t.spreadEndDate).atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            long spreadDays = java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1;
+            if (holder.tvAmortization != null && spreadDays > 1) {
+                holder.tvAmortization.setVisibility(View.VISIBLE);
+                holder.tvAmortization.setText(String.format("%d天均摊 %.2f", spreadDays, t.amount));
+            }
         }
 
         // --- 右下角状态指示器 ---
@@ -144,7 +165,11 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             holder.viewIndicator.setVisibility(View.GONE);
             holder.llAssetInfo.setVisibility(View.VISIBLE);
             holder.tvAssetName.setText(assetName);
-            holder.tvAssetName.setTextColor(statusColor);
+            // 资产名称颜色表达交易类型；备注/照片状态只用于右侧指示点。
+            holder.tvAssetName.setTextColor(t.type == 1
+                    ? context.getColor(R.color.income_red)
+                    : t.type == 2 ? context.getColor(R.color.app_blue)
+                    : context.getColor(R.color.expense_green));
             
             // 显示资产图标
             if (AssetIconHelper.bindSvgIcon(holder.ivAssetIcon, assetAccount.svgIcon)) {
@@ -159,7 +184,7 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
         }
 
         holder.itemView.setOnClickListener(v -> {
-            if (listener != null) listener.onItemClick(t);
+            if (listener != null) listener.onItemClick(t.displaySource != null ? t.displaySource : t);
         });
     }
 
@@ -170,6 +195,7 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView tvDate, tvAmount, tvNote;
+        TextView tvAmortization;
         View viewIndicator;
 
         TextView tvSubCategory;
@@ -181,6 +207,7 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             super(v);
             tvDate = v.findViewById(R.id.tv_detail_date);
             tvSubCategory = v.findViewById(R.id.tv_detail_sub_category);
+            tvAmortization = v.findViewById(R.id.tv_amortization);
             tvAmount = v.findViewById(R.id.tv_detail_amount);
             tvNote = v.findViewById(R.id.tv_detail_note);
             viewIndicator = v.findViewById(R.id.view_remark_indicator);

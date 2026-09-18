@@ -55,7 +55,7 @@ public class CurrencySettingsActivity extends AppCompatActivity {
             "₹", "₽", "฿", "₫", "₱", "R$",
             "Rp", "RM", "CHF", "₺", "₪",
             // --- 对应符号 ---
-            "kr", "kr", "kr", "zł", "Kč", "Ft", "lei", "лв", "RSD", "kr",
+            "kr", "NOK", "DKK", "zł", "Kč", "Ft", "lei", "лв", "RSD", "ISK",
             "BYN", "₴", "L", "Lek", "KM", "den", "₾", "֏", "₼",
             "KD", "SR", "DH", "R", "₦", "E£"
     };

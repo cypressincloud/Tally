@@ -9,6 +9,8 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -45,6 +47,7 @@ public class AutoAssetActivity extends AppCompatActivity {
 
     private List<AssetAccount> cachedAssets = new ArrayList<>();
     private List<AppItem> cachedApps = new ArrayList<>();
+    private LinearLayout appDefaultAssetList;
     
     private static final String PREF_NAME = "asset_display_prefs";
     private static final String KEY_SHOW_ALL_ASSETS = "show_all_assets_in_total";
@@ -115,9 +118,55 @@ public class AutoAssetActivity extends AppCompatActivity {
 
         findViewById(R.id.card_asset_category_settings)
                 .setOnClickListener(v -> startActivity(new Intent(this, AssetCategorySettingsActivity.class)));
+        appDefaultAssetList = findViewById(R.id.app_default_asset_list);
+        findViewById(R.id.card_app_default_asset).setOnClickListener(v -> showAppDefaultDialog());
 
         // 点击新增规则
         findViewById(R.id.btnAddRule).setOnClickListener(v -> showRuleDialog(null));
+    }
+
+    private void showAppDefaultDialog() {
+        if (cachedApps.isEmpty() || cachedAssets.isEmpty()) {
+            Toast.makeText(this, "应用或资产数据加载中...", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_app_default_asset, null);
+        Spinner app = view.findViewById(R.id.sp_default_asset_app);
+        Spinner asset = view.findViewById(R.id.sp_default_asset_account);
+        ArrayAdapter<AppItem> appAdapter = new ArrayAdapter<>(this, R.layout.item_spinner_dropdown, cachedApps);
+        appAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        app.setAdapter(appAdapter);
+        ArrayAdapter<AssetAccount> assetAdapter = new ArrayAdapter<AssetAccount>(this, R.layout.item_spinner_dropdown, cachedAssets) {
+            @NonNull @Override public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View result = super.getView(position, convertView, parent);
+                if (result instanceof TextView) ((TextView) result).setText(getItem(position).name);
+                return result;
+            }
+            @NonNull @Override public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                return getView(position, convertView, parent);
+            }
+        };
+        assetAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        asset.setAdapter(assetAdapter);
+        app.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View selected, int position, long id) {
+                int defaultId = AutoAssetManager.getAppDefaultAsset(AutoAssetActivity.this, cachedApps.get(position).packageName);
+                for (int i = 0; i < cachedAssets.size(); i++) if (cachedAssets.get(i).id == defaultId) { asset.setSelection(i); break; }
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+        });
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(view).create();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        view.findViewById(R.id.btn_default_asset_cancel).setOnClickListener(v -> dialog.dismiss());
+        view.findViewById(R.id.btn_default_asset_save).setOnClickListener(v -> {
+            AppItem selectedApp = (AppItem) app.getSelectedItem();
+            AssetAccount selectedAsset = (AssetAccount) asset.getSelectedItem();
+            AutoAssetManager.setAppDefaultAsset(this, selectedApp.packageName, selectedAsset.id);
+            refreshAppDefaultAssetList();
+            Toast.makeText(this, "已保存应用默认资产", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+        });
+        dialog.show();
     }
 
     private void loadData() {
@@ -142,8 +191,59 @@ public class AutoAssetActivity extends AppCompatActivity {
                 cachedAssets.clear();
                 cachedAssets.addAll(mergedList);
                 adapter.notifyDataSetChanged();
+                refreshAppDefaultAssetList();
             });
         });
+    }
+
+    private void refreshAppDefaultAssetList() {
+        if (appDefaultAssetList == null) return;
+        appDefaultAssetList.removeAllViews();
+        java.util.Map<String, Integer> defaults = AutoAssetManager.getAppDefaultAssets(this);
+        if (defaults.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("暂未设置应用默认资产");
+            empty.setTextSize(13);
+            empty.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.text_secondary));
+            appDefaultAssetList.addView(empty);
+            return;
+        }
+        for (java.util.Map.Entry<String, Integer> entry : defaults.entrySet()) {
+            String appName = getAppNameByPkg(entry.getKey());
+            String assetName = getAssetNameById(entry.getValue());
+            TextView row = new TextView(this);
+            row.setText(appName + "  →  " + assetName);
+            row.setTextSize(14);
+            row.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.text_primary));
+            row.setPadding(0, 8, 0, 8);
+            row.setOnLongClickListener(v -> {
+                View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_confirm_delete, null);
+                AlertDialog dialog = new AlertDialog.Builder(this).setView(dialogView).create();
+                if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+                ((TextView) dialogView.findViewById(R.id.tv_dialog_title)).setText("移除应用默认资产");
+                ((TextView) dialogView.findViewById(R.id.tv_dialog_message)).setText("确定移除“" + appName + "”的默认资产设置吗？");
+                dialogView.findViewById(R.id.btn_dialog_cancel).setOnClickListener(cancel -> dialog.dismiss());
+                dialogView.findViewById(R.id.btn_dialog_confirm).setOnClickListener(confirm -> {
+                    AutoAssetManager.setAppDefaultAsset(this, entry.getKey(), -1);
+                    dialog.dismiss();
+                    refreshAppDefaultAssetList();
+                });
+                dialog.show();
+                return true;
+            });
+            LinearLayout rowContainer = new LinearLayout(this);
+            rowContainer.setOrientation(LinearLayout.HORIZONTAL);
+            rowContainer.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            rowContainer.addView(row, new LinearLayout.LayoutParams(0, -2, 1));
+            ImageButton remove = new ImageButton(this);
+            remove.setImageResource(R.drawable.ic_delete_red);
+            remove.setBackgroundColor(Color.TRANSPARENT);
+            remove.setContentDescription("移除 " + appName + " 默认资产");
+            remove.setTooltipText("移除默认资产");
+            remove.setOnClickListener(v -> row.performLongClick());
+            rowContainer.addView(remove, new LinearLayout.LayoutParams(48, 48));
+            appDefaultAssetList.addView(rowContainer);
+        }
     }
     // 统一的新增/编辑弹窗方法
     private void showRuleDialog(AutoAssetManager.AssetRule oldRule) {

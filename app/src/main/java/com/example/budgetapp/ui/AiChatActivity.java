@@ -1564,7 +1564,7 @@ public class AiChatActivity extends AppCompatActivity {
                 Toast.makeText(AiChatActivity.this, "请输入有效金额。", Toast.LENGTH_SHORT).show();
                 return null;
             }
-            if (amount <= 0d) {
+            if (!Double.isFinite(amount) || amount <= 0d) {
                 Toast.makeText(AiChatActivity.this, "金额需要大于 0。", Toast.LENGTH_SHORT).show();
                 return null;
             }

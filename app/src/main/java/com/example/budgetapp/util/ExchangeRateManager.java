@@ -116,6 +116,7 @@ public class ExchangeRateManager {
             public void onSuccess(double rate) {
                 // 刷新成功，重新计算
                 double total = 0;
+                boolean missingRate = false;
                 for (Map.Entry<String, Double> entry : amounts.entrySet()) {
                     String currency = entry.getKey();
                     double amount = entry.getValue();
@@ -126,10 +127,14 @@ public class ExchangeRateManager {
                         double r = getRateFromCache(targetCurrency, currency);
                         if (r > 0) {
                             total += amount / r;
+                        } else {
+                            missingRate = true;
+                            break;
                         }
                     }
                 }
-                callback.onSuccess(total);
+                if (missingRate) callback.onError("汇率数据不完整");
+                else callback.onSuccess(total);
             }
             
             @Override
@@ -204,11 +209,13 @@ public class ExchangeRateManager {
                     Log.d(TAG, "Fetched rates from API for base: " + baseCurrency);
                     
                     // 如果有指定目标货币，返回该汇率
-                    if (targetCurrency != null && rates.has(targetCurrency)) {
+                    if (targetCurrency == null) {
+                        callback.onSuccess(1.0);
+                    } else if (rates.has(targetCurrency)) {
                         double rate = rates.getDouble(targetCurrency);
                         callback.onSuccess(rate);
                     } else {
-                        callback.onSuccess(1.0); // 默认返回1.0表示成功
+                        callback.onError("汇率数据缺少目标货币: " + targetCurrency);
                     }
                 } else {
                     callback.onError("API返回错误: " + responseCode);

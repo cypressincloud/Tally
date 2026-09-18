@@ -59,11 +59,12 @@
 
     <TextView
         android:id="@+id/tv_month_label"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_below="@id/layout_top_bar"
         android:background="@color/bar_background"
         android:paddingHorizontal="16dp"
+        android:paddingTop="8dp"
         android:paddingBottom="8dp"
         android:text="12月"
         android:textColor="@color/black"
@@ -150,7 +151,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_margin="16dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="16dp"
         app:cardCornerRadius="16dp"
         app:cardElevation="0dp"
         app:cardBackgroundColor="@color/white">
@@ -282,19 +285,20 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/layout_week_header"
-        android:layout_above="@id/card_stats"
+        android:layout_above="@id/card_budget_status"
         android:padding="8dp"/>
 
     <androidx.cardview.widget.CardView
         android:id="@+id/card_budget_status"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_alignTop="@id/btn_quick_record"
-        android:layout_alignBottom="@id/btn_quick_record"
-        android:layout_toStartOf="@id/btn_quick_record"
+        android:minHeight="88dp"
+        android:layout_above="@id/card_stats"
+        android:layout_marginBottom="8dp"
         android:layout_alignParentStart="true"
+        android:layout_toStartOf="@id/btn_quick_record"
         android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
+        android:layout_marginEnd="10dp"
         app:cardCornerRadius="16dp"
         app:cardElevation="0dp"
         app:cardBackgroundColor="@color/white"
@@ -305,7 +309,15 @@
             android:layout_height="match_parent"
             android:orientation="vertical"
             android:gravity="center_vertical"
-            android:paddingHorizontal="16dp">
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_budget_plans"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:clipToPadding="false"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -337,6 +349,7 @@
                 android:layout_marginTop="6dp"
                 android:max="100"
                 android:progress="0"
+                android:progressTint="@color/app_blue"
                 android:progressDrawable="@drawable/layer_budget_progress" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
@@ -375,9 +388,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_above="@id/card_stats"
+        android:layout_alignBottom="@id/card_budget_status"
         android:layout_alignParentEnd="true"
         android:layout_marginEnd="24dp"
-        android:layout_marginBottom="0dp"
+        android:layout_marginBottom="8dp"
         android:src="@drawable/ic_qs_record"
         android:contentDescription="记一笔"
         app:backgroundTint="@color/app_blue"

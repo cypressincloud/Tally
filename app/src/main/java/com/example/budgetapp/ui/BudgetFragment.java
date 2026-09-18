@@ -29,8 +29,10 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.Goal;
+import com.example.budgetapp.database.BudgetPlan;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.CategoryManager;
+import com.example.budgetapp.util.BudgetCalculator;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
@@ -50,6 +52,8 @@ public class BudgetFragment extends Fragment {
     private TabLayout tabLayout;
     private GoalAdapter goalAdapter;
     private DetailedBudgetAdapter detailedAdapter;
+    private PlanAdapter planAdapter;
+    private ActivePlanAdapter activePlanAdapter;
     private boolean isDetailedEnabled = false;
 
     private double currentMonthSurplus = 0;
@@ -67,13 +71,14 @@ public class BudgetFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_budget, container, false);
         viewModel = new ViewModelProvider(requireActivity()).get(FinanceViewModel.class);
+        viewModel.settleExpiredBudgetPlans();
 
         tvTotalSurplus = view.findViewById(R.id.tv_total_surplus);
         tvHeaderMonthlyBudget = view.findViewById(R.id.tv_header_monthly_budget);
         tvHeaderDailyAvailable = view.findViewById(R.id.tv_header_daily_available);
 
-        view.findViewById(R.id.layout_monthly_budget).setOnClickListener(v -> showSetMonthBudgetDialog());
-        view.findViewById(R.id.btn_add_goal).setOnClickListener(v -> showAddGoalDialog());
+        // 计划金额和日期统一在“计划”页维护；顶部汇总卡仅用于展示，避免继续打开旧月度预算弹窗。
+        view.findViewById(R.id.layout_monthly_budget).setOnClickListener(null);
         view.findViewById(R.id.btn_budget_history).setOnClickListener(v -> startActivity(new Intent(getContext(), BudgetHistoryActivity.class)));
 
         // 初始化 FAB 容器
@@ -83,6 +88,8 @@ public class BudgetFragment extends Fragment {
 
         goalAdapter = new GoalAdapter();
         detailedAdapter = new DetailedBudgetAdapter();
+        planAdapter = new PlanAdapter();
+        activePlanAdapter = new ActivePlanAdapter();
 
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         isDetailedEnabled = prefs.getBoolean("is_detailed_budget_enabled", false);
@@ -91,30 +98,29 @@ public class BudgetFragment extends Fragment {
         tabLayout = view.findViewById(R.id.tab_layout_budget);
         TextView tvGoalsTitle = view.findViewById(R.id.tv_goals_title); // 新增的标题
 
-        BudgetPagerAdapter pagerAdapter = new BudgetPagerAdapter(isDetailedEnabled);
+        BudgetPagerAdapter pagerAdapter = new BudgetPagerAdapter(false);
         viewPager.setAdapter(pagerAdapter);
 
-        // 获取悬浮按钮布局或具体的按钮
-        View actionButtonsLayout = view.findViewById(R.id.btn_add_goal).getParent() instanceof LinearLayout
-                ? (View) view.findViewById(R.id.btn_add_goal).getParent()
-                : null;
-// 或者直接获取两个按钮
         View btnAddGoal = view.findViewById(R.id.btn_add_goal);
         View btnHistory = view.findViewById(R.id.btn_budget_history);
 
-        if (isDetailedEnabled) {
+        {
             tabLayout.setVisibility(View.VISIBLE);
             tvGoalsTitle.setVisibility(View.GONE);
 
             new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
-                tab.setText(position == 0 ? "详细预算" : "存储目标");
+                tab.setText(position == 0 ? "预算" : "计划");
             }).attach();
 
             int lastTab = prefs.getInt("last_budget_tab", 0);
             viewPager.setCurrentItem(lastTab, false);
 
             // 更新按钮初始状态
-            updateActionButtonsVisibility(lastTab, btnAddGoal, btnHistory);
+                    updateActionButtonsVisibility(lastTab, btnAddGoal, btnHistory);
+                    btnAddGoal.setContentDescription(lastTab == 0 ? "添加储蓄目标" : "添加预算计划");
+                    btnAddGoal.setOnClickListener(v -> {
+                        if (lastTab == 0) showAddGoalDialog(); else showAddPlanDialog();
+                    });
 
             viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
                 @Override
@@ -122,63 +128,82 @@ public class BudgetFragment extends Fragment {
                     prefs.edit().putInt("last_budget_tab", position).apply();
                     // 核心逻辑：切换页面时更新按钮可见性
                     updateActionButtonsVisibility(position, btnAddGoal, btnHistory);
+                    btnAddGoal.setContentDescription(position == 0 ? "添加储蓄目标" : "添加预算计划");
+                    btnAddGoal.setOnClickListener(v -> {
+                        if (position == 0) showAddGoalDialog(); else showAddPlanDialog();
+                    });
                     // 切换页面时重新附加滚动监听器
                     attachScrollListeners(position);
                 }
             });
-        } else {
-            tabLayout.setVisibility(View.GONE);
-            tvGoalsTitle.setVisibility(View.VISIBLE);
-            viewPager.setCurrentItem(0, false);
-            // 未开启详细模式时，默认显示按钮
-            btnAddGoal.setVisibility(View.VISIBLE);
-            btnHistory.setVisibility(View.VISIBLE);
-            // 附加滚动监听器到存储目标页面
-            viewPager.post(() -> attachScrollListeners(0));
         }
 
         viewModel.getAllTransactions().observe(getViewLifecycleOwner(), transactions -> {
-            calculateMonthHeader(transactions);
+            if (viewModel.getAllBudgetPlans().getValue() == null || viewModel.getAllBudgetPlans().getValue().isEmpty()) {
+                calculateMonthHeader(transactions);
+            } else {
+                updatePlanSummary(viewModel.getAllBudgetPlans().getValue(), transactions);
+            }
             goalAdapter.setTransactions(transactions);
+            // Plan cards also derive their progress from transactions. Refresh
+            // both adapters when the asynchronous transaction query completes.
+            planAdapter.notifyDataSetChanged();
+            activePlanAdapter.notifyDataSetChanged();
             if (isDetailedEnabled) calculateDetailedBudgets(transactions);
         });
 
         viewModel.getAllGoals().observe(getViewLifecycleOwner(), goals -> {
             if (goals != null) goalAdapter.setGoals(goals);
         });
+        viewModel.getAllBudgetPlans().observe(getViewLifecycleOwner(), plans -> {
+            if (plans != null) {
+                planAdapter.setPlans(plans);
+                List<BudgetPlan> active = new ArrayList<>();
+                LocalDate today = LocalDate.now();
+                for (BudgetPlan plan : plans) {
+                    LocalDate start = java.time.Instant.ofEpochMilli(plan.startDate).atZone(ZoneId.systemDefault()).toLocalDate();
+                    LocalDate end = java.time.Instant.ofEpochMilli(plan.endDate).atZone(ZoneId.systemDefault()).toLocalDate();
+                    if (plan.enabled && !today.isBefore(start) && !today.isAfter(end)) active.add(plan);
+                }
+                activePlanAdapter.setPlans(active);
+                updatePlanSummary(plans, viewModel.getAllTransactions().getValue());
+            }
+        });
 
         return view;
     }
 
+    private void updatePlanSummary(List<BudgetPlan> plans, List<Transaction> transactions) {
+        LocalDate today = LocalDate.now();
+        double total = 0;
+        double remaining = 0;
+        for (BudgetPlan plan : plans) {
+            LocalDate start = java.time.Instant.ofEpochMilli(plan.startDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate end = java.time.Instant.ofEpochMilli(plan.endDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            if (!plan.enabled || today.isBefore(start) || today.isAfter(end)) continue;
+            total += plan.totalAmount;
+            remaining += Math.max(0, plan.totalAmount - com.example.budgetapp.util.BudgetCalculator.expenseBetween(
+                    transactions, plan.startDate, today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+        }
+        tvTotalSurplus.setText(String.format("%.2f", remaining));
+        tvHeaderMonthlyBudget.setText(String.format("%.2f", total));
+        tvHeaderDailyAvailable.setText(String.format("%.2f", remaining));
+    }
+
     /**
      * 根据当前页面位置控制按钮显示
-     * Position 0: 详细预算 -> 隐藏按钮
-     * Position 1: 存储目标 -> 显示按钮
+     * The left page owns savings goals; the right page owns budget plans.
      */
     private void updateActionButtonsVisibility(int position, View btnAdd, View btnHistory) {
-        if (position == 0) {
-            btnAdd.setVisibility(View.GONE);
-            btnHistory.setVisibility(View.GONE);
-        } else {
-            btnAdd.setVisibility(View.VISIBLE);
-            btnHistory.setVisibility(View.VISIBLE);
-        }
+        btnAdd.setVisibility(View.VISIBLE);
+        btnHistory.setVisibility(View.VISIBLE);
     }
     
     /**
      * 附加滚动监听器到当前页面的 RecyclerView
-     * @param position 当前页面位置（0=详细预算，1=存储目标）
+     * @param position 当前页面位置（0=预算与储蓄目标，1=预算计划）
      */
     private void attachScrollListeners(int position) {
-        // 只在"存储目标"页面（position 1 或未开启详细模式时的 position 0）附加监听器
-        boolean shouldAttach = (isDetailedEnabled && position == 1) || (!isDetailedEnabled && position == 0);
-        
-        if (!shouldAttach) {
-            // 移除旧的监听器
-            detachScrollListeners();
-            return;
-        }
-        
         // 延迟获取 RecyclerView，确保 ViewPager2 已经创建了子视图
         viewPager.postDelayed(() -> {
             RecyclerView rv = findRecyclerViewInViewPager(position);
@@ -313,16 +338,14 @@ public class BudgetFragment extends Fragment {
         @Override
         public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
             RecyclerView rv = (RecyclerView) holder.itemView;
-            if (isDetailed) {
-                rv.setAdapter(position == 0 ? detailedAdapter : goalAdapter);
-            } else {
-                rv.setAdapter(goalAdapter);
-            }
+            rv.setAdapter(position == 0
+                    ? new androidx.recyclerview.widget.ConcatAdapter(activePlanAdapter, goalAdapter)
+                    : planAdapter);
 
         }
 
         @Override
-        public int getItemCount() { return isDetailed ? 2 : 1; }
+        public int getItemCount() { return 2; }
 
     }
 
@@ -467,18 +490,11 @@ public class BudgetFragment extends Fragment {
 
         // 【修复1】修正时间边界：涵盖整个月，防止丢失未来日期（但属本月）的账单
         long startOfMonth = today.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-        // 本月最后一天加1天，获取下个月零点作为结束边界 (减 1 毫秒即本月末)
-        long endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1;
-
-        if (transactions != null) {
-            for (Transaction t : transactions) {
-                // 【修改点】：增加不计入预算和资产互转的过滤
-                boolean isTransfer = "资产互转".equals(t.category);
-                if (t.date >= startOfMonth && t.date <= endOfMonth && t.type == 0 && !isTransfer && !t.excludeFromBudget) {
-                    actualExpenseSoFar += t.amount;
-                }
-            }
-        }
+        // 下个月零点作为结束边界，支持跨日摊销并排除不计入预算的流水。
+        long endOfMonthExclusive = today.withDayOfMonth(today.lengthOfMonth()).plusDays(1)
+                .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        actualExpenseSoFar = BudgetCalculator.expenseBetween(
+                transactions, startOfMonth, endOfMonthExclusive);
 
         // 【修复3】总结余应该是真实剩余预算 = 总预算 - 实际总支出
         double monthRemaining = monthlyBudget - actualExpenseSoFar;
@@ -527,6 +543,7 @@ public class BudgetFragment extends Fragment {
         view.findViewById(R.id.btn_save).setOnClickListener(v -> {
             try {
                 float newBudget = Float.parseFloat(etBudget.getText().toString());
+                if (!Float.isFinite(newBudget) || newBudget <= 0) throw new IllegalArgumentException();
                 prefs.edit().putFloat(monthKey, newBudget).apply();
                 if (prefs.getLong("budget_start_time", 0) == 0) {
                     prefs.edit().putLong("budget_start_time", System.currentTimeMillis()).apply();
@@ -558,16 +575,182 @@ public class BudgetFragment extends Fragment {
             String name = etName.getText().toString().trim();
             String targetStr = etTarget.getText().toString().trim();
             if (!name.isEmpty() && !targetStr.isEmpty()) {
-                long startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                Goal goal = new Goal(name, Double.parseDouble(targetStr), 0, false, startOfDay);
-                viewModel.insertGoal(goal);
-                dialog.dismiss();
+                try {
+                    double target = Double.parseDouble(targetStr);
+                    if (!Double.isFinite(target) || target <= 0) throw new IllegalArgumentException();
+                    long startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                    Goal goal = new Goal(name, target, 0, false, startOfDay);
+                    viewModel.insertGoal(goal);
+                    dialog.dismiss();
+                } catch (Exception e) {
+                    Toast.makeText(getContext(), "目标金额必须大于 0", Toast.LENGTH_SHORT).show();
+                }
             } else {
                 Toast.makeText(getContext(), "请输入完整信息", Toast.LENGTH_SHORT).show();
             }
         });
         view.findViewById(R.id.btn_cancel_goal).setOnClickListener(v -> dialog.dismiss());
         dialog.show();
+    }
+
+    private void showAddPlanDialog() {
+        showPlanDialog(null);
+    }
+
+    private void showPlanDialog(@Nullable BudgetPlan existing) {
+        View content = LayoutInflater.from(getContext()).inflate(R.layout.dialog_add_budget_plan, null);
+        AlertDialog dialog = new AlertDialog.Builder(getContext()).setView(content).create();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        EditText name = content.findViewById(R.id.et_plan_name);
+        EditText start = content.findViewById(R.id.et_plan_start);
+        EditText end = content.findViewById(R.id.et_plan_end);
+        EditText amount = content.findViewById(R.id.et_plan_amount);
+        TextView title = content.findViewById(R.id.tv_plan_dialog_title);
+        String today = LocalDate.now().toString();
+        if (existing == null) {
+            start.setText(today);
+            end.setText(today);
+        } else {
+            title.setText("编辑预算计划");
+            name.setText(existing.name);
+            start.setText(java.time.Instant.ofEpochMilli(existing.startDate).atZone(ZoneId.systemDefault()).toLocalDate().toString());
+            end.setText(java.time.Instant.ofEpochMilli(existing.endDate).atZone(ZoneId.systemDefault()).toLocalDate().toString());
+            amount.setText(String.valueOf(existing.totalAmount));
+        }
+        start.setFocusable(false);
+        end.setFocusable(false);
+        start.setOnClickListener(v -> showPlanDatePicker(start));
+        end.setOnClickListener(v -> showPlanDatePicker(end));
+        content.findViewById(R.id.btn_save_plan).setOnClickListener(v -> {
+            try {
+                LocalDate s = LocalDate.parse(start.getText().toString().trim());
+                LocalDate e = LocalDate.parse(end.getText().toString().trim());
+                double total = Double.parseDouble(amount.getText().toString().trim());
+                if (name.getText().toString().trim().isEmpty() || e.isBefore(s)
+                        || !Double.isFinite(total) || total <= 0) {
+                    throw new IllegalArgumentException();
+                }
+                long sm = s.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                long em = e.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                if (existing == null) {
+                    viewModel.insertBudgetPlan(new BudgetPlan(name.getText().toString().trim(), sm, em, total));
+                } else {
+                    existing.name = name.getText().toString().trim();
+                    existing.startDate = sm;
+                    existing.endDate = em;
+                    existing.totalAmount = total;
+                    viewModel.updateBudgetPlan(existing);
+                }
+                dialog.dismiss();
+            } catch (Exception ex) {
+                Toast.makeText(getContext(), "请输入有效的名称、日期和金额", Toast.LENGTH_SHORT).show();
+            }
+        });
+        content.findViewById(R.id.btn_cancel_plan).setOnClickListener(v -> dialog.dismiss());
+        dialog.show();
+    }
+
+    private void showPlanDatePicker(EditText field) {
+        LocalDate initial;
+        try {
+            initial = LocalDate.parse(field.getText().toString());
+        } catch (Exception ignored) {
+            initial = LocalDate.now();
+        }
+        new android.app.DatePickerDialog(requireContext(), (picker, year, month, day) ->
+                field.setText(LocalDate.of(year, month + 1, day).toString()),
+                initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth()).show();
+    }
+
+    private class PlanAdapter extends RecyclerView.Adapter<PlanAdapter.Holder> {
+        private List<BudgetPlan> plans = new ArrayList<>();
+        void setPlans(List<BudgetPlan> value) { plans = value; notifyDataSetChanged(); }
+        @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup p, int t) {
+            return new Holder(LayoutInflater.from(p.getContext()).inflate(R.layout.item_budget_plan, p, false));
+        }
+        @Override public void onBindViewHolder(@NonNull Holder h, int pos) {
+            BudgetPlan plan = plans.get(pos);
+            h.name.setText(plan.name);
+            LocalDate s = java.time.Instant.ofEpochMilli(plan.startDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate e = java.time.Instant.ofEpochMilli(plan.endDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            h.range.setText(s + " 至 " + e);
+            h.amount.setText(String.format("%.2f", plan.totalAmount));
+            if (plan.settled) {
+                h.allocated.setVisibility(View.VISIBLE);
+                h.allocated.setText(String.format("已分配给储蓄目标：%.2f", plan.allocatedToGoals));
+            } else {
+                h.allocated.setVisibility(View.GONE);
+            }
+            h.effective.setText(plan.settled ? "已结束" :
+                    (plan.enabled && !LocalDate.now().isBefore(s) && !LocalDate.now().isAfter(e) ? "生效中" : "未生效"));
+            List<Transaction> transactions = viewModel.getAllTransactions().getValue();
+            long endExclusive = e.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+            double spent = com.example.budgetapp.util.BudgetCalculator.expenseBetween(
+                    transactions, plan.startDate, Math.min(System.currentTimeMillis(), endExclusive));
+            h.amount.setText(String.format("已消耗 %.2f / 总预算 %.2f", spent, plan.totalAmount));
+            h.progress.setProgress(com.example.budgetapp.util.BudgetCalculator.progress(spent, plan.totalAmount));
+            h.progress.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(),
+                    spent > plan.totalAmount ? R.color.budget_progress_exceed : R.color.app_blue)));
+            h.itemView.setOnClickListener(v -> {
+                if (plan.settled) Toast.makeText(getContext(), "已结束的预算计划不能修改", Toast.LENGTH_SHORT).show();
+                else showPlanDialog(plan);
+            });
+            h.itemView.setOnLongClickListener(v -> { showConfirmDeletePlanDialog(plan); return true; });
+        }
+        @Override public int getItemCount() { return plans.size(); }
+        class Holder extends RecyclerView.ViewHolder {
+            TextView name, range, amount, effective, allocated; ProgressBar progress;
+            Holder(View v) { super(v); name=v.findViewById(R.id.tv_plan_name); range=v.findViewById(R.id.tv_plan_range); amount=v.findViewById(R.id.tv_plan_amount); effective=v.findViewById(R.id.tv_plan_effective); allocated=v.findViewById(R.id.tv_plan_allocated); progress=v.findViewById(R.id.pb_plan); }
+        }
+    }
+
+    private void showConfirmDeletePlanDialog(BudgetPlan plan) {
+        View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_confirm_delete, null);
+        AlertDialog dialog = new AlertDialog.Builder(getContext()).setView(view).create();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        TextView title = view.findViewById(R.id.tv_dialog_title);
+        TextView message = view.findViewById(R.id.tv_dialog_message);
+        if (title != null) title.setText("删除预算计划");
+        if (message != null) message.setText("确定要删除“" + plan.name + "”吗？删除后无法恢复。");
+        view.findViewById(R.id.btn_dialog_cancel).setOnClickListener(v -> dialog.dismiss());
+        view.findViewById(R.id.btn_dialog_confirm).setOnClickListener(v -> {
+            viewModel.deleteBudgetPlan(plan);
+            dialog.dismiss();
+        });
+        dialog.show();
+    }
+
+    private class ActivePlanAdapter extends RecyclerView.Adapter<ActivePlanAdapter.Holder> {
+        private List<BudgetPlan> plans = new ArrayList<>();
+        void setPlans(List<BudgetPlan> value) { plans = value; notifyDataSetChanged(); }
+        @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup p, int t) {
+            return new Holder(LayoutInflater.from(p.getContext()).inflate(R.layout.item_active_budget_card, p, false));
+        }
+        @Override public void onBindViewHolder(@NonNull Holder h, int pos) {
+            BudgetPlan plan = plans.get(pos);
+            LocalDate today = LocalDate.now();
+            LocalDate end = java.time.Instant.ofEpochMilli(plan.endDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            long endExclusive = end.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+            List<Transaction> transactions = viewModel.getAllTransactions().getValue();
+            double spent = com.example.budgetapp.util.BudgetCalculator.expenseBetween(transactions, plan.startDate, Math.min(System.currentTimeMillis(), endExclusive));
+            double remaining = Math.max(0, plan.totalAmount - spent);
+            h.name.setText(plan.name);
+            h.effective.setText("生效至 " + end);
+            h.remaining.setText(String.format("%.2f", remaining));
+            h.spent.setText(String.format("已消耗 %.2f", spent));
+            h.total.setText(String.format("%.2f", plan.totalAmount));
+            h.daily.setText(String.format("%.2f",
+                    BudgetCalculator.remainingDailyBudget(plan, today, transactions)));
+            h.progress.setProgress(com.example.budgetapp.util.BudgetCalculator.progress(spent, plan.totalAmount));
+            h.progress.setProgressTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(),
+                    spent > plan.totalAmount ? R.color.budget_progress_exceed : R.color.app_blue)));
+            h.itemView.setOnClickListener(v -> showPlanDialog(plan));
+        }
+        @Override public int getItemCount() { return plans.size(); }
+        class Holder extends RecyclerView.ViewHolder {
+            TextView name,effective,remaining,spent,total,daily; ProgressBar progress;
+            Holder(View v) { super(v); name=v.findViewById(R.id.tv_active_plan_name); effective=v.findViewById(R.id.tv_active_plan_effective); remaining=v.findViewById(R.id.tv_active_plan_remaining); spent=v.findViewById(R.id.tv_active_plan_spent); total=v.findViewById(R.id.tv_active_plan_total); daily=v.findViewById(R.id.tv_active_plan_daily); progress=v.findViewById(R.id.pb_active_plan); }
+        }
     }
 
     private void showEditGoalDialog(Goal goal) {
@@ -592,6 +775,10 @@ public class BudgetFragment extends Fragment {
                 goal.name = etName.getText().toString();
                 goal.targetAmount = Double.parseDouble(etTarget.getText().toString());
                 goal.savedAmount = Double.parseDouble(etSaved.getText().toString());
+                if (!Double.isFinite(goal.targetAmount) || goal.targetAmount <= 0
+                        || !Double.isFinite(goal.savedAmount) || goal.savedAmount < 0) {
+                    throw new IllegalArgumentException();
+                }
                 if (cbPriority.isChecked()) {
                     viewModel.setPriorityGoal(goal);
                 } else {
@@ -697,18 +884,14 @@ public class BudgetFragment extends Fragment {
             for (LocalDate d = start; d.isBefore(today); d = d.plusDays(1)) {
                 String key = "budget_" + d.getYear() + "_" + d.getMonthValue();
                 float monthBudget = prefs.getFloat(key, defaultBudget);
-                double dailyBudget = (monthBudget > 0) ? ((double) monthBudget / d.lengthOfMonth()) : 0;
+                double dailyBudget = monthBudget > 0
+                        ? BudgetCalculator.distributeEvenly(monthBudget, d.lengthOfMonth())
+                        .get(d.getDayOfMonth() - 1) : 0;
 
-                double expenseToday = 0;
                 long startOfDay = d.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 long endOfDay = d.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                for (Transaction t : allTransactions) {
-                    // 【修改点】：增加不计入预算和资产互转的过滤
-                    boolean isTransfer = "资产互转".equals(t.category);
-                    if (t.date >= startOfDay && t.date < endOfDay && t.type == 0 && !isTransfer && !t.excludeFromBudget) {
-                        expenseToday += t.amount;
-                    }
-                }
+                double expenseToday = BudgetCalculator.expenseBetween(
+                        allTransactions, startOfDay, endOfDay);
 
                 boolean hasActiveGoal = false;
                 for (Goal g : sortedGoals) {
@@ -754,8 +937,9 @@ public class BudgetFragment extends Fragment {
             Goal goal = goals.get(position);
             holder.tvName.setText(goal.name);
 
-            double allocatedSurplus = surplusAllocationMap.containsKey(goal.id) ? surplusAllocationMap.get(goal.id) : 0;
-            double finalSaved = goal.savedAmount + allocatedSurplus;
+            // savedAmount is updated when an expired budget plan is settled.
+            // Do not add the legacy projection again or the card double-counts it.
+            double finalSaved = goal.savedAmount;
 
             holder.viewPriorityDot.setVisibility(goal.isPriority ? View.VISIBLE : View.GONE);
             holder.tvProgressText.setText(String.format("已实现 %.2f / %.2f", finalSaved, goal.targetAmount));
@@ -764,7 +948,7 @@ public class BudgetFragment extends Fragment {
             holder.pbGoal.setProgress(Math.max(0, Math.min(percent, 100)));
 
 
-            // 【新增】：给存储目标子卡片增加 90% 透明度
+            // 自定义背景模式下保持储蓄目标卡片可读。
             SharedPreferences prefs = holder.itemView.getContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
             boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
             if (holder.itemView instanceof androidx.cardview.widget.CardView) {

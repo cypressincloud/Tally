@@ -13,9 +13,14 @@ import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.AssetAccountDao;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.database.TransactionDao;
+import com.example.budgetapp.util.InterestCalculator;
 
 import java.util.Calendar;
 import java.util.List;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 
 /**
  * 活期理财每日计息服务
@@ -58,30 +63,35 @@ public class DailyInterestService extends BroadcastReceiver {
             if (lastDate == 0) {
                 long depositStart = asset.depositDate > 0 ? asset.depositDate : asset.updateTime;
                 daysToCalculate = daysBetween(depositStart, todayStart);
-                if (daysToCalculate <= 0) daysToCalculate = 1;
             } else {
                 daysToCalculate = daysBetween(lastDate, todayStart);
-                if (daysToCalculate <= 0) daysToCalculate = 1;
             }
+            if (daysToCalculate <= 0) continue;
 
-            double dailyRate = asset.interestRate / 100.0 / 365.0;
             double totalInterest = 0;
-            double currentPrincipal = asset.amount;
 
-            for (long day = 0; day < daysToCalculate; day++) {
-                double dayInterest = currentPrincipal * dailyRate;
-                totalInterest += dayInterest;
-                currentPrincipal += dayInterest;
+            if (asset.isCompoundInterest) {
+                totalInterest = InterestCalculator.interest(
+                        asset.amount, asset.interestRate, daysToCalculate, true);
+            } else {
+                Double accruedInterestRaw = transactionDao.getInvestmentInterestTotalSync(asset.id);
+                double accruedInterest = accruedInterestRaw == null ? 0 : accruedInterestRaw;
+                double principal = accruedInterest > 0 && accruedInterest < asset.amount
+                        ? asset.amount - accruedInterest : asset.amount;
+                totalInterest = InterestCalculator.interest(
+                        principal, asset.interestRate, daysToCalculate, false);
             }
 
-            asset.amount = Math.round(currentPrincipal * 100.0) / 100.0;
+            double roundedInterest = Math.round(totalInterest * 100.0) / 100.0;
+            if (roundedInterest <= 0) continue;
+            asset.amount = Math.round((asset.amount + roundedInterest) * 100.0) / 100.0;
             assetDao.update(asset);
 
             Transaction transaction = new Transaction(
                     System.currentTimeMillis(),
                     1,
                     "理财收益",
-                    Math.round(totalInterest * 100.0) / 100.0,
+                    roundedInterest,
                     asset.name + " 活期利息"
             );
             transaction.assetId = asset.id;
@@ -108,9 +118,11 @@ public class DailyInterestService extends BroadcastReceiver {
     }
 
     private long daysBetween(long startMillis, long endMillis) {
-        long startDay = startMillis / (24 * 60 * 60 * 1000L);
-        long endDay = endMillis / (24 * 60 * 60 * 1000L);
-        return Math.max(1, endDay - startDay);
+        LocalDate start = Instant.ofEpochMilli(startMillis)
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate end = Instant.ofEpochMilli(endMillis)
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        return ChronoUnit.DAYS.between(start, end);
     }
 
     /**

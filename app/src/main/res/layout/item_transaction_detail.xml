@@ -37,6 +37,15 @@
                 android:textColor="#999999"
                 android:layout_marginStart="8dp"
                 android:visibility="gone"/>
+
+            <TextView
+                android:id="@+id/tv_amortization"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textSize="11sp"
+                android:textColor="#F2B233"
+                android:visibility="gone"/>
         </LinearLayout>
 
         <TextView

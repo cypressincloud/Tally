@@ -173,6 +173,38 @@
                     android:layout_marginHorizontal="20dp"/>
 
                 <TextView
+                    android:id="@+id/btn_notification_accounting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="通知记账设置"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
+
+                <TextView
+                    android:id="@+id/btn_root_keep_alive"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:text="Root 保活"
+                    android:textSize="16sp"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:textColor="?android:attr/textColorPrimary"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1F888888"
+                    android:layout_marginHorizontal="20dp"/>
+
+                <TextView
                     android:id="@+id/btn_budget_management"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

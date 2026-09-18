@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"
+    android:background="@drawable/bg_bottom_sheet_rounded" android:padding="24dp">
+    <TextView android:id="@+id/tv_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center"
+        android:text="设置应用默认资产" android:textSize="20sp" android:textStyle="bold" android:textColor="?android:attr/textColorPrimary" android:layout_marginBottom="24dp" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="应用" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:layout_marginBottom="8dp" />
+    <Spinner android:id="@+id/sp_default_asset_app" android:layout_width="match_parent" android:layout_height="50dp" android:background="@drawable/bg_input_field" android:paddingHorizontal="12dp" android:spinnerMode="dropdown" android:popupBackground="@drawable/bg_input_field" android:layout_marginBottom="16dp" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="默认资产" android:textSize="14sp" android:textColor="?android:attr/textColorPrimary" android:layout_marginBottom="8dp" />
+    <Spinner android:id="@+id/sp_default_asset_account" android:layout_width="match_parent" android:layout_height="50dp" android:background="@drawable/bg_input_field" android:paddingHorizontal="12dp" android:spinnerMode="dropdown" android:popupBackground="@drawable/bg_input_field" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="24dp">
+        <com.google.android.material.button.MaterialButton android:id="@+id/btn_default_asset_cancel" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="取 消" android:textColor="?android:attr/textColorSecondary" android:backgroundTint="@color/input_bg" android:layout_marginEnd="8dp" app:cornerRadius="16dp" app:elevation="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/btn_default_asset_save" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="保 存" android:textColor="@color/text_white" android:textStyle="bold" android:backgroundTint="@color/app_blue" android:layout_marginStart="8dp" app:cornerRadius="16dp" app:elevation="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+    </LinearLayout>
+</LinearLayout>

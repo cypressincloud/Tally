@@ -51,6 +51,8 @@ import com.example.budgetapp.ui.CategoryAdapter;
 import com.example.budgetapp.ui.PhotoActionActivity;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.util.AutoAssetManager;
+import com.example.budgetapp.util.AutoCategoryRule;
+import com.example.budgetapp.util.AutoCategoryRuleManager;
 import com.example.budgetapp.util.CategoryManager;
 import com.example.budgetapp.util.KeywordManager;
 import com.google.android.material.chip.Chip;
@@ -118,6 +120,7 @@ public class SelectToSpeakService extends AccessibilityService {
                 if (rootNode == null) return;
 
                 String packageName = rootNode.getPackageName() != null ? rootNode.getPackageName().toString() : "";
+                activePackageName = packageName;
 
 
                 // ======= 全局无差别节点树日志捕获 =======
@@ -260,6 +263,9 @@ public class SelectToSpeakService extends AccessibilityService {
             }
         }
     };
+
+    /** Package currently being scanned; used for app-scoped classification rules. */
+    private String activePackageName = "";
 
     // 新增：向界面输出Logcat同款节点树日志 (去除视觉噪音版)
     private void printNodeToManager(AccessibilityNodeInfo node, int depth, String packageName) {
@@ -564,25 +570,43 @@ public class SelectToSpeakService extends AccessibilityService {
     // 2. 核心主方法（必须加上 long transactionTime）
     private void showConfirmWindow(double amount, int type, String category, String note, int matchedAssetId, String initialSymbol, long transactionTime) {
         if (isWindowShowing) return;
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        if (activePackageName != null && !activePackageName.isEmpty()) {
+            prefs.edit()
+                    .putLong("last_screen_accounting_trigger_" + activePackageName, System.currentTimeMillis())
+                    .putLong("last_screen_accounting_amount_" + activePackageName,
+                            Double.doubleToRawLongBits(amount))
+                    .apply();
+        }
         selectedSubCategory = null;
 
-        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        // Apply user-defined app/record-identifier rules before showing the confirmation UI.
+        AutoCategoryRule matchedRule = AutoCategoryRuleManager.findMatch(
+                this, activePackageName, note, type);
+        if (matchedRule != null) {
+            type = matchedRule.getTargetType();
+            category = matchedRule.getCategory();
+            selectedSubCategory = matchedRule.getSubCategory().isEmpty()
+                    ? null : matchedRule.getSubCategory();
+        } else {
+            com.example.budgetapp.util.AutoCategoryRuleManager.DefaultCategory fallback =
+                    AutoCategoryRuleManager.findDefault(this, activePackageName, type);
+            if (fallback != null) {
+                category = fallback.category;
+                selectedSubCategory = fallback.subCategory.isEmpty() ? null : fallback.subCategory;
+            }
+        }
+
         boolean isCurrencyEnabled = prefs.getBoolean("enable_currency", false);
         boolean isPhotoBackupEnabled = prefs.getBoolean("enable_photo_backup", false);
-
-        // 【修改点 A】：如果是后台直接记账（无悬浮窗权限），传入 transactionTime
-        if (!Settings.canDrawOverlays(this)) {
-            int finalAssetId = (matchedAssetId > 0) ? matchedAssetId : 0;
-            saveToDatabase(amount, type, category, null, note + " (后台)", "", finalAssetId, initialSymbol, "", transactionTime);
-            return;
-        }
 
         try {
             WindowManager windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
             WindowManager.LayoutParams params = new WindowManager.LayoutParams();
 
-            params.type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
+            // AccessibilityService 自身可使用 ACCESSIBILITY_OVERLAY，不依赖额外的悬浮窗权限。
+            // 之前使用 APPLICATION_OVERLAY 时，权限未授予会静默走后台记账分支，用户看不到确认窗口。
+            params.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
             params.format = PixelFormat.TRANSLUCENT;
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;
@@ -864,6 +888,10 @@ public class SelectToSpeakService extends AccessibilityService {
         } catch (Exception e) {
             Log.e("AutoTrackService", "Window show failed", e);
             isWindowShowing = false;
+            // 窗口服务异常时仍保留记账结果，避免支付已成功但账单丢失。
+            int finalAssetId = (matchedAssetId > 0) ? matchedAssetId : 0;
+            saveToDatabase(amount, type, category, selectedSubCategory, note + " (后台)", "",
+                    finalAssetId, initialSymbol, "", transactionTime);
         }
     }
     private void closeWindow(WindowManager wm, View view) {
@@ -1095,8 +1123,10 @@ public class SelectToSpeakService extends AccessibilityService {
                     }
                 }
                 if (existingTarget != null) {
-                    existingTarget.amount += amount;
-                    db.assetAccountDao().update(existingTarget);
+                    if (existingTarget.id != assetId) {
+                        existingTarget.amount += amount;
+                        db.assetAccountDao().update(existingTarget);
+                    }
                 } else {
                     AssetAccount newTarget = new AssetAccount(targetObject, 0, liabilityLoanType);
                     newTarget.amount = amount;
@@ -1105,7 +1135,7 @@ public class SelectToSpeakService extends AccessibilityService {
             } else if (type == 0 && remark != null && !remark.isEmpty()) {
                 // 支出还款：检查备注是否匹配负债账户名称
                 AssetAccount liabilityAccount = db.assetAccountDao().getAssetByNameAndType(remark, 1);
-                if (liabilityAccount != null) {
+                if (liabilityAccount != null && liabilityAccount.id != assetId) {
                     liabilityAccount.amount -= amount;
                     if (liabilityAccount.amount <= 0) {
                         liabilityAccount.amount = 0;
@@ -1115,7 +1145,7 @@ public class SelectToSpeakService extends AccessibilityService {
             } else if (type == 1 && remark != null && !remark.isEmpty()) {
                 // 收入收款：检查备注是否匹配借出账户名称
                 AssetAccount lentAccount = db.assetAccountDao().getAssetByNameAndType(remark, 2);
-                if (lentAccount != null) {
+                if (lentAccount != null && lentAccount.id != assetId) {
                     lentAccount.amount -= amount;
                     if (lentAccount.amount <= 0) {
                         lentAccount.amount = 0;
@@ -2255,24 +2285,41 @@ public class SelectToSpeakService extends AccessibilityService {
                 isPaySuccess = true;
             }
 
-            // 2. 提取金额（在“支付成功”后出现的纯数字或带小数的数字，如 "4.83"）
+            // 2. 提取金额。支付宝新页面会把金额作为“￥19.00”节点提供，
+            //    不能只匹配纯数字，否则成功页不会触发记账弹窗。
             if (isPaySuccess && amount == -1) {
-                // 正则匹配：纯数字，可带1到2位小数
-                if (content.matches("^\\d+(\\.\\d{1,2})?$")) {
+                // 支付宝不同版本可能在货币符号后插入普通空格、全角空格或换行。
+                Matcher amountMatcher = Pattern.compile("^[￥¥\\s]*([0-9]+(?:\\.[0-9]{1,2})?)[\\s]*$")
+                        .matcher(content);
+                if (amountMatcher.matches()) {
                     try {
-                        amount = Double.parseDouble(content);
+                        amount = Double.parseDouble(amountMatcher.group(1));
 
-                        // 【核心修复】：没有“收款方”标签时，商户名紧跟在纯数字金额的后面
-                        for (int j = i + 1; j < allNodes.size(); j++) {
+                        // 新版支付宝节点顺序通常是“商户名 -> 金额”，优先向前找商户。
+                        for (int j = i - 1; j >= 0; j--) {
+                            AccessibilityNodeInfo previousNode = allNodes.get(j);
+                            String previousText = previousNode.getText() != null ? previousNode.getText().toString().trim() : "";
+                            String previousDesc = previousNode.getContentDescription() != null ? previousNode.getContentDescription().toString().trim() : "";
+                            String previousContent = !previousText.isEmpty() ? previousText : previousDesc;
+                            if (!previousContent.isEmpty() && !isAlipayPaySuccessControlLabel(previousContent)
+                                    && !previousContent.matches("^[￥¥]?\\s*\\d+(\\.\\d{1,2})?$")
+                                    && !previousContent.startsWith("-")) {
+                                payeeName = previousContent;
+                                break;
+                            }
+                        }
+                        // 兼容旧版“金额 -> 商户名”的节点顺序。
+                        if (payeeName.isEmpty()) for (int j = i + 1; j < allNodes.size(); j++) {
                             AccessibilityNodeInfo nextNode = allNodes.get(j);
                             String nextText = nextNode.getText() != null ? nextNode.getText().toString().trim() : "";
                             String nextDesc = nextNode.getContentDescription() != null ? nextNode.getContentDescription().toString().trim() : "";
                             String nextContent = !nextText.isEmpty() ? nextText : nextDesc;
 
-                            // 排除空节点、以及带有 ￥、¥ 或 - 符号的优惠券金额干扰项
-                            if (!nextContent.isEmpty() && !nextContent.contains("￥") && !nextContent.contains("¥") && !nextContent.startsWith("-")) {
+                            if (!nextContent.isEmpty() && !isAlipayPaySuccessControlLabel(nextContent)
+                                    && !nextContent.matches("^[￥¥]?\\s*\\d+(\\.\\d{1,2})?$")
+                                    && !nextContent.startsWith("-")) {
                                 payeeName = nextContent;
-                                break; // 抓到商户名立刻跳出
+                                break;
                             }
                         }
                     } catch (Exception e) {
@@ -2350,6 +2397,11 @@ public class SelectToSpeakService extends AccessibilityService {
         }
 
         return false;
+    }
+
+    private boolean isAlipayPaySuccessControlLabel(String value) {
+        return "支付成功".equals(value) || "回首页".equals(value) || "完成".equals(value)
+                || "使用说明".equals(value) || "安全支付中".equals(value);
     }
     /**
      * 【专版专杀】专门适配拼多多“多多钱包”支付密码弹窗页面

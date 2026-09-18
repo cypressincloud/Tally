@@ -145,7 +145,7 @@ public class InstallmentDetailActivity extends AppCompatActivity {
 
         // 更新进度条和底部已还/剩余统计
         ProgressBar pbProgress = findViewById(R.id.pb_repayment_progress);
-        int paidCount = account.getPaidInstallmentsList().size();
+        int paidCount = account.getPaidInstallmentCount();
         if (pbProgress != null) {
             pbProgress.setMax(account.totalInstallments);
             pbProgress.setProgress(paidCount);

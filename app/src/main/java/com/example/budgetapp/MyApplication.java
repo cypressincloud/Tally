@@ -10,6 +10,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 
 import com.example.budgetapp.ui.AuthActivity;
+import com.example.budgetapp.util.RootKeepAliveManager;
 
 public class MyApplication extends Application {
 
@@ -19,6 +20,9 @@ public class MyApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+
+        // Rooted devices can opt into stronger background survivability policies.
+        RootKeepAliveManager.applyAsync(this);
 
         // 1. 监听系统锁屏广播（一旦屏幕熄灭，就将状态改为未解锁）
         IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);

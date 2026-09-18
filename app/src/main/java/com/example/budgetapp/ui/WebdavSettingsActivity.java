@@ -153,6 +153,7 @@ public class WebdavSettingsActivity extends AppCompatActivity {
                                     // 1. 清理旧数据
                                     db.transactionDao().deleteAll();
                                     db.goalDao().deleteAll(); // 清理旧目标
+                                    db.budgetPlanDao().deleteAll();
 
                                     // 清理旧资产
                                     java.util.List<com.example.budgetapp.database.AssetAccount> oldAssets = db.assetAccountDao().getAllAssetsSync();
@@ -176,6 +177,12 @@ public class WebdavSettingsActivity extends AppCompatActivity {
                                     // 恢复新目标
                                     if (data.goals != null && !data.goals.isEmpty()) {
                                         db.goalDao().insertAll(data.goals);
+                                    }
+                                    if (data.budgetPlans != null && !data.budgetPlans.isEmpty()) {
+                                        for (com.example.budgetapp.database.BudgetPlan plan : data.budgetPlans) {
+                                            plan.id = 0;
+                                            db.budgetPlanDao().insert(plan);
+                                        }
                                     }
                                 });
 

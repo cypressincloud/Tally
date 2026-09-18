@@ -827,7 +827,17 @@ public class StatsFragment extends Fragment {
         btnSave.setOnClickListener(v -> {
             String amountStr = etAmount.getText().toString();
             if (!amountStr.isEmpty()) {
-                double amount = Double.parseDouble(amountStr);
+                double amount;
+                try {
+                    amount = Double.parseDouble(amountStr);
+                } catch (NumberFormatException e) {
+                    Toast.makeText(getContext(), "金额格式不正确", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!Double.isFinite(amount) || amount <= 0) {
+                    Toast.makeText(getContext(), "金额必须大于 0", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 int type = rgType.getCheckedRadioButtonId() == R.id.rb_income ? 1 : 0;
 
                 String category = selectedCategory[0];
@@ -863,6 +873,8 @@ public class StatsFragment extends Fragment {
                     updateT.id = existingTransaction.id;
                     updateT.assetId = selectedAssetId;
                     updateT.subCategory = selectedSubCategory[0]; // 【新增】更新二级分类
+                    updateT.spreadStartDate = existingTransaction.spreadStartDate;
+                    updateT.spreadEndDate = existingTransaction.spreadEndDate;
                     // 【修复】使用带资产同步的方法
                     viewModel.updateTransactionWithAssetSync(existingTransaction, updateT);
                 }
@@ -1261,8 +1273,7 @@ public class StatsFragment extends Fragment {
 
     private void processYearlyData() {
         int year = selectedDate.getYear();
-        aggregateData(t -> {
-            LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
+        aggregateData(date -> {
             return date.getYear() == year ? date.getMonthValue() : -1;
         }, 12, "月", null);
     }
@@ -1271,8 +1282,7 @@ public class StatsFragment extends Fragment {
         int year = selectedDate.getYear();
         int month = selectedDate.getMonthValue();
         int daysInMonth = selectedDate.lengthOfMonth();
-        aggregateData(t -> {
-            LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
+        aggregateData(date -> {
             return (date.getYear() == year && date.getMonthValue() == month) ? date.getDayOfMonth() : -1;
         }, daysInMonth, "日", null);
     }
@@ -1280,8 +1290,7 @@ public class StatsFragment extends Fragment {
     private void processWeeklyData() {
         LocalDate startOfWeek = selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate endOfWeek = selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
-        aggregateData(t -> {
-            LocalDate date = Instant.ofEpochMilli(t.date).atZone(ZoneId.systemDefault()).toLocalDate();
+        aggregateData(date -> {
             if (!date.isBefore(startOfWeek) && !date.isAfter(endOfWeek)) {
                 return date.getDayOfWeek().getValue();
             }
@@ -1289,29 +1298,59 @@ public class StatsFragment extends Fragment {
         }, 7, "", new String[]{"", "周一", "周二", "周三", "周四", "周五", "周六", "周日"});
     }
 
-    interface IndexExtractor { int getIndex(Transaction t); }
+    interface DateIndexExtractor { int getIndex(LocalDate date); }
 
-    private void aggregateData(IndexExtractor extractor, int maxX, String suffix, String[] customLabels) {
+    private void aggregateData(DateIndexExtractor extractor, int maxX, String suffix, String[] customLabels) {
         Map<Integer, Double> incomeMap = new HashMap<>();
         Map<Integer, Double> expenseMap = new HashMap<>();
         Map<String, Double> expensePieCats = new HashMap<>();
         Map<String, Double> incomePieCats = new HashMap<>();
 
         for (Transaction t : allTransactions) {
-            int index = extractor.getIndex(t);
-            if (index != -1) {
-                if (t.type == 1) { // 收入
-                    if (!"加班".equals(t.category)) {
-                        incomeMap.put(index, incomeMap.getOrDefault(index, 0.0) + t.amount);
-                        incomePieCats.put(t.category, incomePieCats.getOrDefault(t.category, 0.0) + t.amount);
-                    }
-                } else if (t.type == 0) { // 🌟 严格限制只有 type == 0 才是支出，完美隔离 type == 2
-                    expenseMap.put(index, expenseMap.getOrDefault(index, 0.0) + t.amount);
-                    expensePieCats.put(t.category, expensePieCats.getOrDefault(t.category, 0.0) + t.amount);
+            if (t.type != 0 && t.type != 1) continue;
+
+            if (t.spreadStartDate > 0 && t.spreadEndDate >= t.spreadStartDate) {
+                LocalDate start = Instant.ofEpochMilli(t.spreadStartDate)
+                        .atZone(ZoneId.systemDefault()).toLocalDate();
+                LocalDate end = Instant.ofEpochMilli(t.spreadEndDate)
+                        .atZone(ZoneId.systemDefault()).toLocalDate();
+                for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
+                    int index = extractor.getIndex(day);
+                    if (index == -1) continue;
+                    addAmountToAggregate(t, index,
+                            com.example.budgetapp.util.BudgetCalculator.amountForDay(t, day),
+                            incomeMap, expenseMap, expensePieCats, incomePieCats);
+                }
+            } else {
+                LocalDate date = Instant.ofEpochMilli(t.date)
+                        .atZone(ZoneId.systemDefault()).toLocalDate();
+                int index = extractor.getIndex(date);
+                if (index != -1) {
+                    addAmountToAggregate(t, index, t.amount,
+                            incomeMap, expenseMap, expensePieCats, incomePieCats);
                 }
             }
         }
         updateCharts(incomeMap, expenseMap, expensePieCats, incomePieCats, maxX, suffix, customLabels);
+    }
+
+    private void addAmountToAggregate(Transaction transaction, int index, double amount,
+                                      Map<Integer, Double> incomeMap,
+                                      Map<Integer, Double> expenseMap,
+                                      Map<String, Double> expensePieCats,
+                                      Map<String, Double> incomePieCats) {
+        if (amount <= 0) return;
+        if (transaction.type == 1) {
+            if (!"加班".equals(transaction.category)) {
+                incomeMap.put(index, incomeMap.getOrDefault(index, 0.0) + amount);
+                incomePieCats.put(transaction.category,
+                        incomePieCats.getOrDefault(transaction.category, 0.0) + amount);
+            }
+        } else {
+            expenseMap.put(index, expenseMap.getOrDefault(index, 0.0) + amount);
+            expensePieCats.put(transaction.category,
+                    expensePieCats.getOrDefault(transaction.category, 0.0) + amount);
+        }
     }
 
     private void updateCharts(Map<Integer, Double> incomeMap, Map<Integer, Double> expenseMap,

@@ -38,6 +38,7 @@ import com.example.budgetapp.widget.TodaySummaryWidget;
 import com.google.android.accessibility.selecttospeak.SelectToSpeakService;
 import com.example.budgetapp.ui.SettingsActivity;
 import com.example.budgetapp.util.AssistantConfig;
+import com.example.budgetapp.util.RootKeepAliveManager;
 import com.example.budgetapp.viewmodel.FinanceViewModel;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
@@ -107,9 +108,27 @@ public class MainActivity extends AppCompatActivity {
                             assetCount = data.assets.size();
                         }
 
-                        if (recordCount > 0 || assetCount > 0) {
+                        int goalCount = 0;
+                        int planCount = 0;
+                        if (data.goals != null) {
+                            for (com.example.budgetapp.database.Goal goal : data.goals) {
+                                goal.id = 0;
+                                financeViewModel.insertGoal(goal);
+                                goalCount++;
+                            }
+                        }
+                        if (data.budgetPlans != null) {
+                            for (com.example.budgetapp.database.BudgetPlan plan : data.budgetPlans) {
+                                plan.id = 0;
+                                financeViewModel.insertBudgetPlan(plan);
+                                planCount++;
+                            }
+                        }
+
+                        if (recordCount > 0 || assetCount > 0 || goalCount > 0 || planCount > 0) {
                             Toast.makeText(this, 
-                                String.format("成功导入: %d条账单, %d个资产", recordCount, assetCount), 
+                                String.format("成功导入: %d条账单, %d个资产, %d个储蓄目标, %d个预算计划",
+                                        recordCount, assetCount, goalCount, planCount),
                                 Toast.LENGTH_LONG).show();
                         } else {
                             Toast.makeText(this, "备份文件中未发现数据", Toast.LENGTH_SHORT).show();
@@ -374,6 +393,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkPermissions() {
+        AssistantConfig config = new AssistantConfig(this);
+
+        if (config.isEnabled() && !isAccessibilitySettingsOn()
+                && RootKeepAliveManager.isEnabled(this)
+                && RootKeepAliveManager.isAutoAccessibilityEnabled(this)) {
+            RootKeepAliveManager.applyAsync(this, () -> {
+                if (!isFinishing() && !isDestroyed()) checkPermissionsAfterRootRestore();
+            });
+            return;
+        }
+        checkPermissionsAfterRootRestore();
+    }
+
+    private void checkPermissionsAfterRootRestore() {
         AssistantConfig config = new AssistantConfig(this);
 
         if (config.isEnabled() && !isAccessibilitySettingsOn()) {

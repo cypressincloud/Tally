@@ -17,7 +17,7 @@
             android:id="@+id/tv_dialog_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="添加预算目标"
+            android:text="添加储蓄目标"
             android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="@color/text_primary"

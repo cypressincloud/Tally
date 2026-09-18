@@ -12,7 +12,13 @@ import androidx.core.content.ContextCompat;
 import com.example.budgetapp.MainActivity;
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AppDatabase;
+import com.example.budgetapp.database.BudgetPlan;
+import com.example.budgetapp.database.Transaction;
+import com.example.budgetapp.util.BudgetCalculator;
 import com.example.budgetapp.util.CategoryManager;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -50,19 +56,37 @@ public class TodayBudgetWidget extends AppWidgetProvider {
                     monthlyBudget = prefs.getFloat(monthKey, defaultBudget);
                 }
 
-                // 🌟 静态计算：今日预算限额 = 总预算 / 月总天数
-                double staticDailyLimit = (daysInMonth > 0) ? (monthlyBudget / daysInMonth) : 0;
-
                 cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
                 long startOfToday = cal.getTimeInMillis();
 
-                // 查询今日支出（数据库已自动排除“资产互转”）
-                Double todayExpRaw = db.transactionDao().getTotalAmountByTypeSync(startOfToday, System.currentTimeMillis(), 0);
-                double tExp = (todayExpRaw == null) ? 0.0 : todayExpRaw;
+                LocalDate today = LocalDate.now();
+                List<BudgetPlan> plans = db.budgetPlanDao().getAllPlansSync();
+                List<Transaction> transactions = db.transactionDao().getAllTransactionsSync();
+                double dailyLimit = 0;
+                boolean hasActivePlan = false;
+                for (BudgetPlan plan : plans) {
+                    LocalDate start = Instant.ofEpochMilli(plan.startDate)
+                            .atZone(ZoneId.systemDefault()).toLocalDate();
+                    LocalDate end = Instant.ofEpochMilli(plan.endDate)
+                            .atZone(ZoneId.systemDefault()).toLocalDate();
+                    if (plan.enabled && !today.isBefore(start) && !today.isAfter(end)) {
+                        dailyLimit += BudgetCalculator.remainingDailyBudget(plan, today, transactions);
+                        hasActivePlan = true;
+                    }
+                }
+
+                if (!hasActivePlan) {
+                    // 没有预算计划时，保持旧版月预算口径。
+                    dailyLimit = (daysInMonth > 0) ? (monthlyBudget / daysInMonth) : 0;
+                }
+
+                // 与 App 使用同一预算过滤规则，并支持跨日摊销。
+                double tExp = BudgetCalculator.expenseBetween(
+                        transactions, startOfToday, System.currentTimeMillis());
 
                 // 判断是否超支并计算进度
-                boolean isExceeded = tExp > staticDailyLimit;
-                int progress = (staticDailyLimit > 0) ? (int) ((tExp / staticDailyLimit) * 100) : 0;
+                boolean isExceeded = tExp > dailyLimit;
+                int progress = (dailyLimit > 0) ? (int) ((tExp / dailyLimit) * 100) : 0;
                 if (progress > 100) progress = 100;
 
                 // 颜色资源适配
@@ -74,7 +98,7 @@ public class TodayBudgetWidget extends AppWidgetProvider {
                     RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_today_budget);
 
                     // 中间大字：显示今日固定额度 (例如 40.00)
-                    views.setTextViewText(R.id.tv_widget_budget_amount, String.format("¥%.2f", staticDailyLimit));
+                    views.setTextViewText(R.id.tv_widget_budget_amount, String.format("¥%.2f", dailyLimit));
 
                     // 右上角小字：仅显示金额数字，颜色随状态变
                     views.setTextViewText(R.id.tv_widget_budget_status, String.format("¥%.2f", tExp));

@@ -79,6 +79,10 @@ public class CategorySettingsActivity extends AppCompatActivity {
         // ==========================================
 
         findViewById(R.id.btn_add_income).setOnClickListener(v -> showAddDialog(false));
+        findViewById(R.id.btn_auto_category_rules).setOnClickListener(v ->
+                startActivity(new android.content.Intent(this, AutoCategoryRuleActivity.class)));
+        findViewById(R.id.btn_default_category).setOnClickListener(v ->
+                startActivity(new android.content.Intent(this, DefaultCategoryActivity.class)));
 
         // 二级分类开关绑定（增加判空保护）
         if (switchSubCategory != null) {

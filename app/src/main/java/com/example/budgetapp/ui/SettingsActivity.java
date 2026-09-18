@@ -26,6 +26,8 @@ import com.example.budgetapp.BackupData;
 import com.example.budgetapp.BackupManager;
 import com.example.budgetapp.R;
 import com.example.budgetapp.database.AssetAccount;
+import com.example.budgetapp.database.BudgetPlan;
+import com.example.budgetapp.database.Goal;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.util.CategoryManager;
@@ -48,6 +50,8 @@ public class SettingsActivity extends AppCompatActivity {
     private FinanceViewModel financeViewModel;
     private List<Transaction> allTransactions = new ArrayList<>();
     private List<AssetAccount> allAssets = new ArrayList<>();
+    private List<Goal> allGoals = new ArrayList<>();
+    private List<BudgetPlan> allBudgetPlans = new ArrayList<>();
     private SwitchCompat switchMinimalist;
 
     // --- 查重辅助方法 开始 ---
@@ -175,6 +179,25 @@ public class SettingsActivity extends AppCompatActivity {
                     Objects.equals(ext.remark, newTx.remark)) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    private boolean isDuplicateGoal(Goal goal, List<Goal> existing) {
+        for (Goal item : existing) {
+            if (Objects.equals(item.name, goal.name)
+                    && Math.abs(item.targetAmount - goal.targetAmount) < 0.01
+                    && Math.abs(item.savedAmount - goal.savedAmount) < 0.01
+                    && item.createdAt == goal.createdAt) return true;
+        }
+        return false;
+    }
+
+    private boolean isDuplicateBudgetPlan(BudgetPlan plan, List<BudgetPlan> existing) {
+        for (BudgetPlan item : existing) {
+            if (Objects.equals(item.name, plan.name)
+                    && item.startDate == plan.startDate && item.endDate == plan.endDate
+                    && Math.abs(item.totalAmount - plan.totalAmount) < 0.01) return true;
         }
         return false;
     }
@@ -326,6 +349,26 @@ public class SettingsActivity extends AppCompatActivity {
                             }
                         }
 
+                        List<Goal> currentGoals = new ArrayList<>(allGoals);
+                        if (data.goals != null) {
+                            for (Goal goal : data.goals) {
+                                if (isDuplicateGoal(goal, currentGoals)) continue;
+                                goal.id = 0;
+                                financeViewModel.insertGoal(goal);
+                                currentGoals.add(goal);
+                            }
+                        }
+
+                        List<BudgetPlan> currentPlans = new ArrayList<>(allBudgetPlans);
+                        if (data.budgetPlans != null) {
+                            for (BudgetPlan plan : data.budgetPlans) {
+                                if (isDuplicateBudgetPlan(plan, currentPlans)) continue;
+                                plan.id = 0;
+                                financeViewModel.insertBudgetPlan(plan);
+                                currentPlans.add(plan);
+                            }
+                        }
+
                         Toast.makeText(this, String.format("成功导入: %d条账单, %d个资产 (已过滤重复)", recordCount, assetCount), Toast.LENGTH_LONG).show();
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -446,6 +489,9 @@ public class SettingsActivity extends AppCompatActivity {
         financeViewModel = new ViewModelProvider(this).get(FinanceViewModel.class);
         financeViewModel.getAllTransactions().observe(this, list -> allTransactions = list);
         financeViewModel.getAllAssets().observe(this, list -> allAssets = list);
+        financeViewModel.getAllGoals().observe(this, list -> allGoals = list == null ? new ArrayList<>() : list);
+        financeViewModel.getAllBudgetPlans().observe(this,
+                list -> allBudgetPlans = list == null ? new ArrayList<>() : list);
 
         findViewById(R.id.btn_category_setting).setOnClickListener(v -> startActivity(new Intent(this, CategorySettingsActivity.class)));
 
@@ -462,6 +508,8 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.btn_default_page).setOnClickListener(v -> startActivity(new Intent(this, DefaultPageActivity.class)));
         findViewById(R.id.btn_toggle_night_mode).setOnClickListener(v -> startActivity(new Intent(this, ThemeSettingsActivity.class)));
         findViewById(R.id.btn_assistant_setting).setOnClickListener(v -> startActivity(new Intent(this, AssistantManagerActivity.class)));
+        findViewById(R.id.btn_notification_accounting).setOnClickListener(v -> startActivity(new Intent(this, NotificationAccountingActivity.class)));
+        findViewById(R.id.btn_root_keep_alive).setOnClickListener(v -> startActivity(new Intent(this, RootKeepAliveSettingsActivity.class)));
         findViewById(R.id.btn_overtime_setting).setOnClickListener(v -> showSetOvertimeRateDialog());
         findViewById(R.id.btn_default_record_display).setOnClickListener(v -> showDefaultRecordDisplayDialog());
 

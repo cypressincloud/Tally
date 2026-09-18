@@ -9,6 +9,8 @@ import com.example.budgetapp.database.AssetAccount;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -18,6 +20,7 @@ public class AutoAssetManager {
     private static final String PREF_NAME = "auto_asset_prefs";
     private static final String KEY_ENABLE = "key_enable_auto_asset";
     private static final String KEY_RULES = "key_auto_asset_rules";
+    private static final String KEY_APP_DEFAULTS = "key_app_default_assets";
 
     // 规则实体类
     public static class AssetRule {
@@ -84,6 +87,38 @@ public class AutoAssetManager {
         prefs.edit().putStringSet(KEY_RULES, set).apply();
     }
 
+    /** Sets the fallback asset for an application when no keyword rule matches. */
+    public static void setAppDefaultAsset(Context context, String packageName, int assetId) {
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        Set<String> values = new HashSet<>(prefs.getStringSet(KEY_APP_DEFAULTS, new HashSet<>()));
+        values.removeIf(value -> value.startsWith(packageName + "|"));
+        if (assetId > 0) values.add(packageName + "|" + assetId);
+        prefs.edit().putStringSet(KEY_APP_DEFAULTS, values).apply();
+    }
+
+    public static int getAppDefaultAsset(Context context, String packageName) {
+        if (packageName == null) return -1;
+        for (String value : context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                .getStringSet(KEY_APP_DEFAULTS, new HashSet<>())) {
+            String[] parts = value.split("\\|", 2);
+            if (parts.length == 2 && packageName.equals(parts[0])) {
+                try { return Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {}
+            }
+        }
+        return -1;
+    }
+
+    public static Map<String, Integer> getAppDefaultAssets(Context context) {
+        Map<String, Integer> result = new HashMap<>();
+        for (String value : context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                .getStringSet(KEY_APP_DEFAULTS, new HashSet<>())) {
+            String[] parts = value.split("\\|", 2);
+            if (parts.length != 2) continue;
+            try { result.put(parts[0], Integer.parseInt(parts[1])); } catch (NumberFormatException ignored) {}
+        }
+        return result;
+    }
+
     /**
      * 核心逻辑：根据当前应用包名和屏幕文字，匹配资产ID
      * 匹配优先级：用户自定义精确规则 > 数据库智能模糊匹配 > 默认资产(未命中返回-1)
@@ -99,6 +134,9 @@ public class AutoAssetManager {
                 return rule.assetId; // 命中精确规则，直接返回
             }
         }
+
+        int appDefaultId = getAppDefaultAsset(context, packageName);
+        if (appDefaultId > 0) return appDefaultId;
 
         // 2. 智能模糊匹配：扫描数据库中的所有资产名称 (优先级高于全局默认资产)
         final int[] matchedId = {-1};

@@ -4,7 +4,9 @@ import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 import org.json.JSONArray;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity(tableName = "asset_accounts")
 public class AssetAccount {
@@ -91,7 +93,7 @@ public class AssetAccount {
      */
     public int getRemainingInstallments() {
         if (type != 4) return 0;
-        return totalInstallments - getPaidInstallmentsList().size();
+        return Math.max(0, totalInstallments - getPaidInstallmentCount());
     }
 
     /**
@@ -115,6 +117,16 @@ public class AssetAccount {
      */
     public double getPaidAmount() {
         if (type != 4) return 0;
-        return getPaidInstallmentsList().size() * installmentAmount;
+        return getPaidInstallmentCount() * installmentAmount;
+    }
+
+    public int getPaidInstallmentCount() {
+        Set<Integer> validPeriods = new LinkedHashSet<>();
+        for (Integer period : getPaidInstallmentsList()) {
+            if (period != null && period > 0 && period <= totalInstallments) {
+                validPeriods.add(period);
+            }
+        }
+        return validPeriods.size();
     }
 }

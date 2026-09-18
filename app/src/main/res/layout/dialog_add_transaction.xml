@@ -298,6 +298,20 @@
                     android:layout_marginBottom="16dp"/>
 
                 <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:layout_marginBottom="16dp">
+                    <TextView android:id="@+id/tv_spread_start" android:layout_width="0dp"
+                        android:layout_height="48dp" android:layout_weight="1" android:gravity="center_vertical"
+                        android:paddingHorizontal="14dp" android:text="摊销开始日期" android:textColor="?android:attr/textColorPrimary"
+                        android:background="@drawable/bg_input_field" android:clickable="true" android:focusable="true"/>
+                    <TextView android:id="@+id/tv_spread_end" android:layout_width="0dp"
+                        android:layout_height="48dp" android:layout_weight="1" android:layout_marginStart="8dp"
+                        android:gravity="center_vertical" android:paddingHorizontal="14dp" android:text="摊销结束日期"
+                        android:textColor="?android:attr/textColorPrimary" android:background="@drawable/bg_input_field"
+                        android:clickable="true" android:focusable="true"/>
+                </LinearLayout>
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">

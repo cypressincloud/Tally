@@ -90,7 +90,8 @@ public class ScreenshotOcrHelper {
 
     private double parseAmount(String rawAmount) {
         try {
-            return Double.parseDouble(rawAmount);
+            double amount = Double.parseDouble(rawAmount);
+            return Double.isFinite(amount) ? amount : 0d;
         } catch (Exception ignored) {
             return 0d;
         }

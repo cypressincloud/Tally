@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
@@ -153,7 +154,25 @@
             android:theme="@style/Theme.BudgetApp"
             android:exported="false"/>
 
+        <activity
+            android:name=".ui.AutoCategoryRuleActivity"
+            android:label="自动分类配置"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
+        <activity android:name=".ui.DefaultCategoryActivity" android:label="应用默认分类" android:exported="false" android:theme="@style/Theme.BudgetApp" />
+
         <activity android:name=".ui.AssistantManagerActivity" />
+
+        <activity
+            android:name=".ui.NotificationAccountingActivity"
+            android:label="通知记账设置"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.RootKeepAliveSettingsActivity"
+            android:label="Root 保活"
+            android:exported="false" />
 
         <activity
             android:name=".KeywordSettingActivity"
@@ -295,14 +314,24 @@
                 <action android:name="com.example.budgetapp.action.DAILY_INTEREST" />
             </intent-filter>
         </receiver>
-<!--        <service android:name=".service.NotificationMonitorService"-->
-<!--            android:label="退款通知监听"-->
-<!--            android:exported="true"-->
-<!--            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">-->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.service.notification.NotificationListenerService" />-->
-<!--            </intent-filter>-->
-<!--        </service>-->
+
+        <receiver
+            android:name=".service.RootKeepAliveReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name=".service.NotificationMonitorService"
+            android:label="通知记账"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
     </application>
 

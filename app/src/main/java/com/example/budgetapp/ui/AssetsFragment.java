@@ -308,10 +308,44 @@ public class AssetsFragment extends Fragment {
             AssetAccount fromAccount = allAccounts.get(fromIndex - 1);
             AssetAccount toAccount = allAccounts.get(toIndex - 1);
             String note = etNote.getText().toString().trim();
+            final double transferAmount = amount;
+            final double transferDiscount = discount;
+            final String transferNote = note;
+            Runnable executeTransfer = () -> {
+                viewModel.transferAsset(fromAccount, toAccount,
+                        transferAmount, transferDiscount, transferNote);
+                Toast.makeText(getContext(), "资产转移成功", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            };
 
-            viewModel.transferAsset(fromAccount, toAccount, amount, discount, note);
-            Toast.makeText(getContext(), "资产转移成功", Toast.LENGTH_SHORT).show();
-            dialog.dismiss();
+            SharedPreferences transferPrefs = requireContext()
+                    .getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
+            boolean isCurrencyEnabled = transferPrefs.getBoolean("enable_currency", false);
+            boolean singleCurrencyMode = transferPrefs.getBoolean("single_currency_mode", false);
+            String fromCode = getCurrencyCode(fromAccount.currencySymbol);
+            String toCode = getCurrencyCode(toAccount.currencySymbol);
+            if (isCurrencyEnabled && singleCurrencyMode && !fromCode.equals(toCode)) {
+                // 跨币种转账必须先确保缓存中存在有效汇率，不能在缺失汇率时按 1:1 静默入账。
+                new com.example.budgetapp.util.ExchangeRateManager(requireContext())
+                        .getExchangeRate(fromCode, toCode,
+                                new com.example.budgetapp.util.ExchangeRateManager.ExchangeRateCallback() {
+                    @Override
+                    public void onSuccess(double rate) {
+                        if (getActivity() != null) getActivity().runOnUiThread(executeTransfer);
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> Toast.makeText(
+                                    getContext(), "汇率获取失败，未执行转账: " + error,
+                                    Toast.LENGTH_LONG).show());
+                        }
+                    }
+                });
+            } else {
+                executeTransfer.run();
+            }
         });
 
         dialog.show();
@@ -525,19 +559,19 @@ public class AssetsFragment extends Fragment {
             for (AssetAccount acc : allAccounts) {
                 // 1. 统计各自的分类总额（不论是否计入总资产，面板上的负债/借出总额应如实显示）
                 if (acc.type == 1 || acc.type == 4) {
-                    totalLiability += acc.amount; // 负债和分期都计入负债统计
+                    totalLiability += accountBalanceForSummary(acc); // 分期只统计剩余应还
                 } else if (acc.type == 2) {
-                    totalLent += acc.amount;
+                    totalLent += accountBalanceForSummary(acc);
                 }
 
                 // 2. 统计顶部的大字"总资产"（根据是否勾选了计入总资产来加减）
                 if (acc.isIncludedInTotal) {
                     if (acc.type == 0 || acc.type == 3) {
-                        totalAsset += acc.amount; // 资产和理财
+                        totalAsset += accountBalanceForSummary(acc); // 资产和理财
                     } else if (acc.type == 2) {
-                        totalAsset += acc.amount; // 借出
+                        totalAsset += accountBalanceForSummary(acc); // 借出
                     } else if (acc.type == 1 || acc.type == 4) {
-                        totalAsset -= acc.amount; // 负债和分期（减少总资产）
+                        totalAsset -= accountBalanceForSummary(acc); // 负债和分期（减少总资产）
                     }
                 }
             }
@@ -576,19 +610,19 @@ public class AssetsFragment extends Fragment {
                     // 分类统计
                     if (acc.type == 1 || acc.type == 4) {
                         liabilityAmounts.put(currencyCode, 
-                            liabilityAmounts.getOrDefault(currencyCode, 0.0) + acc.amount);
+                            liabilityAmounts.getOrDefault(currencyCode, 0.0) + accountBalanceForSummary(acc));
                     } else if (acc.type == 2) {
                         lentAmounts.put(currencyCode, 
-                            lentAmounts.getOrDefault(currencyCode, 0.0) + acc.amount);
+                            lentAmounts.getOrDefault(currencyCode, 0.0) + accountBalanceForSummary(acc));
                     }
                     
                     // 总资产统计
                     if (acc.isIncludedInTotal) {
                         double currentAmount = assetAmounts.getOrDefault(currencyCode, 0.0);
                         if (acc.type == 0 || acc.type == 3 || acc.type == 2) {
-                            assetAmounts.put(currencyCode, currentAmount + acc.amount);
+                            assetAmounts.put(currencyCode, currentAmount + accountBalanceForSummary(acc));
                         } else if (acc.type == 1 || acc.type == 4) {
-                            assetAmounts.put(currencyCode, currentAmount - acc.amount);
+                            assetAmounts.put(currencyCode, currentAmount - accountBalanceForSummary(acc));
                         }
                     }
                 }
@@ -669,20 +703,20 @@ public class AssetsFragment extends Fragment {
 
                 // 1. 统计各自的分类总额
                 if (acc.type == 1 || acc.type == 4) {
-                    liabilityMap.put(symbol, liabilityMap.getOrDefault(symbol, 0.0) + acc.amount);
+                    liabilityMap.put(symbol, liabilityMap.getOrDefault(symbol, 0.0) + accountBalanceForSummary(acc));
                 } else if (acc.type == 2) {
-                    lentMap.put(symbol, lentMap.getOrDefault(symbol, 0.0) + acc.amount);
+                    lentMap.put(symbol, lentMap.getOrDefault(symbol, 0.0) + accountBalanceForSummary(acc));
                 }
 
                 // 2. 统计顶部的大学"总资产"
                 if (acc.isIncludedInTotal) {
                 double currentTotal = assetMap.getOrDefault(symbol, 0.0);
                 if (acc.type == 0 || acc.type == 3) {
-                    currentTotal += acc.amount; // 资产和理财
+                    currentTotal += accountBalanceForSummary(acc); // 资产和理财
                 } else if (acc.type == 2) {
-                    currentTotal += acc.amount; // 借出
+                    currentTotal += accountBalanceForSummary(acc); // 借出
                 } else if (acc.type == 1 || acc.type == 4) {
-                    currentTotal -= acc.amount; // 负债和分期
+                    currentTotal -= accountBalanceForSummary(acc); // 负债和分期
                 }
                 assetMap.put(symbol, currentTotal);
                 }
@@ -712,6 +746,10 @@ private String formatMultiCurrency(Map<String, Double> map) {
             sb.append(entry.getKey()).append(String.format("%.2f", entry.getValue()));
         }
         return sb.toString();
+    }
+
+    private double accountBalanceForSummary(AssetAccount account) {
+        return account.type == 4 ? account.getRemainingAmount() : account.amount;
     }
 
     private void refreshList() {
@@ -1047,13 +1085,9 @@ private String formatMultiCurrency(Map<String, Double> map) {
                     double annualRate = Double.parseDouble(rateStr) / 100.0;
                     int months = Integer.parseInt(durationStr);
 
-                    double expected = 0;
-                    // 判断是否选择复利（1 为复利，0 为单利）
-                    if (spinnerInterestType.getSelectedItemPosition() == 1) {
-                        expected = principal * Math.pow(1 + (annualRate / 12.0), months);
-                    } else {
-                        expected = principal + (principal * annualRate * (months / 12.0));
-                    }
+                    double expected = com.example.budgetapp.util.InterestCalculator.expectedReturn(
+                            principal, annualRate * 100.0, months,
+                            spinnerInterestType.getSelectedItemPosition() == 1);
 
                     etExpected.setText(String.format("预计结算资产: %.2f", expected));
                 } else {
@@ -1228,7 +1262,11 @@ private String formatMultiCurrency(Map<String, Double> map) {
                     return;
                 }
                 try { 
-                    amount = Double.parseDouble(amountStr); 
+                    amount = Double.parseDouble(amountStr);
+                    if (!Double.isFinite(amount) || amount < 0) {
+                        Toast.makeText(getContext(), "金额必须为非负数", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                 } catch (NumberFormatException e) { 
                     Toast.makeText(getContext(), "金额格式不正确", Toast.LENGTH_SHORT).show();
                     return; 
@@ -1265,13 +1303,15 @@ private String formatMultiCurrency(Map<String, Double> map) {
                 try {
                     accountToSave.durationMonths = Integer.parseInt(etDuration.getText().toString().trim());
                     double annualRate = Double.parseDouble(etRate.getText().toString().trim());
+                    if (!Double.isFinite(annualRate) || annualRate < 0
+                            || accountToSave.durationMonths < 0) {
+                        throw new IllegalArgumentException();
+                    }
                     accountToSave.interestRate = annualRate;
 
-                    if (accountToSave.isCompoundInterest) {
-                        accountToSave.expectedReturn = amount * Math.pow(1 + ((annualRate / 100.0) / 12.0), accountToSave.durationMonths);
-                    } else {
-                        accountToSave.expectedReturn = amount + (amount * (annualRate / 100.0) * (accountToSave.durationMonths / 12.0));
-                    }
+                    accountToSave.expectedReturn = com.example.budgetapp.util.InterestCalculator.expectedReturn(
+                            amount, annualRate, accountToSave.durationMonths,
+                            accountToSave.isCompoundInterest);
                 } catch (Exception e) {
                     accountToSave.durationMonths = 0;
                     accountToSave.interestRate = 0.0;
@@ -1284,8 +1324,15 @@ private String formatMultiCurrency(Map<String, Double> map) {
                 try {
                     accountToSave.totalInstallments = Integer.parseInt(etTotalInstallments.getText().toString());
                     accountToSave.installmentAmount = Double.parseDouble(etInstallmentAmount.getText().toString());
+                    if (accountToSave.totalInstallments <= 0
+                            || !Double.isFinite(accountToSave.installmentAmount)
+                            || accountToSave.installmentAmount <= 0) {
+                        throw new IllegalArgumentException();
+                    }
                     accountToSave.amount = accountToSave.getTotalAmount(); // 总金额
-                    accountToSave.paidInstallments = "[]"; // 初始为空
+                    if (existing == null) {
+                        accountToSave.paidInstallments = "[]"; // 初始为空
+                    }
                 } catch (Exception e) {
                     Toast.makeText(getContext(), "请输入有效的分期信息", Toast.LENGTH_SHORT).show();
                     return;
@@ -1898,59 +1945,7 @@ dialog.dismiss();
      * @return 货币代码（如 "CNY", "USD", "EUR"）
      */
     private String getCurrencyCode(String symbol) {
-        if (symbol == null || symbol.isEmpty()) {
-            return "CNY"; // 默认人民币
-        }
-        
-        // 符号到代码的映射
-        Map<String, String> symbolToCode = new HashMap<>();
-        symbolToCode.put("¥", "CNY");
-        symbolToCode.put("$", "USD");
-        symbolToCode.put("€", "EUR");
-        symbolToCode.put("£", "GBP");
-        symbolToCode.put("HK$", "HKD");
-        symbolToCode.put("NT$", "TWD");
-        symbolToCode.put("JP¥", "JPY");
-        symbolToCode.put("₩", "KRW");
-        symbolToCode.put("C$", "CAD");
-        symbolToCode.put("A$", "AUD");
-        symbolToCode.put("S$", "SGD");
-        symbolToCode.put("NZ$", "NZD");
-        symbolToCode.put("₹", "INR");
-        symbolToCode.put("₽", "RUB");
-        symbolToCode.put("฿", "THB");
-        symbolToCode.put("₫", "VND");
-        symbolToCode.put("₱", "PHP");
-        symbolToCode.put("R$", "BRL");
-        symbolToCode.put("Rp", "IDR");
-        symbolToCode.put("RM", "MYR");
-        symbolToCode.put("CHF", "CHF");
-        symbolToCode.put("₺", "TRY");
-        symbolToCode.put("₪", "ILS");
-        symbolToCode.put("kr", "SEK"); // 瑞典克朗（默认）
-        symbolToCode.put("zł", "PLN");
-        symbolToCode.put("Kč", "CZK");
-        symbolToCode.put("Ft", "HUF");
-        symbolToCode.put("lei", "RON");
-        symbolToCode.put("лв", "BGN");
-        symbolToCode.put("RSD", "RSD");
-        symbolToCode.put("BYN", "BYN");
-        symbolToCode.put("₴", "UAH");
-        symbolToCode.put("L", "MDL");
-        symbolToCode.put("Lek", "ALL");
-        symbolToCode.put("KM", "BAM");
-        symbolToCode.put("den", "MKD");
-        symbolToCode.put("₾", "GEL");
-        symbolToCode.put("֏", "AMD");
-        symbolToCode.put("₼", "AZN");
-        symbolToCode.put("KD", "KWD");
-        symbolToCode.put("SR", "SAR");
-        symbolToCode.put("DH", "AED");
-        symbolToCode.put("R", "ZAR");
-        symbolToCode.put("₦", "NGN");
-        symbolToCode.put("E£", "EGP");
-        
-        return symbolToCode.getOrDefault(symbol, "CNY");
+        return com.example.budgetapp.util.CurrencyUtils.symbolToCode(symbol);
     }
 
 }

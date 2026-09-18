@@ -47,7 +47,10 @@ public class CurrencyUtils {
         map.put("CHF", "CHF");
         map.put("₺", "TRY");
         map.put("₪", "ILS");
-        map.put("kr", "SEK");  // kr 在多国使用，这里用 SEK 作为兜底
+        map.put("kr", "SEK");
+        map.put("NOK", "NOK");
+        map.put("DKK", "DKK");
+        map.put("ISK", "ISK");
         map.put("zł", "PLN");
         map.put("Kč", "CZK");
         map.put("Ft", "HUF");
@@ -99,7 +102,7 @@ public class CurrencyUtils {
             "JP¥", "₩", "C$", "A$", "S$", "NZ$",
             "₹", "₽", "฿", "₫", "₱", "R$",
             "Rp", "RM", "CHF", "₺", "₪",
-            "kr", "kr", "kr", "zł", "Kč", "Ft", "lei", "лв", "RSD", "kr",
+            "kr", "NOK", "DKK", "zł", "Kč", "Ft", "lei", "лв", "RSD", "ISK",
             "BYN", "₴", "L", "Lek", "KM", "den", "₾", "֏", "₼",
             "KD", "SR", "DH", "R", "₦", "E£"
     };

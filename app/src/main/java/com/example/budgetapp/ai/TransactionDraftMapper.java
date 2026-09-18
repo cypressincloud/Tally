@@ -7,6 +7,8 @@ import com.example.budgetapp.database.AppDatabase;
 import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.util.AssistantConfig;
 import com.example.budgetapp.util.CategoryManager;
+import com.example.budgetapp.util.AutoCategoryRule;
+import com.example.budgetapp.util.AutoCategoryRuleManager;
 
 import org.json.JSONObject;
 
@@ -118,6 +120,21 @@ public class TransactionDraftMapper {
             
             // 应用AI分类关键字规则
             com.example.budgetapp.util.AiCategoryRuleManager.applyRules(context, draft);
+            String recordIdentifier = new java.text.SimpleDateFormat("MM-dd HH:mm ", Locale.getDefault())
+                    .format(new java.util.Date(draft.date)) + (draft.note == null ? "" : draft.note.trim());
+            AutoCategoryRule autoRule = AutoCategoryRuleManager.findMatch(
+                    context, "", recordIdentifier, draft.type);
+            if (autoRule != null) {
+                draft.type = autoRule.getTargetType();
+                draft.category = autoRule.getCategory();
+                draft.subCategory = autoRule.getSubCategory();
+            } else {
+                AutoCategoryRuleManager.DefaultCategory fallback = AutoCategoryRuleManager.findDefault(context, "", draft.type);
+                if (fallback != null) {
+                    draft.category = fallback.category;
+                    draft.subCategory = fallback.subCategory;
+                }
+            }
         }
         
         return draft;

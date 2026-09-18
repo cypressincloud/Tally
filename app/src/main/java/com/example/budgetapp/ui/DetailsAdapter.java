@@ -18,6 +18,9 @@ import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.util.AssetIconHelper;
 
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -140,7 +143,8 @@ public class DetailsAdapter extends RecyclerView.Adapter<DetailsAdapter.ViewHold
 
         // ================= 3. 数据绑定 =================
         String symbol = (current.currencySymbol != null && !current.currencySymbol.isEmpty()) ? current.currencySymbol : "¥";
-        String amountStr = String.format(Locale.CHINA, "%.2f", current.amount);
+        double shownAmount = current.displayAmount != null ? current.displayAmount : current.amount;
+        String amountStr = String.format(Locale.CHINA, "%.2f", shownAmount);
         String displayAmount = showCurrency ? (symbol + " " + amountStr) : amountStr;
 
         if (current.type == 2) {
@@ -169,6 +173,18 @@ public class DetailsAdapter extends RecyclerView.Adapter<DetailsAdapter.ViewHold
         } else {
             holder.tvNote.setVisibility(View.GONE);
         }
+        holder.tvAmortization.setVisibility(View.GONE);
+        if (current.displayAmount != null && current.spreadStartDate > 0
+                && current.spreadEndDate >= current.spreadStartDate) {
+            LocalDate start = Instant.ofEpochMilli(current.spreadStartDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate end = Instant.ofEpochMilli(current.spreadEndDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            long spreadDays = java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1;
+            if (spreadDays > 1) {
+                holder.tvAmortization.setVisibility(View.VISIBLE);
+                holder.tvAmortization.setText(String.format(Locale.CHINA, "%d天均摊 %.2f",
+                        spreadDays, current.amount));
+            }
+        }
 
         String assetName = (current.assetId != 0 && assetMap != null) ? assetMap.get(current.assetId) != null ? assetMap.get(current.assetId).name : null : null;
         AssetAccount assetAccount = (current.assetId != 0 && assetMap != null) ? assetMap.get(current.assetId) : null;
@@ -179,7 +195,11 @@ public class DetailsAdapter extends RecyclerView.Adapter<DetailsAdapter.ViewHold
             holder.viewIndicator.setVisibility(View.GONE);
             holder.llAssetInfo.setVisibility(View.VISIBLE);
             holder.tvAssetName.setText(assetName);
-            holder.tvAssetName.setTextColor(statusColor);
+            // 资产名称颜色表达交易类型，不应因自动记账没有备注而变成红色。
+            holder.tvAssetName.setTextColor(current.type == 1
+                    ? context.getColor(R.color.income_red)
+                    : current.type == 2 ? context.getColor(R.color.app_blue)
+                    : context.getColor(R.color.expense_green));
             
             // 显示资产图标
             if (AssetIconHelper.bindSvgIcon(holder.ivAssetIcon, assetAccount.svgIcon)) {
@@ -194,7 +214,7 @@ public class DetailsAdapter extends RecyclerView.Adapter<DetailsAdapter.ViewHold
         }
 
         holder.cardView.setOnClickListener(v -> {
-            if (listener != null) listener.onTransactionClick(current);
+            if (listener != null) listener.onTransactionClick(current.displaySource != null ? current.displaySource : current);
         });
     }
 
@@ -207,7 +227,7 @@ public class DetailsAdapter extends RecyclerView.Adapter<DetailsAdapter.ViewHold
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView tvHeader;
         View cardView;
-        TextView tvDate, tvSubCategory, tvAmount, tvNote, tvAssetName;
+        TextView tvDate, tvSubCategory, tvAmount, tvNote, tvAssetName, tvAmortization;
         View viewIndicator;
         android.widget.ImageView ivAssetIcon;
         android.widget.LinearLayout llAssetInfo;
@@ -218,6 +238,7 @@ public class DetailsAdapter extends RecyclerView.Adapter<DetailsAdapter.ViewHold
             cardView = card;
             tvDate = card.findViewById(R.id.tv_detail_date);
             tvSubCategory = card.findViewById(R.id.tv_detail_sub_category);
+            tvAmortization = card.findViewById(R.id.tv_amortization);
             tvAmount = card.findViewById(R.id.tv_detail_amount);
             tvNote = card.findViewById(R.id.tv_detail_note);
             tvAssetName = card.findViewById(R.id.tv_asset_name);

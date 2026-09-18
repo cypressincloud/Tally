@@ -84,6 +84,26 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_auto_category_rules"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="自动分类配置"
+                android:textColor="@color/text_white"
+                android:backgroundTint="@color/app_blue"
+                android:layout_marginBottom="16dp"
+                app:cornerRadius="16dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_default_category"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="应用默认分类"
+                android:textColor="@color/text_white"
+                android:backgroundTint="@color/app_blue"
+                android:layout_marginBottom="16dp"
+                app:cornerRadius="16dp" />
+
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

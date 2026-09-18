@@ -36,6 +36,9 @@ public interface TransactionDao {
     @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班'")
     Double getOvertimeTotalAmountSync(long start, long end);
 
+    @Query("SELECT SUM(amount) FROM transactions WHERE assetId = :assetId AND type = 1 AND category = '理财收益'")
+    Double getInvestmentInterestTotalSync(int assetId);
+
     // 【新增】小组件使用：同步查询指定时间段所有加班记录（用于计算时长）
     @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班'")
     List<Transaction> getOvertimeTransactionsSync(long start, long end);
@@ -55,15 +58,19 @@ public interface TransactionDao {
 
     // ================= 以下为新增的高性能优化查询 =================
 
-    // 1. 按需查询：只获取指定时间段内的账单（用于首页日历按月加载）
-    @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end ORDER BY date DESC")
+    // 1. 按需查询：包含原始账单日和覆盖当前时间段的跨日摊销账单（用于首页日历按月加载）
+    @Query("SELECT * FROM transactions WHERE " +
+            "(date >= :start AND date <= :end) OR " +
+            "(spreadStartDate > 0 AND spreadStartDate <= :end AND spreadEndDate >= :start) " +
+            "ORDER BY date DESC")
     LiveData<List<Transaction>> getTransactionsByRangeLive(long start, long end);
 
     // 2. 高级过滤：用于明细页 (DetailsFragment) 的高级筛选，null 表示该条件不限制
     // 使用普通的 LiveData<List<Transaction>> 返回类型，并加上金额筛选条件和资产筛选
     @Query("SELECT t.* FROM transactions t " +
             "LEFT JOIN asset_accounts a ON t.assetId = a.id " +
-            "WHERE t.date BETWEEN :startDate AND :endDate " +
+            "WHERE ((t.date >= :startDate AND t.date < :endDate) OR " +
+            "(t.spreadStartDate > 0 AND t.spreadStartDate < :endDate AND t.spreadEndDate >= :startDate)) " +
             "AND (:type IS NULL OR t.type = :type) " +
             "AND (:minAmount IS NULL OR t.amount >= :minAmount) " +
             "AND (:maxAmount IS NULL OR t.amount <= :maxAmount) " +

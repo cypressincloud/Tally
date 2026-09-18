@@ -157,7 +157,16 @@ public class AutoRenewalActivity extends AppCompatActivity {
 
             RenewalItem saveItem = (item != null) ? item : new RenewalItem();
             saveItem.object = objStr;
-            saveItem.amount = Float.parseFloat(amtStr);
+            try {
+                float amount = Float.parseFloat(amtStr);
+                if (!Float.isFinite(amount) || amount <= 0) {
+                    throw new NumberFormatException();
+                }
+                saveItem.amount = amount;
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "金额必须大于 0", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
             int checkedId = rgPeriod.getCheckedRadioButtonId();
             if (checkedId == R.id.rb_custom) {

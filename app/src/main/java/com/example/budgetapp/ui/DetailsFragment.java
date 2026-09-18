@@ -76,6 +76,26 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 public class DetailsFragment extends Fragment {
 
+    private static long startOfDay(java.util.Calendar calendar) {
+        java.util.Calendar value = (java.util.Calendar) calendar.clone();
+        value.set(java.util.Calendar.HOUR_OF_DAY, 0); value.set(java.util.Calendar.MINUTE, 0);
+        value.set(java.util.Calendar.SECOND, 0); value.set(java.util.Calendar.MILLISECOND, 0);
+        return value.getTimeInMillis();
+    }
+
+    private static long endOfDay(java.util.Calendar calendar) {
+        java.util.Calendar value = (java.util.Calendar) calendar.clone();
+        value.set(java.util.Calendar.HOUR_OF_DAY, 23); value.set(java.util.Calendar.MINUTE, 59);
+        value.set(java.util.Calendar.SECOND, 59); value.set(java.util.Calendar.MILLISECOND, 999);
+        return value.getTimeInMillis();
+    }
+
+    private static long nextDayStart(long millis) {
+        return java.time.Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
+                .toLocalDate().plusDays(1).atStartOfDay(ZoneId.systemDefault())
+                .toInstant().toEpochMilli();
+    }
+
     private FinanceViewModel viewModel;
     private RecyclerView recyclerView;
     private TextView tvStatisticsSummary;
@@ -601,6 +621,10 @@ public class DetailsFragment extends Fragment {
      * 显示日期选择器，选择完日期后自动弹出时间选择器
      */
     private void showTransactionDatePicker(java.util.Calendar calendar, Runnable updateDisplay) {
+        showTransactionDatePicker(calendar, updateDisplay, false);
+    }
+
+    private void showTransactionDatePicker(java.util.Calendar calendar, Runnable updateDisplay, boolean dateOnly) {
         if (getContext() == null) return;
 
         final BottomSheetDialog dialog = new BottomSheetDialog(getContext());
@@ -662,7 +686,8 @@ public class DetailsFragment extends Fragment {
             calendar.set(java.util.Calendar.MONTH, npMonth.getValue() - 1);
             calendar.set(java.util.Calendar.DAY_OF_MONTH, npDay.getValue());
             dialog.dismiss();
-            showTransactionTimePicker(calendar, updateDisplay);
+            if (dateOnly) updateDisplay.run();
+            else showTransactionTimePicker(calendar, updateDisplay);
         });
 
         dialog.show();
@@ -764,10 +789,10 @@ public class DetailsFragment extends Fragment {
         currentFilteredDataLive.observe(getViewLifecycleOwner(), list -> {
             if (list != null) {
                 // 🌟 修改点：将分页流替换为常规的 List 更新
-                adapter.setTransactions(list);
+                adapter.setTransactions(expandAmortizedTransactions(list, range[0], range[1]));
                 
                 // 更新统计信息
-                updateStatisticsSummary(list);
+                updateStatisticsSummary(list, range[0], range[1]);
             }
 
             if (getContext() != null && recyclerView != null && direction != 0) {
@@ -777,10 +802,45 @@ public class DetailsFragment extends Fragment {
         });
     }
 
+    private List<Transaction> expandAmortizedTransactions(List<Transaction> source, long rangeStart, long rangeEnd) {
+        List<Transaction> expanded = new ArrayList<>();
+        if (source == null) return expanded;
+        LocalDate first = java.time.Instant.ofEpochMilli(rangeStart).atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate last = java.time.Instant.ofEpochMilli(rangeEnd - 1).atZone(ZoneId.systemDefault()).toLocalDate();
+        for (Transaction original : source) {
+            if (original.spreadStartDate <= 0 || original.spreadEndDate < original.spreadStartDate) {
+                expanded.add(original);
+                continue;
+            }
+            LocalDate start = java.time.Instant.ofEpochMilli(original.spreadStartDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate end = java.time.Instant.ofEpochMilli(original.spreadEndDate).atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate day = start.isAfter(first) ? start : first;
+            if (end.isAfter(last)) end = last;
+            while (!day.isAfter(end)) {
+                Transaction display = new Transaction();
+                display.id = original.id;
+                display.date = day.equals(start) ? original.date
+                        : day.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                display.type = original.type; display.category = original.category; display.amount = original.amount;
+                display.note = original.note; display.remark = original.remark; display.assetId = original.assetId;
+                display.currencySymbol = original.currencySymbol; display.photoPath = original.photoPath;
+                display.subCategory = original.subCategory; display.targetObject = original.targetObject;
+                display.excludeFromBudget = original.excludeFromBudget;
+                display.spreadStartDate = original.spreadStartDate; display.spreadEndDate = original.spreadEndDate;
+                display.displayAmount = com.example.budgetapp.util.BudgetCalculator.amountForDay(original, day);
+                display.displaySource = original;
+                expanded.add(display);
+                day = day.plusDays(1);
+            }
+        }
+        expanded.sort((a, b) -> Long.compare(b.date, a.date));
+        return expanded;
+    }
+
     private long[] getTimeRange() {
         // 如果筛选器中设置了自定义时间范围，优先使用
         if (currentFilter.startTime != null && currentFilter.endTime != null) {
-            return new long[]{currentFilter.startTime, currentFilter.endTime + 86400000L - 1}; // 结束时间加一天减1毫秒（到23:59:59.999）
+            return new long[]{currentFilter.startTime, nextDayStart(currentFilter.endTime)};
         }
         if (currentFilter.startTime != null) {
             // 只设置了起始时间，结束时间使用当前时间
@@ -788,7 +848,7 @@ public class DetailsFragment extends Fragment {
         }
         if (currentFilter.endTime != null) {
             // 只设置了结束时间，起始时间使用2000年1月1日
-            return new long[]{946656000000L, currentFilter.endTime + 86400000L - 1}; // 2000-01-01 00:00:00
+            return new long[]{946656000000L, nextDayStart(currentFilter.endTime)}; // 2000-01-01 00:00:00
         }
         
         // 如果有其他筛选条件（类型、金额、分类、资产），则默认显示全部时间范围
@@ -805,15 +865,15 @@ public class DetailsFragment extends Fragment {
         
         // 没有任何筛选条件，使用原有的年/月/周逻辑
         ZoneId zone = ZoneId.systemDefault();
-        if (currentMode == 0) return new long[]{selectedDate.with(TemporalAdjusters.firstDayOfYear()).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.lastDayOfYear()).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
-        if (currentMode == 2) return new long[]{selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
-        return new long[]{selectedDate.with(TemporalAdjusters.firstDayOfMonth()).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.lastDayOfMonth()).atTime(23,59,59).atZone(zone).toInstant().toEpochMilli()};
+        if (currentMode == 0) return new long[]{selectedDate.with(TemporalAdjusters.firstDayOfYear()).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.lastDayOfYear()).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()};
+        if (currentMode == 2) return new long[]{selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()};
+        return new long[]{selectedDate.with(TemporalAdjusters.firstDayOfMonth()).atStartOfDay(zone).toInstant().toEpochMilli(), selectedDate.with(TemporalAdjusters.lastDayOfMonth()).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()};
     }
 
     /**
      * 更新统计信息摘要
      */
-    private void updateStatisticsSummary(List<Transaction> transactions) {
+    private void updateStatisticsSummary(List<Transaction> transactions, long rangeStart, long rangeEnd) {
         if (tvStatisticsSummary == null || transactions == null) {
             return;
         }
@@ -829,11 +889,12 @@ public class DetailsFragment extends Fragment {
             }
             
             count++; // 只计算非转账账单
-            
+            double amountInRange = com.example.budgetapp.util.BudgetCalculator.amountBetween(
+                    t, rangeStart, rangeEnd);
             if (t.type == 0) { // 支出
-                totalExpense += t.amount;
+                totalExpense += amountInRange;
             } else if (t.type == 1) { // 收入
-                totalIncome += t.amount;
+                totalIncome += amountInRange;
             }
         }
 
@@ -885,6 +946,8 @@ public class DetailsFragment extends Fragment {
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 
         TextView tvDate = dialogView.findViewById(R.id.tv_dialog_date);
+        TextView tvSpreadStart = dialogView.findViewById(R.id.tv_spread_start);
+        TextView tvSpreadEnd = dialogView.findViewById(R.id.tv_spread_end);
         RadioGroup rgType = dialogView.findViewById(R.id.rg_type);
         RecyclerView rvCategory = dialogView.findViewById(R.id.rv_category);
         EditText etAmount = dialogView.findViewById(R.id.et_amount);
@@ -1200,6 +1263,25 @@ public class DetailsFragment extends Fragment {
         };
         updateDateDisplay.run();
 
+        final java.util.Calendar spreadStart = java.util.Calendar.getInstance();
+        final java.util.Calendar spreadEnd = java.util.Calendar.getInstance();
+        if (existingTransaction != null && existingTransaction.spreadStartDate > 0
+                && existingTransaction.spreadEndDate >= existingTransaction.spreadStartDate) {
+            spreadStart.setTimeInMillis(existingTransaction.spreadStartDate);
+            spreadEnd.setTimeInMillis(existingTransaction.spreadEndDate);
+        } else {
+            spreadStart.setTimeInMillis(calendar.getTimeInMillis());
+            spreadEnd.setTimeInMillis(calendar.getTimeInMillis());
+        }
+        java.text.SimpleDateFormat spreadFormat = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA);
+        Runnable updateSpreadDisplay = () -> {
+            tvSpreadStart.setText("摊销开始 " + spreadFormat.format(spreadStart.getTime()));
+            tvSpreadEnd.setText("摊销结束 " + spreadFormat.format(spreadEnd.getTime()));
+        };
+        updateSpreadDisplay.run();
+            tvSpreadStart.setOnClickListener(v -> showTransactionDatePicker(spreadStart, updateSpreadDisplay, true));
+            tvSpreadEnd.setOnClickListener(v -> showTransactionDatePicker(spreadEnd, updateSpreadDisplay, true));
+
         // 点击日期可修改
         tvDate.setClickable(true);
         tvDate.setFocusable(true);
@@ -1307,7 +1389,17 @@ public class DetailsFragment extends Fragment {
         btnSave.setOnClickListener(v -> {
             String amountStr = etAmount.getText().toString();
             if (!amountStr.isEmpty()) {
-                double amount = Double.parseDouble(amountStr);
+                double amount;
+                try {
+                    amount = Double.parseDouble(amountStr);
+                } catch (NumberFormatException e) {
+                    Toast.makeText(getContext(), "金额格式不正确", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!Double.isFinite(amount) || amount <= 0) {
+                    Toast.makeText(getContext(), "金额必须大于 0", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 int type = rgType.getCheckedRadioButtonId() == R.id.rb_income ? 1 : 0;
 
                 String category = selectedCategory[0];
@@ -1332,6 +1424,12 @@ public class DetailsFragment extends Fragment {
                 }
 
                 String currencySymbol = isCurrencyEnabled ? btnCurrency.getText().toString() : "¥";
+                long spreadStartTs = startOfDay(spreadStart);
+                long spreadEndTs = endOfDay(spreadEnd);
+                if (spreadEndTs < spreadStartTs) {
+                    Toast.makeText(getContext(), "摊销结束日期不能早于开始日期", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
                 if (existingTransaction != null) {
                     Transaction updateT = new Transaction(ts, type, category, amount, noteContent, userRemark);
@@ -1341,6 +1439,8 @@ public class DetailsFragment extends Fragment {
                     updateT.subCategory = selectedSubCategory[0];
                     updateT.photoPath = currentPhotoPath[0];
                     updateT.excludeFromBudget = isExcludedFromBudget[0];
+                    updateT.spreadStartDate = spreadStartTs;
+                    updateT.spreadEndDate = spreadEndTs;
 
                     viewModel.updateTransactionWithAssetSync(existingTransaction, updateT);
                 } else {
@@ -1351,6 +1451,8 @@ public class DetailsFragment extends Fragment {
                     newT.subCategory = selectedSubCategory[0];
                     newT.photoPath = currentPhotoPath[0];
                     newT.excludeFromBudget = isExcludedFromBudget[0];
+                    newT.spreadStartDate = spreadStartTs;
+                    newT.spreadEndDate = spreadEndTs;
 
                     viewModel.addTransactionWithAssetSync(newT);
                 }
@@ -2015,7 +2117,8 @@ public class DetailsFragment extends Fragment {
                 long start = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 long end = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 dayList = allTransactions.stream()
-                        .filter(t -> t.date >= start && t.date < end)
+                        .filter(t -> t.date >= start && t.date < end
+                                || com.example.budgetapp.util.BudgetCalculator.amountForDay(t, date) > 0)
                         .collect(Collectors.toList());
             }
 
@@ -2054,7 +2157,7 @@ public class DetailsFragment extends Fragment {
                     if (t.type == 1) {
                         dayIncome += t.amount;
                     } else if (t.type == 0) {
-                        dayExpense += t.amount;
+                        dayExpense += com.example.budgetapp.util.BudgetCalculator.amountForDay(t, date);
                     }
                 }
 
@@ -2092,7 +2195,10 @@ public class DetailsFragment extends Fragment {
                     currentDetailSummaryTextView.setText(ssb);
                 }
             }
-            currentDetailAdapter.setTransactions(dayList);
+            if (currentDetailAdapter != null) {
+                currentDetailAdapter.setDisplayDate(date);
+                currentDetailAdapter.setTransactions(dayList);
+            }
         });
     }
 
