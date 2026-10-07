@@ -10,9 +10,6 @@ import com.example.budgetapp.util.RecurringTransactionManager;
 /**
  * 周期记账后台任务
  * 每天定时检查并激活到期的周期账单
- * 
- * TODO: 需要在 build.gradle 添加依赖: implementation "androidx.work:work-runtime:2.8.1"
- * 取消下面的注释以启用
  */
 
 import androidx.work.Worker;

@@ -112,7 +112,6 @@ public class MyApplication extends Application {
         });
 
         // 【周期记账】初始化WorkManager定时任务
-        // TODO: 需要在 build.gradle 添加依赖: implementation "androidx.work:work-runtime:2.8.1"
          scheduleRecurringTransactionWorker();
     }
 
