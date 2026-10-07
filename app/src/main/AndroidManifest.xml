@@ -201,6 +201,12 @@
             android:theme="@style/Theme.BudgetApp" />
 
         <activity
+            android:name=".ui.RecurringTransactionActivity"
+            android:label="周期记账"
+            android:exported="false"
+            android:theme="@style/Theme.BudgetApp" />
+
+        <activity
             android:name=".ui.InstallmentDetailActivity"
             android:label="分期详情"
             android:exported="false"

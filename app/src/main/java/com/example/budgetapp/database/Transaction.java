@@ -10,7 +10,10 @@ import androidx.room.PrimaryKey;
         indices = {
                 @Index("date"),
                 @Index("type"),
-                @Index("category")
+                @Index("category"),
+                @Index("isSettled"),
+                @Index("recurringRuleId"),
+                @Index("scheduledExecuteTime")
         })
 public class Transaction {
     @PrimaryKey(autoGenerate = true)
@@ -33,6 +36,18 @@ public class Transaction {
     // 【新增】是否不计入预算 (默认 false，即计入预算)
     @androidx.room.ColumnInfo(defaultValue = "0")
     public boolean excludeFromBudget;
+
+    // 【周期记账】是否已生效: true = 正式账单, false = 灰色预生成账单
+    @androidx.room.ColumnInfo(defaultValue = "1")
+    public boolean isSettled = true;
+
+    // 【周期记账】关联的周期规则 ID (若为 0 则为普通手动账单)
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    public int recurringRuleId = 0;
+
+    // 【周期记账】计划生效时间戳 (毫秒)
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    public long scheduledExecuteTime = 0L;
 
     public Transaction() {
     }
@@ -60,5 +75,8 @@ public class Transaction {
         this.subCategory = ""; // 默认为空
         this.photoPath = "";
         this.excludeFromBudget = false; // 【新增】默认为false
+        this.isSettled = true; // 【周期记账】默认为已生效
+        this.recurringRuleId = 0;
+        this.scheduledExecuteTime = 0L;
     }
 }

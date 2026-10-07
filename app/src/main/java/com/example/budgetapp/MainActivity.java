@@ -490,6 +490,15 @@ public class MainActivity extends AppCompatActivity {
         // 【新增】每次回到主界面时，检查并刷新背景
         applyCustomBackground();
 
+        // 【周期记账】检查并激活到期的周期账单
+        new Thread(() -> {
+            try {
+                com.example.budgetapp.util.RecurringTransactionManager.activatePendingTransactions(this);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+
         // 动态控制"预算"菜单栏是否显示
         BottomNavigationView bottomNav = findViewById(R.id.bottom_nav);
         if (bottomNav != null) {

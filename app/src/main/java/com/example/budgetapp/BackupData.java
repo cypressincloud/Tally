@@ -4,20 +4,22 @@ import com.example.budgetapp.database.AssetAccount;
 import com.example.budgetapp.database.Goal;
 import com.example.budgetapp.database.Transaction;
 import com.example.budgetapp.database.RenewalItem;
+import com.example.budgetapp.database.RecurringRule;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public class BackupData {
-    public int version = 5;
+    public int version = 6; // 升级版本号以支持周期记账
     public long createTime;
 
     public List<AssetAccount> assets;
     public List<String> expenseCategories;
     public List<String> incomeCategories;
     public Map<String, List<String>> subCategoryMap;
-    public List<Goal> goals; // 👈 新增这一行
+    public List<Goal> goals;
+    public List<RecurringRule> recurringRules; // 【新增】周期记账规则
 
     public AssistantConfigData assistantConfig;
     public List<String> autoAssetRules;
@@ -34,7 +36,7 @@ public class BackupData {
         this.createTime = System.currentTimeMillis();
         this.records = records;
         this.assets = assets;
-        this.goals = goals; // 👈 新增赋值
+        this.goals = goals;
     }
 
     // 保留旧的 2 个参数的构造方法（供微信、支付宝等外部账单导入使用）

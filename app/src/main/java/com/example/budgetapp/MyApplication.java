@@ -81,5 +81,38 @@ public class MyApplication extends Application {
             } catch (Exception ignored) {
             }
         });
+
+        // 【周期记账】初始化WorkManager定时任务
+        // TODO: 需要在 build.gradle 添加依赖: implementation "androidx.work:work-runtime:2.8.1"
+        // scheduleRecurringTransactionWorker();
 }
+
+    /**
+     * 初始化周期记账后台任务
+     * 需要先在 build.gradle 添加 WorkManager 依赖
+     */
+    /*
+    private void scheduleRecurringTransactionWorker() {
+        try {
+            androidx.work.Constraints constraints = new androidx.work.Constraints.Builder()
+                    .setRequiresBatteryNotLow(false)
+                    .build();
+
+            androidx.work.PeriodicWorkRequest workRequest =
+                    new androidx.work.PeriodicWorkRequest.Builder(
+                            com.example.budgetapp.service.RecurringTransactionWorker.class,
+                            1, java.util.concurrent.TimeUnit.HOURS) // 每小时检查一次
+                            .setConstraints(constraints)
+                            .build();
+
+            androidx.work.WorkManager.getInstance(this)
+                    .enqueueUniquePeriodicWork(
+                            "RecurringTransactionWorker",
+                            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+                            workRequest);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    */
 }

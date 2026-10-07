@@ -143,14 +143,71 @@ public class DetailsAdapter extends RecyclerView.Adapter<DetailsAdapter.ViewHold
         String amountStr = String.format(Locale.CHINA, "%.2f", current.amount);
         String displayAmount = showCurrency ? (symbol + " " + amountStr) : amountStr;
 
+        // 【周期记账】判断是否为未生效账单
+        boolean isUnsettled = !current.isSettled;
+        
+        // 调试日志
+        android.util.Log.d("DetailsAdapter", "Transaction ID=" + current.id + 
+                ", category=" + current.category + 
+                ", isSettled=" + current.isSettled + 
+                ", isUnsettled=" + isUnsettled);
+        
+        if (isUnsettled) {
+            // 未生效账单：全部使用浅灰色，禁用点击
+            int grayColor = context.getColor(android.R.color.darker_gray);
+            holder.tvAmount.setTextColor(grayColor);
+            holder.tvDate.setTextColor(grayColor); // 分类
+            holder.tvSubCategory.setTextColor(grayColor); // 二级分类
+            holder.tvNote.setTextColor(grayColor); // 备注
+            holder.tvAssetName.setTextColor(grayColor); // 资产名称
+            holder.cardView.setAlpha(0.6f); // 整体半透明
+            
+            // 彻底禁用点击事件：在多个层级禁用
+            holder.itemView.setClickable(false);
+            holder.itemView.setEnabled(false);
+            holder.itemView.setOnClickListener(null);
+            holder.cardView.setClickable(false);
+            holder.cardView.setEnabled(false);
+            holder.cardView.setOnClickListener(null);
+            
+            // 阻止触摸事件传播
+            holder.itemView.setOnTouchListener((v, event) -> true);
+        } else {
+            // 已生效账单：正常颜色和点击
+            holder.cardView.setAlpha(1.0f);
+            holder.itemView.setClickable(true);
+            holder.itemView.setEnabled(true);
+            holder.itemView.setOnTouchListener(null);
+            holder.cardView.setClickable(true);
+            holder.cardView.setEnabled(true);
+            
+            // 设置金额颜色
+            if (current.type == 2) {
+                holder.tvAmount.setTextColor(context.getColor(R.color.app_blue));
+            } else if (current.type == 1) {
+                holder.tvAmount.setTextColor(context.getColor(R.color.income_red));
+            } else {
+                holder.tvAmount.setTextColor(context.getColor(R.color.expense_green));
+            }
+            
+            // 恢复其他文字的正常颜色
+            int textColorPrimary = ContextCompat.getColor(context, R.color.text_primary);
+            int textColorSecondary = ContextCompat.getColor(context, R.color.text_secondary);
+            holder.tvDate.setTextColor(textColorPrimary); // 分类
+            holder.tvSubCategory.setTextColor(textColorSecondary); // 二级分类
+            holder.tvNote.setTextColor(textColorSecondary); // 备注
+            
+            // 设置点击事件
+            holder.cardView.setOnClickListener(v -> {
+                if (listener != null) listener.onTransactionClick(current);
+            });
+        }
+
         if (current.type == 2) {
-            holder.tvAmount.setTextColor(context.getColor(R.color.app_blue));
             holder.tvAmount.setText(displayAmount);
         } else if (current.type == 1) {
-            holder.tvAmount.setTextColor(context.getColor(R.color.income_red));
             holder.tvAmount.setText("+" + displayAmount);
         } else {
-            holder.tvAmount.setTextColor(context.getColor(R.color.expense_green));
             holder.tvAmount.setText("-" + displayAmount);
         }
 
@@ -179,7 +236,13 @@ public class DetailsAdapter extends RecyclerView.Adapter<DetailsAdapter.ViewHold
             holder.viewIndicator.setVisibility(View.GONE);
             holder.llAssetInfo.setVisibility(View.VISIBLE);
             holder.tvAssetName.setText(assetName);
-            holder.tvAssetName.setTextColor(statusColor);
+            
+            // 【周期记账】未生效账单的资产名称也要是灰色
+            if (!current.isSettled) {
+                holder.tvAssetName.setTextColor(context.getColor(android.R.color.darker_gray));
+            } else {
+                holder.tvAssetName.setTextColor(statusColor);
+            }
             
             // 显示资产图标
             if (AssetIconHelper.bindSvgIcon(holder.ivAssetIcon, assetAccount.svgIcon)) {
@@ -192,10 +255,6 @@ public class DetailsAdapter extends RecyclerView.Adapter<DetailsAdapter.ViewHold
             holder.viewIndicator.setVisibility(View.VISIBLE);
             holder.viewIndicator.setBackgroundColor(statusColor);
         }
-
-        holder.cardView.setOnClickListener(v -> {
-            if (listener != null) listener.onTransactionClick(current);
-        });
     }
 
     // 🌟 新增：标准 Adapter 必须实现的方法

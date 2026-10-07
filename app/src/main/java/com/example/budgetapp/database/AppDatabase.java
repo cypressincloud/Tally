@@ -10,13 +10,15 @@ import androidx.annotation.NonNull;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Database(entities = {Transaction.class, AssetAccount.class, Goal.class}, version = 24, exportSchema = false)
+@Database(entities = {Transaction.class, AssetAccount.class, Goal.class, RecurringRule.class}, version = 27, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     public abstract TransactionDao transactionDao();
     public abstract AssetAccountDao assetAccountDao();
 
     public abstract GoalDao goalDao();
+    
+    public abstract RecurringRuleDao recurringRuleDao();
 
     private static volatile AppDatabase INSTANCE;
     private static final int NUMBER_OF_THREADS = 4;
@@ -184,6 +186,49 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    // 【周期记账】24 -> 25 的迁移逻辑：为 transactions 表添加周期记账相关字段
+    static final Migration MIGRATION_24_25 = new Migration(24, 25) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE transactions ADD COLUMN isSettled INTEGER NOT NULL DEFAULT 1");
+            database.execSQL("ALTER TABLE transactions ADD COLUMN recurringRuleId INTEGER NOT NULL DEFAULT 0");
+            database.execSQL("ALTER TABLE transactions ADD COLUMN scheduledExecuteTime INTEGER NOT NULL DEFAULT 0");
+        }
+    };
+
+    // 【周期记账】25 -> 26 的迁移逻辑：创建 recurring_rules 表
+    static final Migration MIGRATION_25_26 = new Migration(25, 26) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE TABLE IF NOT EXISTS `recurring_rules` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`type` INTEGER NOT NULL, " +
+                    "`amount` REAL NOT NULL, " +
+                    "`currencySymbol` TEXT, " +
+                    "`category` TEXT, " +
+                    "`subCategory` TEXT, " +
+                    "`assetId` INTEGER NOT NULL, " +
+                    "`periodUnit` TEXT, " +
+                    "`periodInterval` INTEGER NOT NULL, " +
+                    "`startDate` INTEGER NOT NULL, " +
+                    "`endDate` INTEGER NOT NULL, " +
+                    "`triggerTime` TEXT, " +
+                    "`note` TEXT, " +
+                    "`isEnabled` INTEGER NOT NULL, " +
+                    "`createTime` INTEGER NOT NULL)");
+        }
+    };
+
+    // 【周期记账】26 -> 27 的迁移逻辑：为 transactions 表添加索引以优化查询性能
+    static final Migration MIGRATION_26_27 = new Migration(26, 27) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_isSettled` ON `transactions` (`isSettled`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_recurringRuleId` ON `transactions` (`recurringRuleId`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_scheduledExecuteTime` ON `transactions` (`scheduledExecuteTime`)");
+        }
+    };
+
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
@@ -199,7 +244,8 @@ public abstract class AppDatabase extends RoomDatabase {
                                     MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
                                     MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                                     MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
-                                    MIGRATION_23_24
+                                    MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26,
+                                    MIGRATION_26_27
                             )
                             .fallbackToDestructiveMigration()
                             .build();

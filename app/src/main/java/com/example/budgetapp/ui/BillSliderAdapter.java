@@ -63,6 +63,9 @@ public class BillSliderAdapter extends RecyclerView.Adapter<BillSliderAdapter.Bi
     public void onBindViewHolder(@NonNull BillViewHolder holder, int position) {
         Transaction transaction = transactions.get(position);
 
+        // 【周期记账】判断是否为未生效账单
+        boolean isUnsettled = !transaction.isSettled;
+
         // 分类名称
         holder.tvCategory.setText(transaction.category);
 
@@ -93,7 +96,27 @@ public class BillSliderAdapter extends RecyclerView.Adapter<BillSliderAdapter.Bi
             amountColor = ContextCompat.getColor(context, R.color.text_primary);
         }
         holder.tvAmount.setText(amountText);
-        holder.tvAmount.setTextColor(amountColor);
+        
+        // 【周期记账】未生效账单设置灰色
+        if (isUnsettled) {
+            int grayColor = context.getColor(android.R.color.darker_gray);
+            holder.tvAmount.setTextColor(grayColor);
+            holder.tvCategory.setTextColor(grayColor);
+            holder.tvSubCategory.setTextColor(grayColor);
+            holder.tvNote.setTextColor(grayColor);
+            holder.tvRemark.setTextColor(grayColor);
+            holder.tvAssetName.setTextColor(grayColor);
+            holder.itemView.setAlpha(0.6f);
+        } else {
+            holder.tvAmount.setTextColor(amountColor);
+            int textPrimary = ContextCompat.getColor(context, R.color.text_primary);
+            int textSecondary = ContextCompat.getColor(context, R.color.text_secondary);
+            holder.tvCategory.setTextColor(textPrimary);
+            holder.tvSubCategory.setTextColor(textSecondary);
+            holder.tvNote.setTextColor(textSecondary);
+            holder.tvRemark.setTextColor(textSecondary);
+            holder.itemView.setAlpha(1.0f);
+        }
 
         // 备注
         String note = transaction.note;
@@ -121,6 +144,19 @@ public class BillSliderAdapter extends RecyclerView.Adapter<BillSliderAdapter.Bi
             if (asset != null) {
                 holder.llAssetInfo.setVisibility(View.VISIBLE);
                 holder.tvAssetName.setText(asset.name);
+                
+                // 【周期记账】未生效账单的资产名称也是灰色
+                if (!isUnsettled) {
+                    // 已生效账单根据 remark 设置颜色(使用前面已定义的remark变量)
+                    boolean hasRemarkOrPhoto = (remark != null && !remark.isEmpty()) || 
+                                              (transaction.photoPath != null && !transaction.photoPath.isEmpty());
+                    int statusColor = hasRemarkOrPhoto ? 
+                        context.getColor(R.color.expense_green) : 
+                        context.getColor(R.color.income_red);
+                    holder.tvAssetName.setTextColor(statusColor);
+                }
+                // 未生效的颜色已在前面设置为灰色
+                
                 // 使用 AssetIconHelper 加载 SVG 图标
                 AssetIconHelper.bindSvgIcon(holder.ivAssetIcon, asset.svgIcon);
             } else {
@@ -131,11 +167,23 @@ public class BillSliderAdapter extends RecyclerView.Adapter<BillSliderAdapter.Bi
         }
 
         // 点击事件
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onBillClick(transaction);
-            }
-        });
+        if (isUnsettled) {
+            // 【周期记账】未生效账单禁用点击
+            holder.itemView.setOnClickListener(null);
+            holder.itemView.setClickable(false);
+            holder.itemView.setEnabled(false);
+            holder.itemView.setOnTouchListener((v, event) -> true);
+        } else {
+            // 正常账单可以点击
+            holder.itemView.setClickable(true);
+            holder.itemView.setEnabled(true);
+            holder.itemView.setOnTouchListener(null);
+            holder.itemView.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onBillClick(transaction);
+                }
+            });
+        }
 
         // 自定义主题背景设置
         SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);

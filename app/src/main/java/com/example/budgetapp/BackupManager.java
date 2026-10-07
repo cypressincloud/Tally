@@ -7,6 +7,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.example.budgetapp.database.AssetAccount;
+import com.example.budgetapp.database.AppDatabase;
 import com.example.budgetapp.database.Goal;
 import com.example.budgetapp.database.RenewalItem;
 import com.example.budgetapp.database.Transaction;
@@ -92,6 +93,11 @@ public class BackupManager {
 
         // 【新增】保存自动续费列表
         data.renewalList = config.getRenewalList();
+
+        // 【周期记账】保存周期记账规则
+        AppDatabase db = AppDatabase.getDatabase(context);
+        List<com.example.budgetapp.database.RecurringRule> recurringRules = db.recurringRuleDao().getAllRulesSync();
+        data.recurringRules = recurringRules;
 
         // 【修复】携带原始数据类型保存 SharedPreferences
         SharedPreferences prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
@@ -1244,6 +1250,15 @@ public class BackupManager {
                     // 【新增】恢复自动续费列表
                     if (data.renewalList != null) {
                         new AssistantConfig(context).saveRenewalList(data.renewalList);
+                    }
+
+                    // 【周期记账】恢复周期记账规则
+                    if (data.recurringRules != null && !data.recurringRules.isEmpty()) {
+                        AppDatabase db = AppDatabase.getDatabase(context);
+                        for (com.example.budgetapp.database.RecurringRule rule : data.recurringRules) {
+                            rule.id = 0; // 重置ID让数据库自动分配
+                            db.recurringRuleDao().insert(rule);
+                        }
                     }
 
                     // 【修复】按照原数据类型恢复，防止类型转换异常崩溃

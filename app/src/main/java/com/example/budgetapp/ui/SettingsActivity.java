@@ -501,6 +501,11 @@ public class SettingsActivity extends AppCompatActivity {
             startActivity(new Intent(this, AutoRenewalActivity.class));
         });
 
+        // 周期记账设置
+        findViewById(R.id.btn_recurring_transaction).setOnClickListener(v -> {
+            startActivity(new Intent(this, RecurringTransactionActivity.class));
+        });
+
         // 新增：快捷按钮设置
         findViewById(R.id.btn_quick_record_setting).setOnClickListener(v -> showQuickRecordSettingDialog());
 

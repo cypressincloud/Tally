@@ -33,11 +33,11 @@ public interface TransactionDao {
     void deleteAll();
 
     // 【新增】小组件使用：同步查询指定时间段加班总收入
-    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班'")
+    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班' AND isSettled = 1")
     Double getOvertimeTotalAmountSync(long start, long end);
 
     // 【新增】小组件使用：同步查询指定时间段所有加班记录（用于计算时长）
-    @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班'")
+    @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班' AND isSettled = 1")
     List<Transaction> getOvertimeTransactionsSync(long start, long end);
 
     @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end")
@@ -64,6 +64,7 @@ public interface TransactionDao {
     @Query("SELECT t.* FROM transactions t " +
             "LEFT JOIN asset_accounts a ON t.assetId = a.id " +
             "WHERE t.date BETWEEN :startDate AND :endDate " +
+            "AND t.isSettled = 1 " +
             "AND (:type IS NULL OR t.type = :type) " +
             "AND (:minAmount IS NULL OR t.amount >= :minAmount) " +
             "AND (:maxAmount IS NULL OR t.amount <= :maxAmount) " +
@@ -73,20 +74,20 @@ public interface TransactionDao {
     LiveData<List<Transaction>> getFilteredTransactions(long startDate, long endDate, Integer type, Float minAmount, Float maxAmount, String keyword, String assetName);
 
     // 【新增】供桌面小组件使用：同步聚合查询指定时间的收入或支出总和
-    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = :type AND category != '资产互转'")
+    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = :type AND category != '资产互转' AND isSettled = 1")
     Double getTotalAmountByTypeSync(long start, long end, int type);
 
 
     // 3. 聚合查询：直接让数据库计算指定时间段的收入或支出总和 (返回 Double 防止没数据时报错)
-    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = :type AND category != '资产互转'")
+    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = :type AND category != '资产互转' AND isSettled = 1")
     LiveData<Double> getTotalAmountByTypeLive(long start, long end, int type);
 
     // 4. 聚合查询：直接计算加班总收入
-    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班'")
+    @Query("SELECT SUM(amount) FROM transactions WHERE date >= :start AND date <= :end AND type = 1 AND category = '加班' AND isSettled = 1")
     LiveData<Double> getOvertimeTotalAmountLive(long start, long end);
 
     // 【新增】年视图专用的轻量级查询：只取3个字段，直接排除互转和转账，速度提升 10 倍以上
-    @Query("SELECT date, type, amount FROM transactions WHERE date >= :start AND date <= :end AND type IN (0, 1) AND category != '资产互转'")
+    @Query("SELECT date, type, amount FROM transactions WHERE date >= :start AND date <= :end AND type IN (0, 1) AND category != '资产互转' AND isSettled = 1")
     List<TransactionMinimal> getMinimalTransactionsSync(long start, long end);
 
     /**
@@ -97,7 +98,40 @@ public interface TransactionDao {
     @Query("SELECT DISTINCT CAST(strftime('%m', date / 1000, 'unixepoch', 'localtime') AS INTEGER) " +
             "FROM transactions " +
             "WHERE date >= :start AND date <= :end " +
-            "AND type IN (0, 1) AND category != '资产互转'")
+            "AND type IN (0, 1) AND category != '资产互转' AND isSettled = 1")
     List<Integer> getMonthsWithDataSync(long start, long end);
+
+    // ============ 周期记账相关查询 ============
+
+    /**
+     * 查询指定时间范围内的未生效账单（包括已生效和未生效）
+     * 用于日历明细列表展示
+     */
+    @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end ORDER BY date DESC, isSettled DESC")
+    LiveData<List<Transaction>> getTransactionsIncludingUnsettledLive(long start, long end);
+
+    /**
+     * 同步查询指定日期的所有账单（包括未生效的灰色账单）
+     */
+    @Query("SELECT * FROM transactions WHERE date >= :start AND date <= :end ORDER BY date DESC, isSettled DESC")
+    List<Transaction> getTransactionsIncludingUnsettledSync(long start, long end);
+
+    /**
+     * 查询所有需要激活的账单（已到生效时间但尚未生效）
+     */
+    @Query("SELECT * FROM transactions WHERE isSettled = 0 AND scheduledExecuteTime <= :currentTime")
+    List<Transaction> getPendingActivationTransactionsSync(long currentTime);
+
+    /**
+     * 查询指定周期规则生成的所有未生效账单
+     */
+    @Query("SELECT * FROM transactions WHERE recurringRuleId = :ruleId AND isSettled = 0")
+    List<Transaction> getUnsettledTransactionsByRuleSync(int ruleId);
+
+    /**
+     * 批量删除指定规则的所有未生效账单
+     */
+    @Query("DELETE FROM transactions WHERE recurringRuleId = :ruleId AND isSettled = 0")
+    void deleteUnsettledTransactionsByRule(int ruleId);
 
 }

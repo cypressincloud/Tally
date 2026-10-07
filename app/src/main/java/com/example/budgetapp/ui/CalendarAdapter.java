@@ -159,6 +159,11 @@ public class CalendarAdapter extends RecyclerView.Adapter<CalendarAdapter.ViewHo
         for (Transaction t : transactions) {
             if (t.date >= start && t.date < end) {
 
+                // 【周期记账】跳过未生效的账单，不计入日历金额统计
+                if (!t.isSettled) {
+                    continue;
+                }
+
                 // 🌟 核心拦截：如果是资产互转，直接跳过，不参与日历下方任何数字的计算
                 boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
                 if (isTransfer) {

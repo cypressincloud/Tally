@@ -61,6 +61,9 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
         Transaction t = list.get(position);
         Context context = holder.itemView.getContext();
 
+        // 【周期记账】判断是否为未生效账单
+        boolean isUnsettled = !t.isSettled;
+
         // 基础配置：货币单位与符号
         boolean showCurrency = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
                 .getBoolean("enable_currency", false);
@@ -89,12 +92,38 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
             }
             holder.tvAmount.setText("-" + displayAmount);
             holder.tvNote.setAlpha(0.6f); // 预览项文字稍微淡化以示区分
+        } else if (isUnsettled) {
+            // 【周期记账】未生效账单：全部灰色，半透明，禁用点击
+            holder.itemView.setBackgroundResource(0);
+            int grayColor = context.getColor(android.R.color.darker_gray);
+            holder.tvAmount.setTextColor(grayColor);
+            holder.tvDate.setTextColor(grayColor);
+            holder.tvSubCategory.setTextColor(grayColor);
+            holder.tvNote.setTextColor(grayColor);
+            holder.tvAssetName.setTextColor(grayColor);
+            holder.itemView.setAlpha(0.6f);
+            
+            // 设置金额显示
+            if (t.type == 2) {
+                holder.tvAmount.setText(displayAmount);
+            } else if (t.type == 1) {
+                holder.tvAmount.setText("+" + displayAmount);
+            } else {
+                holder.tvAmount.setText("-" + displayAmount);
+            }
         } else {
             // 正常入库记录清除背景，防止复用错乱
             holder.itemView.setBackgroundResource(0);
 
             // 正常入库记录的颜色逻辑
+            holder.itemView.setAlpha(1.0f);
             holder.tvNote.setAlpha(1.0f);
+            int textPrimary = context.getColor(R.color.text_primary);
+            int textSecondary = context.getColor(R.color.text_secondary);
+            holder.tvDate.setTextColor(textPrimary);
+            holder.tvSubCategory.setTextColor(textSecondary);
+            holder.tvNote.setTextColor(textSecondary);
+            
             if (t.type == 2) {
                 // 🌟 资产转移
                 holder.tvAmount.setTextColor(context.getColor(R.color.app_blue));
@@ -159,7 +188,10 @@ public class TransactionListAdapter extends RecyclerView.Adapter<TransactionList
         }
 
         holder.itemView.setOnClickListener(v -> {
-            if (listener != null) listener.onItemClick(t);
+            // 【周期记账】未生效账单和预览账单禁用点击
+            if (!isUnsettled && listener != null) {
+                listener.onItemClick(t);
+            }
         });
     }
 

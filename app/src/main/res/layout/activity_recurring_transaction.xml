@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/recurring_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bar_background"
+    android:importantForAccessibility="noHideDescendants"
+    android:orientation="vertical">
+
+    <!-- 1. 顶部标题栏 (与设置页面其他子页面保持一致：大标题 28sp，加粗) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="周期记账设置"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 2. 主体内容容器 (列表 + 空状态 + 悬浮添加按钮) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- 规则列表：保留底部留白，防止被右下角 FAB 遮挡 -->
+
+        <!-- 空状态展示 (图标 + 提示说明) -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_recurring_rules"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="96dp"
+            tools:listitem="@layout/item_recurring_rule" />
+
+        <LinearLayout
+            android:id="@+id/layout_empty_state"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="32dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:alpha="0.4"
+                android:src="@drawable/ic_nav_record"
+                app:tint="?android:attr/textColorSecondary" />
+
+            <TextView
+                android:id="@+id/tv_empty_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="暂无周期记账任务\n点击右下角按钮添加一个吧"
+                android:textAlignment="center"
+                android:textColor="#888888"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- 3. 悬浮添加按钮 (彻底去除阴影、抬升及点击水波纹) -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_add_rule"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|bottom"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="24dp"
+            android:contentDescription="新增周期记账"
+            android:src="@drawable/ic_add"
+            android:elevation="0dp"
+            android:stateListAnimator="@null"
+            app:backgroundTint="@color/app_blue"
+            app:elevation="0dp"
+            app:pressedTranslationZ="0dp"
+            app:hoveredFocusedTranslationZ="0dp"
+            app:borderWidth="0dp"
+            app:fabSize="normal"
+            app:rippleColor="@android:color/transparent"
+            app:tint="@android:color/white" />
+
+    </FrameLayout>
+
+</LinearLayout>
