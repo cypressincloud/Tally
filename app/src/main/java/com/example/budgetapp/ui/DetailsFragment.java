@@ -365,7 +365,7 @@ public class DetailsFragment extends Fragment {
         recyclerView = view.findViewById(R.id.recycler_details);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         recyclerView.setItemAnimator(null);
-        
+
         tvStatisticsSummary = view.findViewById(R.id.tv_statistics_summary);
 
         adapter = new DetailsAdapter();
@@ -374,7 +374,7 @@ public class DetailsFragment extends Fragment {
             if (hasHorizontalSwipeOccurred) {
                 return;
             }
-            
+
             boolean isTransfer = (t.type == 2) || "资产互转".equals(t.category);
             if (isTransfer) {
                 showDeleteTransferDialog(t);
@@ -386,11 +386,24 @@ public class DetailsFragment extends Fragment {
         });
 
         recyclerView.setAdapter(adapter);
-        
-        // 获取 ScrollView 并设置手势监听
+
+        // 获取 ScrollView 并设置手势监听及 FAB 滑动显隐
         androidx.core.widget.NestedScrollView scrollView = view.findViewById(R.id.scroll_view_details);
         if (scrollView != null) {
             setupFollowHandSwipe(scrollView);
+
+            // 核心实现：上滑隐藏，下滑显示
+            scrollView.setOnScrollChangeListener((androidx.core.widget.NestedScrollView.OnScrollChangeListener)
+                    (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+                        int dy = scrollY - oldScrollY;
+                        if (dy > 12) {
+                            // 页面向上滚动（手指向推查看下方内容），隐藏按钮防遮挡
+                            hideFab();
+                        } else if (dy < -12) {
+                            // 页面向下滚动（手指向下拉回看上方内容），显示按钮
+                            showFab();
+                        }
+                    });
         }
 
         // 初始化 AssistantConfig
@@ -400,10 +413,10 @@ public class DetailsFragment extends Fragment {
         btnQuickRecord = view.findViewById(R.id.btn_quick_record_details);
         SharedPreferences appPrefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean showQuickButton = appPrefs.getBoolean("details_quick_button", true);
-        
+
         if (showQuickButton && btnQuickRecord != null) {
             btnQuickRecord.setVisibility(View.VISIBLE);
-            
+
             // 点击事件（完全照搬RecordFragment）
             btnQuickRecord.setOnClickListener(v -> {
                 v.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK);
@@ -422,7 +435,7 @@ public class DetailsFragment extends Fragment {
                     showDateDetailDialog(LocalDate.now());
                 }
             });
-            
+
             // 长按事件（完全照搬RecordFragment）
             btnQuickRecord.setOnLongClickListener(v -> {
                 AiConfig config = AiConfig.load(requireContext());
@@ -434,14 +447,16 @@ public class DetailsFragment extends Fragment {
                     return false;
                 }
             });
-            
+
             // 初始化滚动监听器
-            fabScrollListener = new FabScrollListener();
-            recyclerView.addOnScrollListener(fabScrollListener);
-            
+//            fabScrollListener = new FabScrollListener();
+//            recyclerView.addOnScrollListener(fabScrollListener);
+            android.util.Log.d("DetailsFragment", "FAB scroll listener added to recyclerView");
+
             // 添加手势监听器（即使列表内容少也能响应滑动）
-            fabGestureListener = new FabGestureListener();
-            recyclerView.addOnItemTouchListener(fabGestureListener);
+//            fabGestureListener = new FabGestureListener();
+//            recyclerView.addOnItemTouchListener(fabGestureListener);
+            android.util.Log.d("DetailsFragment", "FAB gesture listener added to recyclerView");
         } else if (btnQuickRecord != null) {
             btnQuickRecord.setVisibility(View.GONE);
         }
@@ -1662,7 +1677,7 @@ public class DetailsFragment extends Fragment {
         SharedPreferences prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
         boolean isCustomBg = prefs.getInt("theme_mode", -1) == 3;
         updateFragmentTransparency(isCustomBg);
-        
+
         // 重置 FAB 按钮状态
         if (btnQuickRecord != null && btnQuickRecord.getVisibility() == View.VISIBLE) {
             isFabVisible = true;
@@ -1829,39 +1844,19 @@ public class DetailsFragment extends Fragment {
      * 显示 FAB 按钮
      */
     private void showFab() {
-        if (btnQuickRecord == null || isFabVisible || isFabAnimating) return;
-        isFabAnimating = true;
-        btnQuickRecord.animate()
-                .translationY(0f)
-                .alpha(1f)
-                .setDuration(200)
-                .withStartAction(() -> btnQuickRecord.setVisibility(View.VISIBLE))
-                .withEndAction(() -> {
-                    isFabVisible = true;
-                    isFabAnimating = false;
-                })
-                .start();
+        if (btnQuickRecord != null && !btnQuickRecord.isShown()) {
+            btnQuickRecord.show();
+        }
     }
 
     /**
      * 隐藏 FAB 按钮
      */
     private void hideFab() {
-        if (btnQuickRecord == null || !isFabVisible || isFabAnimating) return;
-        isFabAnimating = true;
-        float translationY = btnQuickRecord.getHeight() + 100f;
-        btnQuickRecord.animate()
-                .translationY(translationY)
-                .alpha(0f)
-                .setDuration(200)
-                .withEndAction(() -> {
-                    isFabVisible = false;
-                    isFabAnimating = false;
-                    btnQuickRecord.setVisibility(View.GONE);
-                })
-                .start();
+        if (btnQuickRecord != null && btnQuickRecord.isShown()) {
+            btnQuickRecord.hide();
+        }
     }
-
     /**
      * 监听 RecyclerView 的滚动事件，根据滚动方向自动显示/隐藏浮动按钮
      */
@@ -1869,11 +1864,14 @@ public class DetailsFragment extends Fragment {
         @Override
         public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
             super.onScrolled(recyclerView, dx, dy);
+            android.util.Log.d("DetailsFragment", "onScrolled: dy=" + dy + ", isFabVisible=" + isFabVisible);
             if (dy > 5) {
                 // 向下滚动，隐藏按钮
+                android.util.Log.d("DetailsFragment", "Calling hideFab()");
                 hideFab();
             } else if (dy < -5) {
                 // 向上滚动，显示按钮
+                android.util.Log.d("DetailsFragment", "Calling showFab()");
                 showFab();
             }
         }
@@ -1884,7 +1882,7 @@ public class DetailsFragment extends Fragment {
      */
     private class FabGestureListener implements RecyclerView.OnItemTouchListener {
         private android.view.GestureDetector gestureDetector;
-        
+
         FabGestureListener() {
             gestureDetector = new android.view.GestureDetector(getContext(), new android.view.GestureDetector.SimpleOnGestureListener() {
                 @Override
