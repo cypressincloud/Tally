@@ -7,18 +7,47 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 
+import com.example.budgetapp.service.AccessibilityGuardWorker;
 import com.example.budgetapp.ui.AuthActivity;
+import com.example.budgetapp.util.ShizukuManager;
+
+import rikka.shizuku.Shizuku;
 
 public class MyApplication extends Application {
 
     // 全局静态变量，记录当前是否已经解锁过
     public static boolean isUnlocked = false;
 
+    private final Shizuku.OnBinderReceivedListener binderReceivedListener = () -> {
+        // Shizuku Binder 连接成功，如果已有权限则立即做一次自愈加固
+        if (ShizukuManager.hasShizukuPermission()) {
+            ShizukuManager.grantBackgroundKeepAlive(this);
+            if (!ShizukuManager.isAccessibilityRunning(this)) {
+                ShizukuManager.enableAccessibilityService(this);
+            }
+        }
+    };
+
+    private final Shizuku.OnRequestPermissionResultListener permissionResultListener = (requestCode, grantResult) -> {
+        if (grantResult == PackageManager.PERMISSION_GRANTED) {
+            ShizukuManager.grantBackgroundKeepAlive(this);
+            ShizukuManager.enableAccessibilityService(this);
+        }
+    };
+
     @Override
     public void onCreate() {
         super.onCreate();
+
+        // 1. 注册 Shizuku 事件监听
+        Shizuku.addBinderReceivedListenerSticky(binderReceivedListener);
+        Shizuku.addRequestPermissionResultListener(permissionResultListener);
+
+        // 2. 启动守护 Worker
+        AccessibilityGuardWorker.startPeriodicWork(this);
 
         // 1. 监听系统锁屏广播（一旦屏幕熄灭，就将状态改为未解锁）
         IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
@@ -84,14 +113,14 @@ public class MyApplication extends Application {
 
         // 【周期记账】初始化WorkManager定时任务
         // TODO: 需要在 build.gradle 添加依赖: implementation "androidx.work:work-runtime:2.8.1"
-        // scheduleRecurringTransactionWorker();
-}
+         scheduleRecurringTransactionWorker();
+    }
 
     /**
      * 初始化周期记账后台任务
      * 需要先在 build.gradle 添加 WorkManager 依赖
      */
-    /*
+
     private void scheduleRecurringTransactionWorker() {
         try {
             androidx.work.Constraints constraints = new androidx.work.Constraints.Builder()
@@ -114,5 +143,5 @@ public class MyApplication extends Application {
             e.printStackTrace();
         }
     }
-    */
+
 }

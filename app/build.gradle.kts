@@ -37,6 +37,16 @@ android {
 }
 
 dependencies {
+    // Shizuku 核心依赖
+    val shizukuVersion = "13.1.5"
+    implementation("dev.rikka.shizuku:api:$shizukuVersion")
+    implementation("dev.rikka.shizuku:provider:$shizukuVersion")
+
+    implementation("androidx.work:work-runtime:2.8.1")
+
+    // WorkManager (用于定期静默保活自愈检测)
+    implementation("androidx.work:work-runtime:2.9.0")
+
     // --- 默认生成的依赖 (不要删，如果报错就保留你原来的) ---
     implementation(libs.appcompat)
     implementation(libs.material)
