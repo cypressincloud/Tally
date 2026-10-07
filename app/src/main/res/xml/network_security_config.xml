@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">tallyapp.top</domain>
-        <domain includeSubdomains="false">47.97.78.35</domain>
-    </domain-config>
-</network-security-config>

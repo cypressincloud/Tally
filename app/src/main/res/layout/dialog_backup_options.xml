@@ -242,6 +242,24 @@
                 android:drawablePadding="12dp"
                 android:gravity="center_vertical"/>
 
+            <!-- 在 tv_import_kapi 或任意你想放置的位置之后添加 -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"/>
+
+            <TextView
+                android:id="@+id/tv_import_verifin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="从 Verifin 导入数据 (Zip/JSON)"
+                android:textSize="16sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:padding="16dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:drawablePadding="12dp"
+                android:gravity="center_vertical"/>
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

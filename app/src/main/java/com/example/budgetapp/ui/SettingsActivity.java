@@ -86,6 +86,25 @@ public class SettingsActivity extends AppCompatActivity {
             }
     );
 
+    // =========================================================
+    // Verifin 导入 Launcher
+    // =========================================================
+    private final ActivityResultLauncher<String[]> importVerifinLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        if (financeViewModel == null) return;
+                        BackupData data = BackupManager.importFromVerifin(this, uri, allAssets);
+                        processImportedData(data, "Verifin");
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "Verifin 导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+    );
+
     // 1. 定义飞鸭记账导入的 Launcher
     private final ActivityResultLauncher<String[]> importFeiyaLauncher = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
@@ -916,6 +935,18 @@ public class SettingsActivity extends AppCompatActivity {
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
+
+        // Verifin 导入绑定 (支持 JSON 和 ZIP)
+        view.findViewById(R.id.tv_import_verifin).setOnClickListener(v -> {
+            importVerifinLauncher.launch(new String[]{
+                    "application/zip",
+                    "application/x-zip-compressed",
+                    "application/json",
+                    "text/plain",
+                    "*/*"
+            });
+            dialog.dismiss();
+        });
 
         // 绑定咔皮记账点击事件
         view.findViewById(R.id.tv_import_kapi).setOnClickListener(v -> {

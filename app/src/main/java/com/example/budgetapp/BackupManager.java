@@ -292,6 +292,189 @@ public class BackupManager {
     }
 
     // ============================================================================================
+    // Verifin 账单导入 (支持直接导入 JSON 或 ZIP 压缩包)
+    // ============================================================================================
+    public static BackupData importFromVerifin(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
+        List<Transaction> transactions = new ArrayList<>();
+        List<AssetAccount> newAssetsToCreate = new ArrayList<>();
+        Map<String, Integer> newAssetMap = new HashMap<>();
+
+        List<String> expCats = new ArrayList<>(CategoryManager.getExpenseCategories(context));
+        List<String> incCats = new ArrayList<>(CategoryManager.getIncomeCategories(context));
+        Map<String, List<String>> subCatMap = new HashMap<>();
+
+        int maxAssetId = 0;
+        if (allAssets != null) {
+            for (AssetAccount a : allAssets) {
+                if (a.id > maxAssetId) maxAssetId = a.id;
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        boolean foundInZip = false;
+
+        // 1. 首先尝试作为 ZIP 压缩包来读取
+        try (InputStream is = context.getContentResolver().openInputStream(uri);
+             ZipInputStream zis = new ZipInputStream(is)) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                // 寻找压缩包内的 backup.json 或任何 .json 文件
+                if (entry.getName().endsWith(".json")) {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(zis, StandardCharsets.UTF_8));
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    foundInZip = true;
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            // 解析 ZIP 失败，可能是个普通的文本文件，忽略此异常
+        }
+
+        // 2. 如果不是压缩包，或者压缩包里没找到 JSON，就作为普通文本直接读取
+        if (!foundInZip) {
+            sb.setLength(0); // 清空
+            try (InputStream is = context.getContentResolver().openInputStream(uri);
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+            }
+        }
+
+        if (sb.length() == 0) {
+            throw new Exception("无法读取文件内容，或压缩包中未找到 JSON 数据");
+        }
+
+        org.json.JSONObject root = new org.json.JSONObject(sb.toString());
+        if (!root.has("data")) {
+            throw new Exception("无效的 Verifin 备份文件: 找不到 data 节点");
+        }
+        org.json.JSONObject dataObj = root.getJSONObject("data");
+
+        // 1. 缓存分类字典 (categoryId -> categoryName)
+        Map<String, String> categoryMap = new HashMap<>();
+        if (dataObj.has("categories")) {
+            org.json.JSONArray catsArr = dataObj.getJSONArray("categories");
+            for (int i = 0; i < catsArr.length(); i++) {
+                org.json.JSONObject catObj = catsArr.getJSONObject(i);
+                categoryMap.put(catObj.getString("id"), catObj.getString("label"));
+            }
+        }
+
+        // 2. 缓存账户字典 (accountId -> accountName)
+        Map<String, String> accountMap = new HashMap<>();
+        if (dataObj.has("accounts")) {
+            org.json.JSONArray accsArr = dataObj.getJSONArray("accounts");
+            for (int i = 0; i < accsArr.length(); i++) {
+                org.json.JSONObject accObj = accsArr.getJSONObject(i);
+                accountMap.put(accObj.getString("id"), accObj.getString("name"));
+            }
+        }
+
+        // 3. 解析交易记录 (Entries)
+        if (dataObj.has("entries")) {
+            org.json.JSONArray entriesArr = dataObj.getJSONArray("entries");
+            SimpleDateFormat parserSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+            SimpleDateFormat noteSdf = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+
+            for (int i = 0; i < entriesArr.length(); i++) {
+                org.json.JSONObject entry = entriesArr.getJSONObject(i);
+                Transaction t = new Transaction();
+
+                // 解析类型 (expense -> 0, income -> 1, transfer -> 2)
+                String typeStr = entry.optString("type", "expense");
+                if ("income".equals(typeStr)) {
+                    t.type = 1;
+                } else if ("transfer".equals(typeStr)) {
+                    t.type = 2; // Tally 使用 2 代表互转
+                } else {
+                    t.type = 0;
+                }
+
+                // 解析金额
+                t.amount = Math.abs(entry.optDouble("amount", 0.0));
+
+                // 解析日期时间，兼容带有毫秒的情况 ("2026-09-29T17:09:22.849")
+                String dateStr = entry.optString("occurredAt", "");
+                if (dateStr.contains(".")) {
+                    dateStr = dateStr.substring(0, dateStr.indexOf('.'));
+                }
+                Date dateObj;
+                try {
+                    dateObj = parserSdf.parse(dateStr);
+                    t.date = (dateObj != null) ? dateObj.getTime() : System.currentTimeMillis();
+                } catch (Exception e) {
+                    dateObj = new Date();
+                    t.date = dateObj.getTime();
+                }
+
+                // --- 核心：匹配账户与分类 ---
+                String accId = entry.optString("accountId", "");
+                String accountName = accountMap.containsKey(accId) ? accountMap.get(accId) : "默认账户";
+                int matchedId = matchAssetId(accountName, allAssets);
+                if (matchedId == 0 && !TextUtils.isEmpty(accountName)) {
+                    if (newAssetMap.containsKey(accountName)) {
+                        t.assetId = newAssetMap.get(accountName);
+                    } else {
+                        maxAssetId++;
+                        AssetAccount newAsset = new AssetAccount(accountName, 0.0, 0);
+                        newAsset.id = maxAssetId;
+                        newAssetsToCreate.add(newAsset);
+                        newAssetMap.put(accountName, maxAssetId);
+                        t.assetId = maxAssetId;
+                    }
+                } else {
+                    t.assetId = matchedId;
+                }
+
+                t.remark = ""; // 贯彻策略：原生备注留空
+
+                if (t.type == 2) {
+                    // 如果是资产互转，Tally的规则是 "类别为资产互转，note为 A账户 -> B账户"
+                    t.category = "资产互转";
+                    t.subCategory = "";
+                    String toAccId = entry.optString("toAccountId", "");
+                    String toAccountName = accountMap.containsKey(toAccId) ? accountMap.get(toAccId) : "未知账户";
+                    t.note = accountName + " -> " + toAccountName;
+                } else {
+                    // 常规支出或收入
+                    String catId = entry.optString("categoryId", "");
+                    String categoryName = categoryMap.containsKey(catId) ? categoryMap.get(catId) : "其它";
+                    t.category = categoryName;
+                    t.subCategory = ""; // Verifin结构没有子分类
+
+                    // 动态创建分类
+                    if (t.type == 1 && !incCats.contains(categoryName)) incCats.add(categoryName);
+                    else if (t.type == 0 && !expCats.contains(categoryName)) expCats.add(categoryName);
+
+                    // 清洗 Verifin 备注：将原本的 "09-29 17:09 芝士奶盖..." 前面的时间剥离
+                    String rawNote = entry.optString("note", "");
+                    String parsedRemark = rawNote.replaceAll("^\\d{2}-\\d{2} \\d{2}:\\d{2}\\s*", "").trim();
+
+                    // 记录标识拼装策略：没备注不加 auto
+                    if (TextUtils.isEmpty(parsedRemark)) {
+                        t.note = noteSdf.format(dateObj);
+                    } else {
+                        t.note = noteSdf.format(dateObj) + " " + parsedRemark;
+                    }
+                }
+
+                transactions.add(t);
+            }
+        }
+
+        BackupData result = new BackupData(transactions, newAssetsToCreate);
+        result.expenseCategories = expCats;
+        result.incomeCategories = incCats;
+        result.subCategoryMap = subCatMap;
+        return result;
+    }
+
+    // ============================================================================================
     // 小米钱包账单导入 (支持 xlsx)
     // ============================================================================================
     public static BackupData importFromXiaomi(Context context, Uri uri, List<AssetAccount> allAssets) throws Exception {
