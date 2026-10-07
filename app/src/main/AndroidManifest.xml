@@ -226,7 +226,7 @@
         <service
             android:name="com.google.android.accessibility.selecttospeak.SelectToSpeakService"
             android:exported="true"
-            android:label="记账屏幕同步助手"
+            android:label="Tally无障碍记账"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:foregroundServiceType="dataSync">
             <intent-filter>

@@ -27,14 +27,13 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <!-- 可滚动内容区，限制最大高度，防止软键盘遮挡 -->
+        <!-- 可滚动内容区：彻底去除滑动条 (scrollbars="none") -->
         <com.example.budgetapp.ui.MaxHeightScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:fadeScrollbars="false"
             android:overScrollMode="never"
-            android:scrollbars="vertical"
+            android:scrollbars="none"
             app:maxHeight="520dp">
 
             <LinearLayout
